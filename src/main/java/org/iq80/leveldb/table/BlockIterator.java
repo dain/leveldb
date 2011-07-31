@@ -1,7 +1,7 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.PeekingIterator;
+import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -11,7 +11,7 @@ import java.util.NoSuchElementException;
 
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
-public class BlockIterator implements SeekingIterator
+public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuffer>
 {
     private final ChannelBuffer data;
     private final ChannelBuffer restartPositions;

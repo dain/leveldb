@@ -8,9 +8,6 @@ import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.Comparator;
-
-import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
 
 // todo byte order must be little endian
 public class TableBuilder
@@ -30,7 +27,7 @@ public class TableBuilder
     private final BlockBuilder dataBlockBuilder;
     private final BlockBuilder indexBlockBuilder;
     private final ChannelBuffer lastKey;
-    private final Comparator<ChannelBuffer> comparator;
+    private final UserComparator userComparator;
 
     private long entryCount;
 
@@ -49,13 +46,13 @@ public class TableBuilder
 
     private final ChannelBuffer compressedOutput;
 
-    public TableBuilder(Options options, FileChannel fileChannel)
+    public TableBuilder(Options options, FileChannel fileChannel, UserComparator userComparator)
     {
         Preconditions.checkNotNull(options, "options is null");
         Preconditions.checkNotNull(fileChannel, "fileChannel is null");
 
         this.fileChannel = fileChannel;
-        comparator = CHANNEL_BUFFER_COMPARATOR;
+        this.userComparator = userComparator;
 
         blockRestartInterval = options.getBlockRestartInterval();
         blockSize = options.getBlockSize();
@@ -96,14 +93,14 @@ public class TableBuilder
         Preconditions.checkState(!closed, "table is finished");
 
         if (entryCount > 0) {
-            assert (comparator.compare(key, lastKey) > 0) : "key must be greater than last key";
+            assert (userComparator.compare(key, lastKey) > 0) : "key must be greater than last key";
         }
 
         // If we just wrote a block, we can now add the handle to index block
         if (pendingIndexEntry) {
             Preconditions.checkState(dataBlockBuilder.isEmpty(), "Internal error: Table has a pending index entry but data block builder is empty");
 
-            findShortestSeparator(comparator, lastKey, key);
+            userComparator.findShortestSeparator(lastKey, key);
 
             ChannelBuffer handleEncoding = ChannelBuffers.dynamicBuffer();
             BlockHandle.writeBlockHandle(pendingHandle, handleEncoding);
@@ -150,7 +147,7 @@ public class TableBuilder
             compressedOutput.clear();
 
             try {
-                int compressedSize = Snappy.compress(raw.array(), raw.arrayOffset(), raw.readableBytes(), compressedOutput.array(), 0);
+                int compressedSize = Snappy.compress(raw.array(), raw.arrayOffset() + raw.readerIndex(), raw.readableBytes(), compressedOutput.array(), 0);
                 compressedOutput.writerIndex(compressedSize);
 
                 // Don't use the compressed data if compressed less than 12.5%,
@@ -200,7 +197,7 @@ public class TableBuilder
 
         // add last handle to index block
         if (pendingIndexEntry) {
-            findShortSuccessor(lastKey);
+            userComparator.findShortSuccessor(lastKey);
 
             ChannelBuffer handleEncoding = ChannelBuffers.dynamicBuffer();
             BlockHandle.writeBlockHandle(pendingHandle, handleEncoding);
@@ -226,45 +223,11 @@ public class TableBuilder
     public static int crc32c(ChannelBuffer data, CompressionType type)
     {
         PureJavaCrc32C crc32c = new PureJavaCrc32C();
-        crc32c.update(data.array(), data.arrayOffset(), data.readableBytes());
+        crc32c.update(data.array(), data.arrayOffset() + data.readerIndex(), data.readableBytes());
         crc32c.update(type.getPersistentId() & 0xFF);
         return crc32c.getMaskedValue();
     }
 
-    private static void findShortestSeparator(
-            Comparator<ChannelBuffer> comparator,
-            ChannelBuffer start,
-            ChannelBuffer limit)
-    {
-        // Find length of common prefix
-        int sharedBytes = BlockBuilder.calculateSharedBytes(start, limit);
 
-        // Do not shorten if one string is a prefix of the other
-        if (sharedBytes < Math.min(start.readableBytes(), limit.readableBytes())) {
-            // if we can add one to the last shared byte without overflow and the two keys differ by more than
-            // one increment at this location.
-            int lastSharedByte = start.getUnsignedByte(sharedBytes);
-            if (lastSharedByte < 0xff && lastSharedByte + 1 < limit.getUnsignedByte(sharedBytes)) {
-                start.setByte(sharedBytes, lastSharedByte + 1);
-                start.writerIndex(sharedBytes + 1);
-
-                assert (comparator.compare(start, limit) < 0) : "start must be less than last limit";
-            }
-        }
-    }
-
-    private static void findShortSuccessor(ChannelBuffer key)
-    {
-        // Find first character that can be incremented
-        for (int i = 0; i < key.readableBytes(); i++) {
-            int b = key.getUnsignedByte(i);
-            if (b != 0xff) {
-                key.setByte(i, b + 1);
-                key.writerIndex(i + 1);
-                return;
-            }
-        }
-        // key is a run of 0xffs.  Leave it alone.
-    }
 
 }

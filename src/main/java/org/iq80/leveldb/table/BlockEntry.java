@@ -1,7 +1,10 @@
 package org.iq80.leveldb.table;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.jboss.netty.buffer.ChannelBuffer;
+
+import java.util.Map.Entry;
 
 import static com.google.common.base.Charsets.UTF_8;
 
@@ -51,8 +54,17 @@ import static com.google.common.base.Charsets.UTF_8;
  * </tbody>
  * </table>
  */
-public class BlockEntry
+public class BlockEntry implements Entry<ChannelBuffer, ChannelBuffer>
 {
+    public static final Function<BlockEntry, ChannelBuffer> GET_KEY = new Function<BlockEntry, ChannelBuffer>()
+    {
+        @Override
+        public ChannelBuffer apply(BlockEntry blockEntry)
+        {
+            return blockEntry.getKey();
+        }
+    };
+
     private final ChannelBuffer key;
     private final ChannelBuffer value;
 
@@ -72,6 +84,16 @@ public class BlockEntry
     public ChannelBuffer getValue()
     {
         return value.duplicate();
+    }
+
+
+    /**
+     * @throws UnsupportedOperationException always
+     */
+    @Override
+    public final ChannelBuffer setValue(ChannelBuffer value)
+    {
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -109,8 +131,8 @@ public class BlockEntry
     {
         final StringBuilder sb = new StringBuilder();
         sb.append("BlockEntry");
-        sb.append("{key=").append(new String(key.copy().array(), UTF_8));      // todo don't print the real value
-        sb.append(", value=").append(new String(value.copy().array(), UTF_8));
+        sb.append("{key=").append(key.toString(UTF_8));      // todo don't print the real value
+        sb.append(", value=").append(value.toString(UTF_8));
         sb.append('}');
         return sb.toString();
     }

@@ -1,6 +1,7 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
+import org.iq80.leveldb.SeekingIterable;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 
@@ -43,18 +44,13 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
  * </tbody>
  * </table>
  */
-public class Block implements SeekingIterable
+public class Block implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 {
     private final ChannelBuffer block;
     private final Comparator<ChannelBuffer> comparator;
 
     private final ChannelBuffer data;
     private final ChannelBuffer restartPositions;
-
-    public Block(ChannelBuffer block)
-    {
-        this(block, CHANNEL_BUFFER_COMPARATOR);
-    }
 
     public Block(ChannelBuffer block, Comparator<ChannelBuffer> comparator)
     {
@@ -94,7 +90,7 @@ public class Block implements SeekingIterable
     }
 
     @Override
-    public SeekingIterator iterator()
+    public BlockIterator iterator()
     {
         return new BlockIterator(data, restartPositions, comparator);
     }

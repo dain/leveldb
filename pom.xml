@@ -108,7 +108,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>r09</version>
+            <version>r10-SNAPSHOT</version>
         </dependency>
 
         <dependency>

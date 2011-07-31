@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Arrays.asList;
+import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
 import static org.testng.Assert.assertEquals;
 
 public class BlockTest
@@ -18,7 +19,7 @@ public class BlockTest
     public void testEmptyBuffer()
             throws Exception
     {
-        new Block(ChannelBuffers.EMPTY_BUFFER);
+        new Block(ChannelBuffers.EMPTY_BUFFER, CHANNEL_BUFFER_COMPARATOR);
     }
 
     @Test
@@ -108,26 +109,26 @@ public class BlockTest
         Block block = new Block(blockBuffer, Ordering.<ChannelBuffer>natural());
         assertEquals(block.size(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
-        SeekingIterator seekingIterator = block.iterator();
-        BlockHelper.assertSequence(seekingIterator, entries);
+        BlockIterator blockIterator = block.iterator();
+        BlockHelper.assertSequence(blockIterator, entries);
 
-        seekingIterator.seekToFirst();
-        BlockHelper.assertSequence(seekingIterator, entries);
+        blockIterator.seekToFirst();
+        BlockHelper.assertSequence(blockIterator, entries);
 
         for (BlockEntry entry : entries) {
             List<BlockEntry> nextEntries = entries.subList(entries.indexOf(entry), entries.size());
-            seekingIterator.seek(entry.getKey());
-            BlockHelper.assertSequence(seekingIterator, nextEntries);
+            blockIterator.seek(entry.getKey());
+            BlockHelper.assertSequence(blockIterator, nextEntries);
 
-            seekingIterator.seek(BlockHelper.before(entry));
-            BlockHelper.assertSequence(seekingIterator, nextEntries);
+            blockIterator.seek(BlockHelper.before(entry));
+            BlockHelper.assertSequence(blockIterator, nextEntries);
 
-            seekingIterator.seek(BlockHelper.after(entry));
-            BlockHelper.assertSequence(seekingIterator, nextEntries.subList(1, nextEntries.size()));
+            blockIterator.seek(BlockHelper.after(entry));
+            BlockHelper.assertSequence(blockIterator, nextEntries.subList(1, nextEntries.size()));
         }
 
-        seekingIterator.seek(ChannelBuffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}));
-        BlockHelper.assertSequence(seekingIterator, Collections.<BlockEntry>emptyList());
+        blockIterator.seek(ChannelBuffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}));
+        BlockHelper.assertSequence(blockIterator, Collections.<BlockEntry>emptyList());
 
     }
 }

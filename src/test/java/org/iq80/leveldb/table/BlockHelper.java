@@ -1,10 +1,13 @@
 package org.iq80.leveldb.table;
 
+import com.google.common.base.Charsets;
+import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
 
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
 import static com.google.common.base.Charsets.UTF_8;
@@ -12,13 +15,12 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 public class BlockHelper
 {
-    static int estimateBlockSize(int blockRestartInterval, List<BlockEntry> entries)
+    public static int estimateBlockSize(int blockRestartInterval, List<BlockEntry> entries)
     {
         if (entries.isEmpty()) {
             return SIZE_OF_INT;
@@ -29,14 +31,14 @@ public class BlockHelper
                 SIZE_OF_INT;
     }
 
-    static void assertSequence(SeekingIterator seekingIterator, Iterable<BlockEntry> entries)
+    public static void assertSequence(SeekingIterator<ChannelBuffer, ChannelBuffer> seekingIterator, Iterable<? extends Entry<ChannelBuffer, ChannelBuffer>> entries)
     {
         Assert.assertNotNull(seekingIterator, "blockIterator is not null");
 
-        for (BlockEntry entry : entries) {
+        for (Entry<ChannelBuffer, ChannelBuffer> entry : entries) {
             assertTrue(seekingIterator.hasNext());
-            assertEquals(seekingIterator.peek(), entry);
-            assertEquals(seekingIterator.next(), entry);
+            assertEntryEquals(seekingIterator.peek(), entry);
+            assertEntryEquals(seekingIterator.next(), entry);
         }
         assertFalse(seekingIterator.hasNext());
 
@@ -54,7 +56,14 @@ public class BlockHelper
         }
     }
 
-    static ChannelBuffer before(BlockEntry expectedEntry)
+    public static void assertEntryEquals(Entry<ChannelBuffer, ChannelBuffer> actual, Entry<ChannelBuffer, ChannelBuffer> expected)
+    {
+        assertEquals(actual.getKey().toString(Charsets.UTF_8), expected.getKey().toString(Charsets.UTF_8));
+        assertEquals(actual.getValue().toString(Charsets.UTF_8), expected.getValue().toString(Charsets.UTF_8));
+        assertEquals(actual, expected);
+    }
+
+    public static ChannelBuffer before(Entry<ChannelBuffer, ?> expectedEntry)
     {
         ChannelBuffer channelBuffer = ChannelBuffers.copiedBuffer(expectedEntry.getKey());
         int lastByte = channelBuffer.readableBytes() - 1;
@@ -62,7 +71,7 @@ public class BlockHelper
         return channelBuffer;
     }
 
-    static ChannelBuffer after(BlockEntry expectedEntry)
+    public static ChannelBuffer after(Entry<ChannelBuffer, ?> expectedEntry)
     {
         ChannelBuffer channelBuffer = ChannelBuffers.copiedBuffer(expectedEntry.getKey());
         int lastByte = channelBuffer.readableBytes() - 1;
@@ -70,7 +79,7 @@ public class BlockHelper
         return channelBuffer;
     }
 
-    static int estimateEntriesSize(int blockRestartInterval, List<BlockEntry> entries)
+    public static int estimateEntriesSize(int blockRestartInterval, List<BlockEntry> entries)
     {
         int size = 0;
         ChannelBuffer previousKey = null;
@@ -97,11 +106,6 @@ public class BlockHelper
 
     static BlockEntry createBlockEntry(String key, String value)
     {
-        return new BlockEntry(toChannelBuffer(key), toChannelBuffer(value));
-    }
-
-    static ChannelBuffer toChannelBuffer(String value)
-    {
-        return ChannelBuffers.wrappedBuffer(value.getBytes(UTF_8));
+        return new BlockEntry(ChannelBuffers.copiedBuffer(key, UTF_8), ChannelBuffers.copiedBuffer(value, UTF_8));
     }
 }

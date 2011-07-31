@@ -1,6 +1,7 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.io.Closeables;
+import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.annotations.AfterMethod;
@@ -16,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Arrays.asList;
+import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
 import static org.testng.Assert.assertTrue;
 
 public class TableTest
@@ -28,7 +30,7 @@ public class TableTest
     public void testEmptyFile()
             throws Exception
     {
-        new Table(new Options(), fileChannel);
+        new Table(fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
     }
 
     @Test
@@ -92,16 +94,16 @@ public class TableTest
             throws IOException
     {
         Options options = new Options().setBlockSize(blockSize).setBlockRestartInterval(blockRestartInterval);
-        TableBuilder builder = new TableBuilder(options, fileChannel);
+        TableBuilder builder = new TableBuilder(options, fileChannel, new BasicUserComparator());
 
         for (BlockEntry entry : entries) {
             builder.add(entry);
         }
         builder.finish();
 
-        Table table = new Table(options, fileChannel);
+        Table table = new Table(fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
 
-        SeekingIterator seekingIterator = table.iterator();
+        SeekingIterator<ChannelBuffer, ChannelBuffer> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);
 
         seekingIterator.seekToFirst();

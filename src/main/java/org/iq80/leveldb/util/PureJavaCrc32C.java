@@ -28,6 +28,8 @@ import java.util.zip.Checksum;
  * the CRC32-C polynomial, the same polynomial used by iSCSI
  * and implemented on many Intel chipsets supporting SSE4.2.
  */
+// this code was taken from Apache Hadoop
+// todo modify to work on buffers directly to avoid extra memcopy
 public class PureJavaCrc32C implements Checksum
 {
     private static final int MASK_DELTA = 0xa282ead8;

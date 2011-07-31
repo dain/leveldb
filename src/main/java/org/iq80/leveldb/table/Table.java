@@ -3,7 +3,10 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import org.iq80.leveldb.SeekingIterable;
+import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.util.PureJavaCrc32C;
+import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.xerial.snappy.Snappy;
@@ -12,27 +15,30 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Comparator;
 
 import static org.iq80.leveldb.table.CompressionType.SNAPPY;
 
-public class Table implements SeekingIterable
+public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 {
     private final FileChannel fileChannel;
+    private final Comparator<ChannelBuffer> comparator;
 
     private final boolean verifyChecksums;
 
     private final Block indexBlock;
     private final BlockHandle metaindexBlockHandle;
 
-    public Table(Options options, FileChannel fileChannel)
+    public Table(FileChannel fileChannel, Comparator<ChannelBuffer> comparator, boolean verifyChecksums)
             throws IOException
     {
-        Preconditions.checkNotNull(options, "options is null");
         Preconditions.checkNotNull(fileChannel, "fileChannel is null");
         Preconditions.checkArgument(fileChannel.size() >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
+        Preconditions.checkNotNull(comparator, "comparator is null");
 
         this.fileChannel = fileChannel;
-        this.verifyChecksums = options.isVerifyChecksums();
+        this.verifyChecksums = verifyChecksums;
+        this.comparator = comparator;
 
         ChannelBuffer footerBuffer = read(fileChannel, fileChannel.size() - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
         Footer footer = Footer.readFooter(footerBuffer);
@@ -42,14 +48,14 @@ public class Table implements SeekingIterable
     }
 
     @Override
-    public SeekingIterator iterator()
+    public SeekingIterator<ChannelBuffer, ChannelBuffer> iterator()
     {
-        return SeekingIterators.concat(indexBlock.iterator(), new Function<BlockEntry, SeekingIterator>()
+        SeekingIterator<ChannelBuffer, BlockIterator> inputs = SeekingIterators.transformValues(indexBlock.iterator(), new Function<ChannelBuffer, BlockIterator>()
         {
             @Override
-            public SeekingIterator apply(BlockEntry blockEntry)
+            public BlockIterator apply(ChannelBuffer blockEntry)
             {
-                BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry.getValue());
+                BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry);
                 try {
                     Block dataBlock = readBlock(blockHandle);
                     return dataBlock.iterator();
@@ -59,6 +65,8 @@ public class Table implements SeekingIterable
                 }
             }
         });
+
+        return SeekingIterators.concat(inputs);
     }
 
     private Block readBlock(BlockHandle blockHandle)
@@ -83,16 +91,17 @@ public class Table implements SeekingIterable
         // decompress data
         ChannelBuffer uncompressedData;
         if (blockTrailer.getCompressionType() == SNAPPY) {
-            int uncompressedLength = Snappy.uncompressedLength(data.array(), data.arrayOffset(), blockHandle.getDataSize());
+            // todo when code is change to direct buffers, use the buffer method instead
+            int uncompressedLength = Snappy.uncompressedLength(data.array(), data.arrayOffset() + data.readerIndex(), blockHandle.getDataSize());
             uncompressedData = ChannelBuffers.buffer(uncompressedLength);
-            Snappy.uncompress(data.array(), data.arrayOffset(), blockHandle.getDataSize(), uncompressedData.array(), uncompressedData.arrayOffset());
+            Snappy.uncompress(data.array(), data.arrayOffset() + data.readerIndex(), blockHandle.getDataSize(), uncompressedData.array(), uncompressedData.arrayOffset());
             uncompressedData.writerIndex(uncompressedLength);
         }
         else {
             uncompressedData = data.slice(data.readerIndex(), blockHandle.getDataSize());
         }
 
-        return new Block(uncompressedData);
+        return new Block(uncompressedData, comparator);
     }
 
     /**
@@ -105,7 +114,7 @@ public class Table implements SeekingIterable
      */
     public long getApproximateOffsetOf(ChannelBuffer key)
     {
-        SeekingIterator iterator = indexBlock.iterator();
+        BlockIterator iterator = indexBlock.iterator();
         iterator.seek(key);
         if (iterator.hasNext()) {
             BlockHandle blockHandle = BlockHandle.readBlockHandle(iterator.next().getValue());

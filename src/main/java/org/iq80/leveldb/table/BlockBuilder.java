@@ -1,14 +1,12 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Ordering;
 import com.google.common.primitives.Ints;
 import org.iq80.leveldb.util.IntVector;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 
-import java.util.Collection;
 import java.util.Comparator;
 
 import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
