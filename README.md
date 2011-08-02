@@ -41,19 +41,19 @@ The iterator intensive design of this code comes directly from the C++ code.
 LevelDB can most easily described follows:
 
 * DB merge Iterator
- * MemTable iterator
- * Immutable MemTable iterator (the one being compacted)
- * Version merge iterator
-  * Level0 merge iterator over files
-   * Table merge iterator
-    * Block iterator
-  * Level1 concat iterator over files
-   * Table merge iterator
-    * Block iterator
-  * ...
-  * LevelN concat iterator over files
-   * Table merge iterator
-    * Block iterator
+    * MemTable iterator
+    * Immutable MemTable iterator (the one being compacted)
+    * Version merge iterator
+        * Level0 merge iterator over files
+            * Table merge iterator
+                * Block iterator
+        * Level1 concat iterator over files
+            * Table merge iterator
+                * Block iterator
+        * ...
+        * LevelN concat iterator over files
+            * Table merge iterator
+               * Block iterator
 
 As you can see it is easy to get lost in these deeply nested data structures.
 In addition to these iterators from the original C++ code, this code wraps the
@@ -98,10 +98,10 @@ There has been no performance tests yet.
 
 * Port C++ performance benchmark to Java
 * Establish performance base line against:
- * C++ original
- * Kyoto TreeDB
- * SQLite3
- * [LevelDB JNI] (https://github.com/fusesource/leveldbjni)
+    * C++ original
+    * Kyoto TreeDB
+    * SQLite3
+    * [LevelDB JNI] (https://github.com/fusesource/leveldbjni)
 
 ## API
 
@@ -118,4 +118,4 @@ the drawing-board already.
 * Need logging interface
 * TX logging and recovery
 * Need iterator structure inspector for easier debugging
-*   All buffers must be in little endian
+* All buffers must be in little endian
