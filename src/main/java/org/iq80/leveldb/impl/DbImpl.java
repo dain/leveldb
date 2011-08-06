@@ -39,8 +39,10 @@ import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.InternalKey.INTERNAL_KEY_TO_USER_KEY;
 import static org.iq80.leveldb.impl.InternalKey.createUserKeyToInternalKeyFunction;
+import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 import static org.iq80.leveldb.util.Buffers.writeLengthPrefixedBytes;
@@ -71,6 +73,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     private ExecutorService compactionExecutor;
     private Future<?> backgroundCompaction;
+
+    private ManualCompaction manualCompaction;
 
     public DbImpl(Options options, File databaseDir)
             throws IOException
@@ -226,6 +230,17 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
+    public void compactRange(int level, ChannelBuffer start, ChannelBuffer end)
+    {
+        Preconditions.checkArgument(level >= 0, "level is negative");
+        Preconditions.checkArgument(level + 1 < NUM_LEVELS, "level is greater than %s", NUM_LEVELS);
+        Preconditions.checkNotNull(start, "start is null");
+        Preconditions.checkNotNull(end, "end is null");
+
+        manualCompaction = new ManualCompaction(level, start, end);
+        // todo await completion of manual compaction
+    }
+
     private void maybeScheduleCompaction()
     {
         if (backgroundCompaction != null) {
@@ -234,7 +249,9 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         else if (shuttingDown.get()) {
             // DB is being shutdown; no more background compactions
         }
-        else if (immutableMemTable == null && !versions.needsCompaction()) {
+        else if (immutableMemTable == null &&
+                manualCompaction == null &&
+                !versions.needsCompaction()) {
             // No work to be done
         }
         else {
@@ -279,7 +296,48 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             compactMemTable();
         }
 
-        // todo much more here
+        Compaction compaction;
+        if (manualCompaction != null) {
+            compaction = versions.compactRange(manualCompaction.level,
+                    new InternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, ValueType.VALUE),
+                    new InternalKey(manualCompaction.end, 0, ValueType.DELETION));
+        } else {
+            compaction = versions.pickCompaction();
+        }
+
+        if (compaction == null) {
+            // no compaction
+        } else if (/* !isManual && */ compaction.isTrivialMove()) {
+            // Move file to next level
+            Preconditions.checkState(compaction.getLevelInputs().size() == 1);
+            FileMetaData fileMetaData = compaction.getLevelInputs().get(0);
+            compaction.getEdit().deleteFile(compaction.getLevel(), fileMetaData.getNumber());
+            compaction.getEdit().addFile(compaction.getLevel() + 1, fileMetaData);
+            versions.logAndApply(compaction.getEdit());
+            // log
+        } else {
+            CompactionState compactionState = new CompactionState(compaction);
+            doCompactionWork(compactionState);
+            cleanupCompaction(compactionState);
+        }
+
+        // manual compaction complete
+        if (manualCompaction != null) {
+            manualCompaction = null;
+        }
+    }
+
+    private void cleanupCompaction(CompactionState compactionState)
+    {
+        if (compactionState.builder != null) {
+            compactionState.builder.abandon();
+        } else {
+            Preconditions.checkArgument(compactionState.outfile == null);
+        }
+
+        for (FileMetaData output : compactionState.outputs) {
+            pendingOutputs.remove(output.getNumber());
+        }
     }
 
     private long recoverLogFile(long fileNumber, VersionEdit edit)
@@ -626,6 +684,223 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         catch (IOException e) {
             file.delete();
             throw e;
+        }
+    }
+
+    private void doCompactionWork(CompactionState compactionState)
+            throws IOException
+    {
+        Preconditions.checkArgument(versions.numberOfBytesInLevel(compactionState.getCompaction().getLevel()) > 0);
+        Preconditions.checkArgument(compactionState.builder == null);
+        Preconditions.checkArgument(compactionState.outfile == null);
+
+        // todo track snapshots
+        compactionState.smallestSnapshot = versions.getLastSequence();
+
+        SeekingIterator<InternalKey, ChannelBuffer> iterator = versions.makeInputIterator(compactionState.compaction);
+
+        ChannelBuffer currentUserKey = null;
+        boolean hasCurrentUserKey = false;
+
+        long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+        while (iterator.hasNext() && !shuttingDown.get()) {
+            // always give priority to compacting the current mem table
+            if (immutableMemTable != null) {
+                compactMemTable();
+                // todo wake up waiting threads
+            }
+
+            InternalKey key = iterator.peek().getKey();
+            if (compactionState.compaction.shouldStopBefore(key) && compactionState.builder != null) {
+                finishCompactionOutputFile(compactionState, iterator);
+            }
+
+            // Handle key/value, add to state, etc.
+            boolean drop = false;
+            // todo if key doesn't parse (it is corrupted),
+            if (false /*!ParseInternalKey(key, &ikey)*/) {
+                // do not hide error keys
+                currentUserKey = null;
+                hasCurrentUserKey = false;
+                lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+            }
+            else {
+                if (!hasCurrentUserKey || internalKeyComparator.getUserComparator().compare(key.getUserKey(), currentUserKey) != 0) {
+                    // First occurrence of this user key
+                    currentUserKey = key.getUserKey();
+                    hasCurrentUserKey = true;
+                    lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+                }
+
+                if (lastSequenceForKey <= compactionState.smallestSnapshot) {
+                    // Hidden by an newer entry for same user key
+                    drop = true; // (A)
+                }
+                else if (key.getValueType() == ValueType.DELETION &&
+                        key.getSequenceNumber() <= compactionState.smallestSnapshot &&
+                        compactionState.compaction.isBaseLevelForKey(key.getUserKey())) {
+
+                    // For this user key:
+                    // (1) there is no data in higher levels
+                    // (2) data in lower levels will have larger sequence numbers
+                    // (3) data in layers that are being compacted here and have
+                    //     smaller sequence numbers will be dropped in the next
+                    //     few iterations of this loop (by rule (A) above).
+                    // Therefore this deletion marker is obsolete and can be dropped.
+                    drop = true;
+                }
+
+                lastSequenceForKey = key.getSequenceNumber();
+            }
+
+            if (!drop) {
+                // Open output file if necessary
+                if (compactionState.builder == null) {
+                    openCompactionOutputFile(compactionState);
+                }
+                if (compactionState.builder.getEntryCount() == 0) {
+                    compactionState.currentSmallest = key;
+                }
+                compactionState.currentLargest = key;
+                compactionState.builder.add(key.encode(), iterator.peek().getValue());
+
+                // Close output file if it is big enough
+                if (compactionState.builder.getFileSize() >=
+                        compactionState.compaction.MaxOutputFileSize()) {
+                    finishCompactionOutputFile(compactionState, iterator);
+                }
+            }
+            iterator.next();
+        }
+
+        if (shuttingDown.get()) {
+            throw new IOException("DB shutdown during compaction");
+        }
+        if (compactionState.builder != null) {
+            finishCompactionOutputFile(compactionState, iterator);
+        }
+
+        // todo port CompactionStats code
+
+        installCompactionResults(compactionState);
+    }
+
+    private void openCompactionOutputFile(CompactionState compactionState)
+            throws FileNotFoundException
+    {
+        long fileNumber = versions.getNextFileNumber();
+        pendingOutputs.add(fileNumber);
+        compactionState.currentFileNumber = fileNumber;
+        compactionState.currentFileSize = 0;
+        compactionState.currentSmallest = null;
+        compactionState.currentLargest = null;
+
+        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
+        compactionState.outfile = new FileOutputStream(file).getChannel();
+        compactionState.builder = new TableBuilder(options, compactionState.outfile, internalKeyComparator.getUserComparator());
+    }
+
+    private void finishCompactionOutputFile(CompactionState compactionState, SeekingIterator<InternalKey, ChannelBuffer> input)
+            throws IOException
+    {
+        Preconditions.checkNotNull(compactionState, "compactionState is null");
+        Preconditions.checkArgument(compactionState.outfile != null);
+        Preconditions.checkArgument(compactionState.builder != null);
+
+        long outputNumber = compactionState.currentFileNumber;
+        Preconditions.checkArgument(outputNumber != 0);
+
+        long currentEntries = compactionState.builder.getEntryCount();
+        compactionState.builder.finish();
+
+        long currentBytes = compactionState.builder.getFileSize();
+        compactionState.currentFileSize = currentBytes;
+        compactionState.totalBytes += currentBytes;
+
+        FileMetaData currentFileMetaData = new FileMetaData(compactionState.currentFileNumber,
+                compactionState.currentFileSize,
+                compactionState.currentSmallest,
+                compactionState.currentLargest);
+        compactionState.outputs.add(currentFileMetaData);
+
+        compactionState.builder = null;
+
+        compactionState.outfile.force(true);
+        compactionState.outfile.close();
+        compactionState.outfile = null;
+
+        if (currentEntries > 0) {
+            // Verify that the table is usable
+            tableCache.newIterator(outputNumber);
+        }
+    }
+
+    private void installCompactionResults(CompactionState compact)
+            throws IOException
+    {
+        // Add compaction outputs
+        compact.compaction.addInputDeletions(compact.compaction.getEdit());
+        int level = compact.compaction.getLevel();
+        for (FileMetaData output : compact.outputs) {
+            compact.compaction.getEdit().addFile(level + 1, output);
+            pendingOutputs.remove(output.getNumber());
+        }
+        compact.outputs.clear();
+
+        try {
+            versions.logAndApply(compact.compaction.getEdit());
+            deleteObsoleteFiles();
+        }
+        catch (IOException e) {
+            // Discard any files we may have created during this failed compaction
+            for (FileMetaData output : compact.outputs) {
+                new File(databaseDir, Filename.tableFileName(output.getNumber())).delete();
+            }
+        }
+    }
+
+    private static class CompactionState
+    {
+        private final Compaction compaction;
+
+        private final List<FileMetaData> outputs = newArrayList();
+
+        private long smallestSnapshot;
+
+        // State kept for output being generated
+        private FileChannel outfile;
+        private TableBuilder builder;
+
+        // Current file being generated
+        private long currentFileNumber;
+        private long currentFileSize;
+        private InternalKey currentSmallest;
+        private InternalKey currentLargest;
+
+        private long totalBytes;
+
+        private CompactionState(Compaction compaction)
+        {
+            this.compaction = compaction;
+        }
+
+        public Compaction getCompaction()
+        {
+            return compaction;
+        }
+    }
+
+    private static class ManualCompaction
+    {
+        private final int level;
+        private final ChannelBuffer begin;
+        private final ChannelBuffer end;
+
+        private ManualCompaction(int level, ChannelBuffer begin, ChannelBuffer end)
+        {
+            this.level = level;
+            this.begin = begin;
+            this.end = end;
         }
     }
 }

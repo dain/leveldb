@@ -3,16 +3,18 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MapMaker;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
+import org.iq80.leveldb.SeekingIterable;
 import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.table.Options;
-import org.iq80.leveldb.SeekingIterable;
+import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 
@@ -47,7 +49,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
 
     // Maximum bytes of overlaps in grandparent (i.e., level+2) before we
     // stop building a single file in a level.level+1 compaction.
-    private static final long MAX_GRAND_PARENT_OVERLAP_BYTES = 10 * TARGET_FILE_SIZE;
+    public static final long MAX_GRAND_PARENT_OVERLAP_BYTES = 10 * TARGET_FILE_SIZE;
 
 
     private AtomicLong nextFileNumber = new AtomicLong(2);
@@ -57,14 +59,14 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
     private long logNumber;
     private long prevLogNumber;
 
-    private final Map<Version, Object> activeVersions = new MapMaker().weakKeys().<Version, Object>makeMap();
+    private final Map<Version, Object> activeVersions = new MapMaker().weakKeys().makeMap();
     private final File databaseDir;
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
 
     private FileChannel descriptorFile;
     private LogWriter descriptorLog;
-    private final Multimap<Integer, InternalKey> compactPointers = ArrayListMultimap.create();
+    private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
 
     public VersionSet(Options options, File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
@@ -117,6 +119,32 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
     public List<SeekingIterator<InternalKey, ChannelBuffer>> getIterators()
     {
         return current.getIterators();
+    }
+
+    public SeekingIterator<InternalKey, ChannelBuffer> makeInputIterator(Compaction c)
+    {
+        // Level-0 files have to be merged together.  For other levels,
+        // we will make a concatenating iterator per level.
+        // TODO(opt): use concatenating iterator for level-0 if there is no overlap
+        int space = (c.getLevel() == 0 ? c.getLevelInputs().size() + 1 : 2);
+        List<SeekingIterator<InternalKey, ChannelBuffer>> list = newArrayList();
+        int num = 0;
+
+        if (c.getLevel() == 0) {
+            for (FileMetaData fileMetaData : c.getLevelInputs()) {
+                list.add(tableCache.newIterator(fileMetaData.getNumber()));
+            }
+        }
+        else {
+            // concat iterator over files in this level
+            list.add(Level.createLevelConcatIterator(tableCache, c.getLevelInputs(), internalKeyComparator));
+        }
+
+        list.add(Level.createLevelConcatIterator(tableCache, c.getLevelUpInputs(), internalKeyComparator));
+
+        assert (num <= space);
+        SeekingIterator<InternalKey, ChannelBuffer> iterator = SeekingIterators.merge(list, internalKeyComparator);
+        return iterator;
     }
 
     public LookupResult get(LookupKey key)
@@ -399,10 +427,182 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
 
     public boolean needsCompaction()
     {
-        // todo
-        return false;  //To change body of created methods use File | Settings | File Templates.
+        return current.getCompactionScore() >= 1 || current.getFileToCompact() != null;
     }
 
+    public Compaction compactRange(int level, InternalKey begin, InternalKey end)
+    {
+        List<FileMetaData> levelInputs = getOverlappingInputs(level, begin, end);
+        if (levelInputs.isEmpty()) {
+            return null;
+        }
+
+        return setupOtherInputs(level, levelInputs);
+    }
+
+    public Compaction pickCompaction()
+    {
+        // We prefer compactions triggered by too much data in a level over
+        // the compactions triggered by seeks.
+        boolean sizeCompaction = (current.getCompactionScore() >= 1);
+        boolean seekCompaction = (current.getFileToCompact() != null);
+
+        int level;
+        List<FileMetaData> levelInputs;
+        if (sizeCompaction) {
+            level = current.getCompactionLevel();
+            Preconditions.checkState(level > 0);
+            Preconditions.checkState(level + 1 < NUM_LEVELS);
+
+            // Pick the first file that comes after compact_pointer_[level]
+            levelInputs = newArrayList();
+            for (FileMetaData fileMetaData : current.getFiles(level)) {
+                if (compactPointers.containsKey(level) ||
+                        internalKeyComparator.compare(fileMetaData.getLargest(), compactPointers.get(level)) > 0) {
+                    levelInputs.add(fileMetaData);
+                    break;
+                }
+            }
+            if (levelInputs.isEmpty()) {
+                // Wrap-around to the beginning of the key space
+                levelInputs.add(current.getFiles(level).get(0));
+            }
+        }
+        else if (seekCompaction) {
+            level = current.getFileToCompactLevel();
+            levelInputs = ImmutableList.of(current.getFileToCompact());
+        }
+        else {
+            return null;
+        }
+
+        // Files in level 0 may overlap each other, so pick up all overlapping ones
+        if (level == 0) {
+            Entry<InternalKey, InternalKey> range = getRange(levelInputs);
+            // Note that the next call will discard the file we placed in
+            // c->inputs_[0] earlier and replace it with an overlapping set
+            // which will include the picked file.
+            levelInputs.addAll(getOverlappingInputs(0, range.getKey(), range.getValue()));
+
+            Preconditions.checkState(!levelInputs.isEmpty());
+        }
+
+        Compaction compaction = setupOtherInputs(level, levelInputs);
+        return compaction;
+    }
+
+    private Compaction setupOtherInputs(int level, List<FileMetaData> levelInputs)
+    {
+        Entry<InternalKey, InternalKey> range = getRange(levelInputs);
+        InternalKey smallest = range.getKey();
+        InternalKey largest = range.getValue();
+
+        List<FileMetaData> levelUpInputs = getOverlappingInputs(level + 1, smallest, largest);
+
+        // Get entire range covered by compaction
+        range = getRange(levelInputs, levelUpInputs);
+        InternalKey allStart = range.getKey();
+        InternalKey allLimit = range.getValue();
+
+        // See if we can grow the number of inputs in "level" without
+        // changing the number of "level+1" files we pick up.
+        if (!levelUpInputs.isEmpty()) {
+
+            List<FileMetaData> expanded0 = getOverlappingInputs(level, allStart, allLimit);
+
+            if (expanded0.size() > levelInputs.size()) {
+                range = getRange(expanded0);
+                InternalKey newStart = range.getKey();
+                InternalKey newLimit = range.getValue();
+
+                List<FileMetaData> expanded1 = getOverlappingInputs(level + 1, newStart, newLimit);
+                if (expanded1.size() == levelUpInputs.size()) {
+//              Log(options_->info_log,
+//                  "Expanding@%d %d+%d to %d+%d\n",
+//                  level,
+//                  int(c->inputs_[0].size()),
+//                  int(c->inputs_[1].size()),
+//                  int(expanded0.size()),
+//                  int(expanded1.size()));
+                    smallest = newStart;
+                    largest = newLimit;
+                    levelInputs = expanded0;
+                    levelUpInputs = expanded1;
+
+                    range = getRange(levelInputs, levelUpInputs);
+                    allStart = range.getKey();
+                    allLimit = range.getValue();
+
+                }
+            }
+        }
+
+        // Compute the set of grandparent files that overlap this compaction
+        // (parent == level+1; grandparent == level+2)
+        List<FileMetaData> grandparents = null;
+        if (level + 2 < NUM_LEVELS) {
+            grandparents = getOverlappingInputs(level + 1, allStart, allLimit);
+        }
+
+//        if (false) {
+//            Log(options_ - > info_log, "Compacting %d '%s' .. '%s'",
+//                    level,
+//                    EscapeString(smallest.Encode()).c_str(),
+//                    EscapeString(largest.Encode()).c_str());
+//        }
+
+        Compaction compaction = new Compaction(current, level, levelInputs, levelUpInputs, grandparents);
+
+        // Update the place where we will do the next compaction for this level.
+        // We update this immediately instead of waiting for the VersionEdit
+        // to be applied so that if the compaction fails, we will try a different
+        // key range next time.
+        compactPointers.put(level, largest);
+        compaction.getEdit().setCompactPointer(level, largest);
+
+        return compaction;
+    }
+
+    private List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
+    {
+        ImmutableList.Builder<FileMetaData> files = ImmutableList.builder();
+        ChannelBuffer userBegin = begin.getUserKey();
+        ChannelBuffer userEnd = end.getUserKey();
+        UserComparator userComparator = internalKeyComparator.getUserComparator();
+        for (FileMetaData fileMetaData : current.getFiles(level)) {
+            if (userComparator.compare(fileMetaData.getLargest().getUserKey(), userBegin) < 0 ||
+                    userComparator.compare(fileMetaData.getSmallest().getUserKey(), userEnd) > 0) {
+                // Either completely before or after range; skip it
+            }
+            else {
+                files.add(fileMetaData);
+            }
+        }
+        return files.build();
+    }
+
+    private Entry<InternalKey, InternalKey> getRange(List<FileMetaData>... inputLists)
+    {
+        InternalKey smallest = null;
+        InternalKey largest = null;
+        for (List<FileMetaData> inputList : inputLists) {
+            for (FileMetaData fileMetaData : inputList) {
+                if (smallest == null) {
+                    smallest = fileMetaData.getSmallest();
+                    largest = fileMetaData.getLargest();
+                }
+                else {
+                    if (internalKeyComparator.compare(fileMetaData.getSmallest(), smallest) < 0) {
+                        smallest = fileMetaData.getSmallest();
+                    }
+                    if (internalKeyComparator.compare(fileMetaData.getLargest(), largest) > 0) {
+                        largest = fileMetaData.getLargest();
+                    }
+                }
+            }
+        }
+        return Maps.immutableEntry(smallest, largest);
+    }
 
     /**
      * A helper class so we can efficiently apply a whole sequence
@@ -432,7 +632,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         public void apply(VersionEdit edit)
         {
             // Update compaction pointers
-            for (Entry<Integer, InternalKey> entry : edit.getCompactPointers().entries()) {
+            for (Entry<Integer, InternalKey> entry : edit.getCompactPointers().entrySet()) {
                 Integer level = entry.getKey();
                 InternalKey internalKey = entry.getValue();
                 versionSet.compactPointers.put(level, internalKey);
@@ -486,8 +686,14 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
                 // Merge the set of added files with the set of pre-existing files.
                 // Drop any deleted files.  Store the result in *v.
 
-                Collection<FileMetaData> baseFiles = baseVersion.getFiles().values();
+                Collection<FileMetaData> baseFiles = baseVersion.getFiles().asMap().get(level);
+                if (baseFiles == null) {
+                    baseFiles = ImmutableList.of();
+                }
                 SortedSet<FileMetaData> addedFiles = levels.get(level).addedFiles;
+                if (addedFiles == null) {
+                    addedFiles = ImmutableSortedSet.of();
+                }
 
                 // files must be added in sorted order to assertion check in maybeAddFile works
                 ArrayList<FileMetaData> sortedFiles = newArrayListWithCapacity(baseFiles.size() + addedFiles.size());
@@ -504,16 +710,19 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
                 if (level > 0) {
                     long previousFileNumber = 0;
                     InternalKey previousEnd = null;
-                    for (FileMetaData fileMetaData : version.getFiles().values()) {
-                        if (previousEnd != null) {
-                            Preconditions.checkArgument(versionSet.internalKeyComparator.compare(
-                                    previousEnd,
-                                    fileMetaData.getSmallest()
-                            ) < 0, "Overlapping files %s and %s in level %s", previousFileNumber, fileMetaData.getNumber(), level);
-                        }
+                    Collection<FileMetaData> files = version.getFiles().asMap().get(level);
+                    if (files != null) {
+                        for (FileMetaData fileMetaData : files) {
+                            if (previousEnd != null) {
+                                Preconditions.checkArgument(versionSet.internalKeyComparator.compare(
+                                        previousEnd,
+                                        fileMetaData.getSmallest()
+                                ) < 0, "Overlapping files %s and %s in level %s", previousFileNumber, fileMetaData.getNumber(), level);
+                            }
 
-                        previousFileNumber = fileMetaData.getNumber();
-                        previousEnd = fileMetaData.getLargest();
+                            previousFileNumber = fileMetaData.getNumber();
+                            previousEnd = fileMetaData.getLargest();
+                        }
                     }
                 }
                 //#endif

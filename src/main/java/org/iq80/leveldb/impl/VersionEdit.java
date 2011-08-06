@@ -1,10 +1,14 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.jboss.netty.buffer.ChannelBuffer;
+
+import java.util.Map;
 
 public class VersionEdit
 {
@@ -13,7 +17,7 @@ public class VersionEdit
     private Long nextFileNumber;
     private Long previousLogNumber;
     private Long lastSequenceNumber;
-    private final Multimap<Integer, InternalKey> compactPointers = ArrayListMultimap.create();
+    private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
     private final Multimap<Integer, FileMetaData> newFiles = ArrayListMultimap.create();
     private final Multimap<Integer, Long> deletedFiles = ArrayListMultimap.create();
 
@@ -80,9 +84,9 @@ public class VersionEdit
         this.lastSequenceNumber = lastSequenceNumber;
     }
 
-    public Multimap<Integer, InternalKey> getCompactPointers()
+    public Map<Integer, InternalKey> getCompactPointers()
     {
-        return ImmutableMultimap.copyOf(compactPointers);
+        return ImmutableMap.copyOf(compactPointers);
     }
 
     public void setCompactPointer(int level, InternalKey key)
@@ -90,7 +94,7 @@ public class VersionEdit
         compactPointers.put(level, key);
     }
 
-    public void setCompactPointers(Multimap<Integer, InternalKey> compactPointers)
+    public void setCompactPointers(Map<Integer, InternalKey> compactPointers)
     {
         this.compactPointers.putAll(compactPointers);
     }

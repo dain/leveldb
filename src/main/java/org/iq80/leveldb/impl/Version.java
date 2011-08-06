@@ -4,12 +4,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Ordering;
-import com.google.common.primitives.Ints;
 import org.iq80.leveldb.SeekingIterable;
 import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.util.SeekingIterators;
@@ -18,6 +15,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import java.util.List;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Lists.reverse;
 import static com.google.common.collect.Ordering.natural;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
@@ -30,6 +28,8 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
     // move these mutable fields somewhere else
     private int compactionLevel;
     private double compactionScore;
+    private FileMetaData fileToCompact;
+    private int fileToCompactLevel;
 
     public Version(int levels, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
@@ -64,6 +64,11 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
         }
         this.levels = builder.build();
         this.internalKeyComparator = internalKeyComparator;
+    }
+
+    public InternalKeyComparator getInternalKeyComparator()
+    {
+        return internalKeyComparator;
     }
 
     public synchronized int getCompactionLevel()
@@ -108,13 +113,14 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
         // We can search level-by-level since entries never hop across
         // levels.  Therefore we are guaranteed that if we find data
         // in an smaller level, later levels are irrelevant.
+        ReadStats readStats = new ReadStats();
         for (Level level : levels) {
-            LookupResult lookupResult = level.get(key);
+            LookupResult lookupResult = level.get(key, readStats);
             if (lookupResult != null) {
                 return lookupResult;
             }
         }
-
+        updateStats(readStats.getSeekFileLevel(), readStats.getSeekFile());
         return null;
     }
 
@@ -155,5 +161,30 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
     public void addFile(int level, FileMetaData fileMetaData)
     {
         levels.get(level).addFile(fileMetaData);
+    }
+
+    private boolean updateStats(int seekFileLevel, FileMetaData seekFile)
+    {
+        if (seekFile == null) {
+            return false;
+        }
+
+        seekFile.decrementAllowedSeeks();
+        if (seekFile.getAllowedSeeks() <= 0 && fileToCompact == null) {
+            fileToCompact = seekFile;
+            fileToCompactLevel = seekFileLevel;
+            return true;
+        }
+        return false;
+    }
+
+    public FileMetaData getFileToCompact()
+    {
+        return fileToCompact;
+    }
+
+    public int getFileToCompactLevel()
+    {
+        return fileToCompactLevel;
     }
 }

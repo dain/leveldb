@@ -107,7 +107,7 @@ public enum VersionEditTag
                 @Override
                 public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
                 {
-                    for (Entry<Integer, InternalKey> entry : versionEdit.getCompactPointers().entries()) {
+                    for (Entry<Integer, InternalKey> entry : versionEdit.getCompactPointers().entrySet()) {
                         VariableLengthQuantity.packInt(getPersistentId(), buffer);
 
                         // level

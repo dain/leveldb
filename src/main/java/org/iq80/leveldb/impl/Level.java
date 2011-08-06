@@ -8,6 +8,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.iq80.leveldb.SeekingIterable;
 import org.iq80.leveldb.SeekingIterator;
+import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
 
@@ -18,6 +19,8 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
 import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
+import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
+import static org.iq80.leveldb.impl.ValueType.VALUE;
 
 // todo this class should be immutable
 public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
@@ -66,18 +69,23 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
             return SeekingIterators.merge(builder.build(), internalKeyComparator);
         }
         else {
-            FileMetaDataSeekingIterator fileMetaDataIterator = new FileMetaDataSeekingIterator(files, internalKeyComparator);
-            return SeekingIterators.concat(SeekingIterators.transformValues(fileMetaDataIterator, new Function<FileMetaData, SeekingIterator<InternalKey, ChannelBuffer>>()
-            {
-                public SeekingIterator<InternalKey, ChannelBuffer> apply(FileMetaData fileMetaData)
-                {
-                    return tableCache.newIterator(fileMetaData);
-                }
-            }));
+            return createLevelConcatIterator(tableCache, files, internalKeyComparator);
         }
     }
 
-    public LookupResult get(LookupKey key)
+    public static SeekingIterator<InternalKey, ChannelBuffer> createLevelConcatIterator(final TableCache tableCache, List<FileMetaData> files, InternalKeyComparator internalKeyComparator)
+    {
+        FileMetaDataSeekingIterator fileMetaDataIterator = new FileMetaDataSeekingIterator(files, internalKeyComparator);
+        return SeekingIterators.concat(SeekingIterators.transformValues(fileMetaDataIterator, new Function<FileMetaData, SeekingIterator<InternalKey, ChannelBuffer>>()
+        {
+            public SeekingIterator<InternalKey, ChannelBuffer> apply(FileMetaData fileMetaData)
+            {
+                return tableCache.newIterator(fileMetaData);
+            }
+        }));
+    }
+
+    public LookupResult get(LookupKey key, ReadStats readStats)
     {
         if (files.isEmpty()) {
             return null;
@@ -110,6 +118,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
             fileMetaDataList.add(fileMetaData);
         }
 
+        readStats.clear();
         for (FileMetaData fileMetaData : fileMetaDataList) {
             // open the iterator
             SeekingIterator<InternalKey, ChannelBuffer> iterator = tableCache.newIterator(fileMetaData);
@@ -132,9 +141,15 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
                 if (internalKey.getValueType() == ValueType.DELETION) {
                     return LookupResult.deleted(key);
                 }
-                else if (internalKey.getValueType() == ValueType.VALUE) {
+                else if (internalKey.getValueType() == VALUE) {
                     return LookupResult.ok(key, entry.getValue());
                 }
+            }
+
+            if (readStats.getSeekFile() == null) {
+                // We have had more than one seek for this read.  Charge the first file.
+                readStats.setSeekFile(fileMetaData);
+                readStats.setSeekFileLevel(levelNumber);
             }
         }
 
@@ -152,8 +167,40 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
 
     public boolean someFileOverlapsRange(ChannelBuffer smallestUserKey, ChannelBuffer largestUserKey)
     {
-        // todo
-        return false;
+        InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
+        int index = findFile(smallestInternalKey);
+
+        UserComparator userComparator = internalKeyComparator.getUserComparator();
+        return ((index < files.size()) &&
+                userComparator.compare(largestUserKey, files.get(index).getSmallest().getUserKey()) >= 0);
+    }
+
+    private int findFile(InternalKey targetKey)
+    {
+        if (files.size() == 0) {
+            return files.size();
+        }
+
+        // todo replace with Collections.binarySearch
+        int left = 0;
+        int right = files.size() - 1;
+
+        // binary search restart positions to find the restart position immediately before the targetKey
+        while (left < right) {
+            int mid = (left + right) / 2;
+
+            if (internalKeyComparator.compare(files.get(mid).getLargest(), targetKey) < 0) {
+                // Key at "mid.largest" is < "target".  Therefore all
+                // files at or before "mid" are uninteresting.
+                left = mid + 1;
+            }
+            else {
+                // Key at "mid.largest" is >= "target".  Therefore all files
+                // after "mid" are uninteresting.
+                right = mid;
+            }
+        }
+        return right;
     }
 
     public void addFile(FileMetaData fileMetaData)
@@ -173,7 +220,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         return sb.toString();
     }
 
-    private static class FileMetaDataSeekingIterator implements SeekingIterator<InternalKey, FileMetaData>
+    public static class FileMetaDataSeekingIterator implements SeekingIterator<InternalKey, FileMetaData>
     {
         private final List<FileMetaData> files;
         private final InternalKeyComparator comparator;
@@ -207,6 +254,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
                 return;
             }
 
+            // todo replace with Collections.binarySearch
             int left = 0;
             int right = files.size() - 1;
 

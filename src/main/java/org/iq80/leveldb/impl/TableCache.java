@@ -42,16 +42,21 @@ public class TableCache
 
     public SeekingIterator<InternalKey, ChannelBuffer> newIterator(FileMetaData file)
     {
+        return newIterator(file.getNumber());
+    }
+
+    public SeekingIterator<InternalKey, ChannelBuffer> newIterator(long number)
+    {
         Table table;
         try {
-            table = cache.get(file.getNumber()).getTable();
+            table = cache.get(number).getTable();
         }
         catch (ExecutionException e) {
             Throwable cause = e;
             if (e.getCause() != null) {
                 cause = e.getCause();
             }
-            throw new RuntimeException("Could not open table " + file.getNumber(), cause);
+            throw new RuntimeException("Could not open table " + number, cause);
         }
         return SeekingIterators.transformKeys(table.iterator(), CHANNEL_BUFFER_TO_INTERNAL_KEY, INTERNAL_KEY_TO_CHANNEL_BUFFER);
     }

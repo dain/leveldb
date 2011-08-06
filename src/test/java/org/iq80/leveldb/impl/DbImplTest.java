@@ -1,5 +1,6 @@
 package org.iq80.leveldb.impl;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.Maps;
 import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.table.BlockEntry;
@@ -21,7 +22,6 @@ import java.util.Map.Entry;
 import static com.google.common.base.Charsets.UTF_8;
 import static java.util.Arrays.asList;
 import static org.iq80.leveldb.table.BlockHelper.after;
-import static org.iq80.leveldb.table.BlockHelper.assertEntryEquals;
 import static org.iq80.leveldb.table.BlockHelper.assertSequence;
 import static org.iq80.leveldb.table.BlockHelper.before;
 import static org.testng.Assert.assertEquals;
@@ -29,31 +29,47 @@ import static org.testng.Assert.assertEquals;
 public class DbImplTest
 {
     private File databaseDir;
-    private DbImpl db;
 
     @Test
     public void testEmptyBlock()
             throws Exception
     {
-        db = new DbImpl(new Options(), databaseDir);
+        DbImpl db = new DbImpl(new Options(), databaseDir);
 
-        tableDb();
+        testDb(db);
     }
 
 
     @Test
-    public void testSingleEntrySingleBlock()
+    public void testSingleEntrySingle()
             throws Exception
     {
-        db = new DbImpl(new Options(), databaseDir);
-        tableDb(createEntry("name", "dain sundstrom"));
+        DbImpl db = new DbImpl(new Options(), databaseDir);
+        testDb(db, createEntry("name", "dain sundstrom"));
     }
 
     @Test
-    public void testMultipleEntriesWithSingleBlock()
+    public void testMultipleEntries()
             throws Exception
     {
-        db = new DbImpl(new Options().setWriteBufferSize(100), databaseDir);
+        DbImpl db = new DbImpl(new Options().setWriteBufferSize(100), databaseDir);
+
+        List<Entry<ChannelBuffer, ChannelBuffer>> entries = Arrays.asList(
+                createEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
+                createEntry("beer/ipa", "Lagunitas IPA"),
+                createEntry("beer/stout", "Lagunitas Imperial Stout"),
+                createEntry("scotch/light", "Oban 14"),
+                createEntry("scotch/medium", "Highland Park"),
+                createEntry("scotch/strong", "Lagavulin"));
+
+        testDb(db, entries);
+    }
+
+    @Test
+    public void testMultiPassMultipleEntries()
+            throws Exception
+    {
+        DbImpl db = new DbImpl(new Options().setWriteBufferSize(100), databaseDir);
 
         List<Entry<ChannelBuffer, ChannelBuffer>> entries = Arrays.asList(
                 createEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
@@ -64,34 +80,17 @@ public class DbImplTest
                 createEntry("scotch/strong", "Lagavulin"));
 
         for (int i = 1; i < entries.size(); i++) {
-            tableDb(entries);
+            testDb(db, entries);
         }
     }
 
-    @Test
-    public void testMultipleEntriesWithMultipleBlock()
-            throws Exception
-    {
-        db = new DbImpl(new Options(), databaseDir);
-
-        List<Entry<ChannelBuffer, ChannelBuffer>> entries = Arrays.asList(
-                createEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
-                createEntry("beer/ipa", "Lagunitas IPA"),
-                createEntry("beer/stout", "Lagunitas Imperial Stout"),
-                createEntry("scotch/light", "Oban 14"),
-                createEntry("scotch/medium", "Highland Park"),
-                createEntry("scotch/strong", "Lagavulin"));
-
-        tableDb(entries);
-    }
-
-    private void tableDb(Entry<ChannelBuffer, ChannelBuffer>... entries)
+    private void testDb(DbImpl db, Entry<ChannelBuffer, ChannelBuffer>... entries)
             throws IOException
     {
-        tableDb(asList(entries));
+        testDb(db, asList(entries));
     }
 
-    private void tableDb(List<Entry<ChannelBuffer, ChannelBuffer>> entries)
+    private void testDb(DbImpl db, List<Entry<ChannelBuffer, ChannelBuffer>> entries)
             throws IOException
     {
 
@@ -100,7 +99,8 @@ public class DbImplTest
         }
 
         for (Entry<ChannelBuffer, ChannelBuffer> entry : entries) {
-            assertEquals(db.get(entry.getKey()), entry.getValue());
+            ChannelBuffer actual = db.get(entry.getKey());
+            assertEquals(actual, entry.getValue(), "Key: " +  entry.getKey().toString(UTF_8));
         }
 
         SeekingIterator<ChannelBuffer, ChannelBuffer> seekingIterator = db.iterator();
