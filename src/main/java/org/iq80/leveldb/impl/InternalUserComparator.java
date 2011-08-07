@@ -45,7 +45,7 @@ public class InternalUserComparator implements UserComparator
 
             // todo it is assumed that start is a dynamic channel buffer and temp space
             start.clear();
-            start.writeBytes(tmp);
+            start.writeBytes(newInternalKey.encode());
         }
     }
 
@@ -67,7 +67,7 @@ public class InternalUserComparator implements UserComparator
 
             // todo it is assumed that key is a dynamic channel buffer and temp space
             key.clear();
-            key.writeBytes(tmp);
+            key.writeBytes(newInternalKey.encode());
         }
     }
 }
