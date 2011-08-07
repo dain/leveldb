@@ -28,12 +28,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
@@ -59,6 +60,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private final VersionSet versions;
 
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    private final ReentrantLock mutex = new ReentrantLock();
+    private final Condition backgroundCondition = mutex.newCondition();
 
     private final List<Long> pendingOutputs = newArrayList(); // todo
 
@@ -114,70 +117,93 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         databaseDir.mkdirs();
         Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory");
 
-        // lock the database dir
-        dbLock = new DbLock(new File(databaseDir, Filename.lockFileName()));
+        mutex.lock();
+        try {
+            // lock the database dir
+            dbLock = new DbLock(new File(databaseDir, Filename.lockFileName()));
 
-        // verify the "current" file
-        File currentFile = new File(databaseDir, Filename.currentFileName());
-        if (!currentFile.canRead()) {
-            Preconditions.checkArgument(options.isCreateIfMissing(), "Database '%s' does not exist and the create if missing option is disabled", databaseDir);
-        }
-        else {
-            Preconditions.checkArgument(options.isErrorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
-        }
-
-        // load  (and recover) current version
-        versions.recover();
-
-        // Recover from all newer log files than the ones named in the
-        // descriptor (new log files may have been added by the previous
-        // incarnation without registering them in the descriptor).
-        //
-        // Note that PrevLogNumber() is no longer used, but we pay
-        // attention to it in case we are recovering a database
-        // produced by an older version of leveldb.
-        long minLogNumber = versions.getLogNumber();
-        long previousLogNumber = versions.getPrevLogNumber();
-        List<File> filenames = Filename.listFiles(databaseDir);
-
-        List<Long> logs = Lists.newArrayList();
-        for (File filename : filenames) {
-            FileInfo fileInfo = Filename.parseFileName(filename);
-
-            if (fileInfo != null &&
-                    fileInfo.getFileType() == FileType.LOG &&
-                    ((fileInfo.getFileNumber() >= minLogNumber) || (fileInfo.getFileNumber() == previousLogNumber))) {
-                logs.add(fileInfo.getFileNumber());
+            // verify the "current" file
+            File currentFile = new File(databaseDir, Filename.currentFileName());
+            if (!currentFile.canRead()) {
+                Preconditions.checkArgument(options.isCreateIfMissing(), "Database '%s' does not exist and the create if missing option is disabled", databaseDir);
             }
-        }
-
-        // Recover in the order in which the logs were generated
-        VersionEdit edit = new VersionEdit();
-        Collections.sort(logs);
-        for (Long fileNumber : logs) {
-            long maxSequence = recoverLogFile(fileNumber, edit);
-            if (versions.getLastSequence() < maxSequence) {
-                versions.setLastSequence(maxSequence);
+            else {
+                Preconditions.checkArgument(options.isErrorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
+
+            // load  (and recover) current version
+            versions.recover();
+
+            // Recover from all newer log files than the ones named in the
+            // descriptor (new log files may have been added by the previous
+            // incarnation without registering them in the descriptor).
+            //
+            // Note that PrevLogNumber() is no longer used, but we pay
+            // attention to it in case we are recovering a database
+            // produced by an older version of leveldb.
+            long minLogNumber = versions.getLogNumber();
+            long previousLogNumber = versions.getPrevLogNumber();
+            List<File> filenames = Filename.listFiles(databaseDir);
+
+            List<Long> logs = Lists.newArrayList();
+            for (File filename : filenames) {
+                FileInfo fileInfo = Filename.parseFileName(filename);
+
+                if (fileInfo != null &&
+                        fileInfo.getFileType() == FileType.LOG &&
+                        ((fileInfo.getFileNumber() >= minLogNumber) || (fileInfo.getFileNumber() == previousLogNumber))) {
+                    logs.add(fileInfo.getFileNumber());
+                }
+            }
+
+            // Recover in the order in which the logs were generated
+            VersionEdit edit = new VersionEdit();
+            Collections.sort(logs);
+            for (Long fileNumber : logs) {
+                long maxSequence = recoverLogFile(fileNumber, edit);
+                if (versions.getLastSequence() < maxSequence) {
+                    versions.setLastSequence(maxSequence);
+                }
+            }
+
+            // open transaction log
+            long newLogNumber = versions.getNextFileNumber();
+            File logFile = new File(databaseDir, Filename.logFileName(newLogNumber));
+            FileChannel logChannel = new FileOutputStream(logFile).getChannel();
+            edit.setLogNumber(newLogNumber);
+            this.logChannel = logChannel;
+            this.logFileNumber = newLogNumber;
+            this.log = new LogWriter(logChannel);
+
+            // apply recovered edits
+            versions.logAndApply(edit);
+
+            // cleanup unused files
+            deleteObsoleteFiles();
+
+            // schedule compactions
+            maybeScheduleCompaction();
+        }
+        finally {
+            mutex.unlock();
+        }
+    }
+
+    public void close() {
+        if (shuttingDown.getAndSet(true)) {
+            return;
         }
 
-        // open transaction log
-        long newLogNumber = versions.getNextFileNumber();
-        File logFile = new File(databaseDir, Filename.logFileName(newLogNumber));
-        FileChannel logChannel = new FileOutputStream(logFile).getChannel();
-        edit.setLogNumber(newLogNumber);
-        this.logChannel = logChannel;
-        this.logFileNumber = newLogNumber;
-        this.log = new LogWriter(logChannel);
+        mutex.lock();
+        try {
+            while (backgroundCompaction != null) {
+                backgroundCondition.awaitUninterruptibly();
+            }
+        } finally {
+            mutex.unlock();
+        }
 
-        // apply recovered edits
-        versions.logAndApply(edit);
-
-        // cleanup unused files
-        deleteObsoleteFiles();
-
-        // schedule compactions
-        maybeScheduleCompaction();
+        dbLock.release();
     }
 
     private void deleteObsoleteFiles()
@@ -229,6 +255,22 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             }
         }
     }
+    public void flushMemTable()
+    {
+        mutex.lock();
+        try {
+            // force compaction
+            makeRoomForWrite(true);
+
+            // todo bg_error code
+            while(immutableMemTable != null) {
+                backgroundCondition.awaitUninterruptibly();
+            }
+
+        } finally {
+            mutex.unlock();
+        }
+    }
 
     public void compactRange(int level, ChannelBuffer start, ChannelBuffer end)
     {
@@ -237,12 +279,29 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         Preconditions.checkNotNull(start, "start is null");
         Preconditions.checkNotNull(end, "end is null");
 
-        manualCompaction = new ManualCompaction(level, start, end);
-        // todo await completion of manual compaction
+        mutex.lock();
+        try {
+            while (this.manualCompaction != null) {
+                backgroundCondition.awaitUninterruptibly();
+            }
+            ManualCompaction manualCompaction = new ManualCompaction(level, start, end);
+            this.manualCompaction = manualCompaction;
+            // todo await completion of manual compaction
+
+            while (this.manualCompaction == manualCompaction) {
+                backgroundCondition.awaitUninterruptibly();
+            }
+        }
+        finally {
+            mutex.unlock();
+        }
+
     }
 
     private void maybeScheduleCompaction()
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         if (backgroundCompaction != null) {
             // Already scheduled
         }
@@ -271,27 +330,40 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private void backgroundCall()
             throws IOException
     {
-        if (backgroundCompaction == null) {
-            return;
-        }
-
+        mutex.lock();
         try {
-            if (!shuttingDown.get()) {
-                backgroundCompaction();
+            if (backgroundCompaction == null) {
+                return;
             }
+
+            try {
+                if (!shuttingDown.get()) {
+                    backgroundCompaction();
+                }
+            }
+            finally {
+                backgroundCompaction = null;
+            }
+
+            // Previous compaction may have produced too many files in a level,
+            // so reschedule another compaction if needed.
+            maybeScheduleCompaction();
         }
         finally {
-            backgroundCompaction = null;
+            try {
+                backgroundCondition.signalAll();
+            }
+            finally {
+                mutex.unlock();
+            }
         }
-
-        // Previous compaction may have produced too many files in a level,
-        // so reschedule another compaction if needed.
-        maybeScheduleCompaction();
     }
 
     private void backgroundCompaction()
             throws IOException
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         if (immutableMemTable != null) {
             compactMemTable();
         }
@@ -329,6 +401,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     private void cleanupCompaction(CompactionState compactionState)
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         if (compactionState.builder != null) {
             compactionState.builder.abandon();
         } else {
@@ -353,26 +427,36 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     public ChannelBuffer get(ReadOptions options, ChannelBuffer key)
     {
-        long snapshot = getSnapshotNumber(options);
-        LookupKey lookupKey = new LookupKey(key, snapshot);
+        LookupKey lookupKey;
+        mutex.lock();
+        try {
+            long snapshot = getSnapshotNumber(options);
+            lookupKey = new LookupKey(key, snapshot);
 
-        // First look in the memtable, then in the immutable memtable (if any).
-        LookupResult lookupResult = memTable.get(lookupKey);
-        if (lookupResult != null) {
-            return lookupResult.getValue();
-        }
-        if (immutableMemTable != null) {
-            lookupResult = immutableMemTable.get(lookupKey);
+            // First look in the memtable, then in the immutable memtable (if any).
+            LookupResult lookupResult = memTable.get(lookupKey);
             if (lookupResult != null) {
                 return lookupResult.getValue();
             }
+            if (immutableMemTable != null) {
+                lookupResult = immutableMemTable.get(lookupKey);
+                if (lookupResult != null) {
+                    return lookupResult.getValue();
+                }
+            }
+        }
+        finally {
+            mutex.unlock();
         }
 
         // Not in memTables; try live files in level order
-        lookupResult = versions.get(lookupKey);
+        LookupResult lookupResult = versions.get(lookupKey);
         if (lookupResult != null) {
             return lookupResult.getValue();
         }
+
+        // todo schedule compaction
+
         return null;
     }
 
@@ -393,66 +477,72 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     public Snapshot write(WriteOptions options, WriteBatch updates)
     {
-        makeRoomForWrite(false);
-
-        // Get sequence numbers for this change set
-        final long sequenceBegin = versions.getLastSequence() + 1;
-        final long sequenceEnd = sequenceBegin + updates.size() - 1;
-
-        // Reserve this sequence in the version set
-        versions.setLastSequence(sequenceEnd);
-
-        // Log write
-        final ChannelBuffer record = ChannelBuffers.dynamicBuffer();
-        record.writeLong(sequenceBegin);
-        record.writeInt(updates.size());
-        updates.forEach(new Handler()
-        {
-            @Override
-            public void put(ChannelBuffer key, ChannelBuffer value)
-            {
-                record.writeByte(VALUE.getPersistentId());
-                writeLengthPrefixedBytes(record, key.slice());
-                writeLengthPrefixedBytes(record, value.slice());
-            }
-
-            @Override
-            public void delete(ChannelBuffer key)
-            {
-                record.writeByte(DELETION.getPersistentId());
-                writeLengthPrefixedBytes(record, key.slice());
-            }
-        });
+        mutex.lock();
         try {
-            log.addRecord(record);
-            if (options.isSync()) {
-                logChannel.force(false);
-            }
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
+            makeRoomForWrite(false);
 
-        // Update memtable
-        final MemTable memTable = this.memTable;
-        updates.forEach(new Handler()
-        {
-            private long sequence = sequenceBegin;
+            // Get sequence numbers for this change set
+            final long sequenceBegin = versions.getLastSequence() + 1;
+            final long sequenceEnd = sequenceBegin + updates.size() - 1;
 
-            @Override
-            public void put(ChannelBuffer key, ChannelBuffer value)
+            // Reserve this sequence in the version set
+            versions.setLastSequence(sequenceEnd);
+
+            // Log write
+            final ChannelBuffer record = ChannelBuffers.dynamicBuffer();
+            record.writeLong(sequenceBegin);
+            record.writeInt(updates.size());
+            updates.forEach(new Handler()
             {
-                memTable.add(sequence++, VALUE, key, value);
+                @Override
+                public void put(ChannelBuffer key, ChannelBuffer value)
+                {
+                    record.writeByte(VALUE.getPersistentId());
+                    writeLengthPrefixedBytes(record, key.slice());
+                    writeLengthPrefixedBytes(record, value.slice());
+                }
+
+                @Override
+                public void delete(ChannelBuffer key)
+                {
+                    record.writeByte(DELETION.getPersistentId());
+                    writeLengthPrefixedBytes(record, key.slice());
+                }
+            });
+            try {
+                log.addRecord(record);
+                if (options.isSync()) {
+                    logChannel.force(false);
+                }
+            }
+            catch (IOException e) {
+                throw Throwables.propagate(e);
             }
 
-            @Override
-            public void delete(ChannelBuffer key)
+            // Update memtable
+            final MemTable memTable = this.memTable;
+            updates.forEach(new Handler()
             {
-                memTable.add(sequence++, DELETION, key, ChannelBuffers.EMPTY_BUFFER);
-            }
-        });
+                private long sequence = sequenceBegin;
 
-        return new SnapshotImpl(sequenceEnd);
+                @Override
+                public void put(ChannelBuffer key, ChannelBuffer value)
+                {
+                    memTable.add(sequence++, VALUE, key, value);
+                }
+
+                @Override
+                public void delete(ChannelBuffer key)
+                {
+                    memTable.add(sequence++, DELETION, key, ChannelBuffers.EMPTY_BUFFER);
+                }
+            });
+
+            return new SnapshotImpl(sequenceEnd);
+        }
+        finally {
+            mutex.unlock();
+        }
     }
 
     @Override
@@ -463,32 +553,44 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     public SeekingIterator<ChannelBuffer, ChannelBuffer> iterator(ReadOptions options)
     {
-        // merge together the memTable, immutableMemTable, and tables in version set
-        ImmutableList.Builder<SeekingIterator<InternalKey, ChannelBuffer>> iterators = ImmutableList.builder();
-        if (memTable != null && !memTable.isEmpty()) {
-            iterators.add(memTable.iterator());
-        }
-        if (immutableMemTable != null && !immutableMemTable.isEmpty()) {
-            iterators.add(immutableMemTable.iterator());
-        }
-        // todo only add if versions is not empty... makes debugging the iterators easier
-        iterators.add(versions.iterator());
-        SeekingIterator<InternalKey, ChannelBuffer> rawIterator = SeekingIterators.merge(iterators.build(), internalKeyComparator);
+        mutex.lock();
+        try {
+            // merge together the memTable, immutableMemTable, and tables in version set
+            ImmutableList.Builder<SeekingIterator<InternalKey, ChannelBuffer>> iterators = ImmutableList.builder();
+            if (memTable != null && !memTable.isEmpty()) {
+                iterators.add(memTable.iterator());
+            }
+            if (immutableMemTable != null && !immutableMemTable.isEmpty()) {
+                iterators.add(immutableMemTable.iterator());
+            }
+            // todo only add if versions is not empty... makes debugging the iterators easier
+            iterators.add(versions.iterator());
+            SeekingIterator<InternalKey, ChannelBuffer> rawIterator = SeekingIterators.merge(iterators.build(), internalKeyComparator);
 
-        // filter any entries not visible in our snapshot
-        long snapshot = getSnapshotNumber(options);
-        SeekingIterator<InternalKey, ChannelBuffer> snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
+            // filter any entries not visible in our snapshot
+            long snapshot = getSnapshotNumber(options);
+            SeekingIterator<InternalKey, ChannelBuffer> snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
 
-        // transform the keys user space
-        SeekingIterator<ChannelBuffer, ChannelBuffer> userIterator = SeekingIterators.transformKeys(snapshotIterator,
-                INTERNAL_KEY_TO_USER_KEY,
-                createUserKeyToInternalKeyFunction(snapshot));
-        return userIterator;
+            // transform the keys user space
+            SeekingIterator<ChannelBuffer, ChannelBuffer> userIterator = SeekingIterators.transformKeys(snapshotIterator,
+                    INTERNAL_KEY_TO_USER_KEY,
+                    createUserKeyToInternalKeyFunction(snapshot));
+            return userIterator;
+        }
+        finally {
+            mutex.unlock();
+        }
     }
 
     public Snapshot getSnapshot()
     {
-        return new SnapshotImpl(versions.getLastSequence());
+        mutex.lock();
+        try {
+            return new SnapshotImpl(versions.getLastSequence());
+        }
+        finally {
+            mutex.unlock();
+        }
     }
 
     private long getSnapshotNumber(ReadOptions options)
@@ -505,6 +607,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     private void makeRoomForWrite(boolean force)
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         boolean allowDelay = !force;
 
         while (true) {
@@ -522,11 +626,14 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 // this delay hands over some CPU to the compaction thread in
                 // case it is sharing the same core as the writer.
                 try {
+                    mutex.unlock();
                     Thread.sleep(1);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException(e);
+                } finally {
+                    mutex.lock();
                 }
 
                 // Do not delay a single write more than once
@@ -536,15 +643,15 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 // There is room in current memtable
                 break;
             }
-            else if (immutableMemTable != null && backgroundCompaction != null) {
+            else if (immutableMemTable != null) {
                 // We have filled up the current memtable, but the previous
                 // one is still being compacted, so we wait.
-                awaitBackgroundCompaction();
+                backgroundCondition.awaitUninterruptibly();
             }
-            else if (versions.numberOfFilesInLevel(0) >= L0_STOP_WRITES_TRIGGER && backgroundCompaction != null) {
+            else if (versions.numberOfFilesInLevel(0) >= L0_STOP_WRITES_TRIGGER) {
                 // There are too many level-0 files.
 //                Log(options_.info_log, "waiting...\n");
-                awaitBackgroundCompaction();
+                backgroundCondition.awaitUninterruptibly();
             }
             else {
                 // Attempt to switch to a new memtable and trigger compaction of old
@@ -577,24 +684,10 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
-    private void awaitBackgroundCompaction()
-    {
-        Preconditions.checkState(backgroundCompaction != null);
-
-        try {
-            backgroundCompaction.get();
-        }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
-        catch (ExecutionException ignored) {
-        }
-    }
-
     private void compactMemTable()
             throws IOException
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
         Preconditions.checkState(immutableMemTable != null);
 
         // Save the contents of the memtable as a new Table
@@ -619,12 +712,21 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private void writeLevel0Table(MemTable memTable, VersionEdit edit, Version base)
             throws IOException
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         if (memTable.isEmpty()) {
             return;
         }
 
         // write the memtable to a new sstable
-        FileMetaData fileMetaData = buildTable(memTable);
+        FileMetaData fileMetaData;
+        mutex.unlock();
+        try {
+            fileMetaData = buildTable(memTable);
+        }
+        finally {
+            mutex.lock();
+        }
 
         ChannelBuffer minUserKey = fileMetaData.getSmallest().getUserKey();
         ChannelBuffer maxUserKey = fileMetaData.getLargest().getUserKey();
@@ -690,6 +792,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private void doCompactionWork(CompactionState compactionState)
             throws IOException
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
         Preconditions.checkArgument(versions.numberOfBytesInLevel(compactionState.getCompaction().getLevel()) > 0);
         Preconditions.checkArgument(compactionState.builder == null);
         Preconditions.checkArgument(compactionState.outfile == null);
@@ -697,87 +800,104 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         // todo track snapshots
         compactionState.smallestSnapshot = versions.getLastSequence();
 
-        SeekingIterator<InternalKey, ChannelBuffer> iterator = versions.makeInputIterator(compactionState.compaction);
+        // Release mutex while we're actually doing the compaction work
+        mutex.unlock();
+        try {
+            SeekingIterator<InternalKey, ChannelBuffer> iterator = versions.makeInputIterator(compactionState.compaction);
 
-        ChannelBuffer currentUserKey = null;
-        boolean hasCurrentUserKey = false;
+            ChannelBuffer currentUserKey = null;
+            boolean hasCurrentUserKey = false;
 
-        long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
-        while (iterator.hasNext() && !shuttingDown.get()) {
-            // always give priority to compacting the current mem table
-            if (immutableMemTable != null) {
-                compactMemTable();
-                // todo wake up waiting threads
-            }
-
-            InternalKey key = iterator.peek().getKey();
-            if (compactionState.compaction.shouldStopBefore(key) && compactionState.builder != null) {
-                finishCompactionOutputFile(compactionState, iterator);
-            }
-
-            // Handle key/value, add to state, etc.
-            boolean drop = false;
-            // todo if key doesn't parse (it is corrupted),
-            if (false /*!ParseInternalKey(key, &ikey)*/) {
-                // do not hide error keys
-                currentUserKey = null;
-                hasCurrentUserKey = false;
-                lastSequenceForKey = MAX_SEQUENCE_NUMBER;
-            }
-            else {
-                if (!hasCurrentUserKey || internalKeyComparator.getUserComparator().compare(key.getUserKey(), currentUserKey) != 0) {
-                    // First occurrence of this user key
-                    currentUserKey = key.getUserKey();
-                    hasCurrentUserKey = true;
-                    lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+            long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+            while (iterator.hasNext() && !shuttingDown.get()) {
+                // always give priority to compacting the current mem table
+                if (immutableMemTable != null) {
+                    mutex.lock();
+                    try {
+                        compactMemTable();
+                    }
+                    finally {
+                        try {
+                            backgroundCondition.signalAll();
+                        }
+                        finally {
+                            mutex.unlock();
+                        }
+                    }
                 }
 
-                if (lastSequenceForKey <= compactionState.smallestSnapshot) {
-                    // Hidden by an newer entry for same user key
-                    drop = true; // (A)
-                }
-                else if (key.getValueType() == ValueType.DELETION &&
-                        key.getSequenceNumber() <= compactionState.smallestSnapshot &&
-                        compactionState.compaction.isBaseLevelForKey(key.getUserKey())) {
-
-                    // For this user key:
-                    // (1) there is no data in higher levels
-                    // (2) data in lower levels will have larger sequence numbers
-                    // (3) data in layers that are being compacted here and have
-                    //     smaller sequence numbers will be dropped in the next
-                    //     few iterations of this loop (by rule (A) above).
-                    // Therefore this deletion marker is obsolete and can be dropped.
-                    drop = true;
-                }
-
-                lastSequenceForKey = key.getSequenceNumber();
-            }
-
-            if (!drop) {
-                // Open output file if necessary
-                if (compactionState.builder == null) {
-                    openCompactionOutputFile(compactionState);
-                }
-                if (compactionState.builder.getEntryCount() == 0) {
-                    compactionState.currentSmallest = key;
-                }
-                compactionState.currentLargest = key;
-                compactionState.builder.add(key.encode(), iterator.peek().getValue());
-
-                // Close output file if it is big enough
-                if (compactionState.builder.getFileSize() >=
-                        compactionState.compaction.MaxOutputFileSize()) {
+                InternalKey key = iterator.peek().getKey();
+                if (compactionState.compaction.shouldStopBefore(key) && compactionState.builder != null) {
                     finishCompactionOutputFile(compactionState, iterator);
                 }
-            }
-            iterator.next();
-        }
 
-        if (shuttingDown.get()) {
-            throw new IOException("DB shutdown during compaction");
+                // Handle key/value, add to state, etc.
+                boolean drop = false;
+                // todo if key doesn't parse (it is corrupted),
+                if (false /*!ParseInternalKey(key, &ikey)*/) {
+                    // do not hide error keys
+                    currentUserKey = null;
+                    hasCurrentUserKey = false;
+                    lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+                }
+                else {
+                    if (!hasCurrentUserKey || internalKeyComparator.getUserComparator().compare(key.getUserKey(), currentUserKey) != 0) {
+                        // First occurrence of this user key
+                        currentUserKey = key.getUserKey();
+                        hasCurrentUserKey = true;
+                        lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+                    }
+
+                    if (lastSequenceForKey <= compactionState.smallestSnapshot) {
+                        // Hidden by an newer entry for same user key
+                        drop = true; // (A)
+                    }
+                    else if (key.getValueType() == ValueType.DELETION &&
+                            key.getSequenceNumber() <= compactionState.smallestSnapshot &&
+                            compactionState.compaction.isBaseLevelForKey(key.getUserKey())) {
+
+                        // For this user key:
+                        // (1) there is no data in higher levels
+                        // (2) data in lower levels will have larger sequence numbers
+                        // (3) data in layers that are being compacted here and have
+                        //     smaller sequence numbers will be dropped in the next
+                        //     few iterations of this loop (by rule (A) above).
+                        // Therefore this deletion marker is obsolete and can be dropped.
+                        drop = true;
+                    }
+
+                    lastSequenceForKey = key.getSequenceNumber();
+                }
+
+                if (!drop) {
+                    // Open output file if necessary
+                    if (compactionState.builder == null) {
+                        openCompactionOutputFile(compactionState);
+                    }
+                    if (compactionState.builder.getEntryCount() == 0) {
+                        compactionState.currentSmallest = key;
+                    }
+                    compactionState.currentLargest = key;
+                    compactionState.builder.add(key.encode(), iterator.peek().getValue());
+
+                    // Close output file if it is big enough
+                    if (compactionState.builder.getFileSize() >=
+                            compactionState.compaction.MaxOutputFileSize()) {
+                        finishCompactionOutputFile(compactionState, iterator);
+                    }
+                }
+                iterator.next();
+            }
+
+            if (shuttingDown.get()) {
+                throw new IOException("DB shutdown during compaction");
+            }
+            if (compactionState.builder != null) {
+                finishCompactionOutputFile(compactionState, iterator);
+            }
         }
-        if (compactionState.builder != null) {
-            finishCompactionOutputFile(compactionState, iterator);
+        finally {
+            mutex.lock();
         }
 
         // todo port CompactionStats code
@@ -788,16 +908,25 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private void openCompactionOutputFile(CompactionState compactionState)
             throws FileNotFoundException
     {
-        long fileNumber = versions.getNextFileNumber();
-        pendingOutputs.add(fileNumber);
-        compactionState.currentFileNumber = fileNumber;
-        compactionState.currentFileSize = 0;
-        compactionState.currentSmallest = null;
-        compactionState.currentLargest = null;
+        Preconditions.checkNotNull(compactionState, "compactionState is null");
+        Preconditions.checkArgument(compactionState.builder == null, "compactionState builder is not null");
 
-        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
-        compactionState.outfile = new FileOutputStream(file).getChannel();
-        compactionState.builder = new TableBuilder(options, compactionState.outfile, internalKeyComparator.getUserComparator());
+        mutex.lock();
+        try {
+            long fileNumber = versions.getNextFileNumber();
+            pendingOutputs.add(fileNumber);
+            compactionState.currentFileNumber = fileNumber;
+            compactionState.currentFileSize = 0;
+            compactionState.currentSmallest = null;
+            compactionState.currentLargest = null;
+
+            File file = new File(databaseDir, Filename.tableFileName(fileNumber));
+            compactionState.outfile = new FileOutputStream(file).getChannel();
+            compactionState.builder = new TableBuilder(options, compactionState.outfile, internalKeyComparator.getUserComparator());
+        }
+        finally {
+            mutex.unlock();
+        }
     }
 
     private void finishCompactionOutputFile(CompactionState compactionState, SeekingIterator<InternalKey, ChannelBuffer> input)
@@ -838,6 +967,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private void installCompactionResults(CompactionState compact)
             throws IOException
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         // Add compaction outputs
         compact.compaction.addInputDeletions(compact.compaction.getEdit());
         int level = compact.compaction.getLevel();
