@@ -75,6 +75,7 @@ public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, Cha
 
             // skip entries created after our snapshot
             if (internalKey.getSequenceNumber() > snapshot) {
+                iterator.next();
                 continue;
             }
 
