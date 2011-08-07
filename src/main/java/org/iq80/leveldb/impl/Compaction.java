@@ -21,7 +21,7 @@ public class Compaction
     private final List<FileMetaData> grandparents;
 
     private long maxOutputFileSize;
-    private VersionEdit edit;
+    private final VersionEdit edit = new VersionEdit();
 
     // State used to check for number of of overlapping grandparent files
     // (parent == level_ + 1, grandparent == level_ + 2)
