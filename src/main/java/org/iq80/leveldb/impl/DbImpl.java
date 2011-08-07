@@ -996,6 +996,11 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
+    int numberOfFilesInLevel(int level)
+    {
+        return versions.getCurrent().numberOfFilesInLevel(level);
+    }
+
     private static class CompactionState
     {
         private final Compaction compaction;
