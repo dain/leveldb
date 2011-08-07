@@ -471,6 +471,11 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         write(options, new WriteBatch().put(key, value));
     }
 
+    public void delete(ChannelBuffer key)
+    {
+        write(new WriteOptions(), new WriteBatch().delete(key));
+    }
+
     public void delete(WriteOptions options, ChannelBuffer key)
     {
         write(options, new WriteBatch().delete(key));
