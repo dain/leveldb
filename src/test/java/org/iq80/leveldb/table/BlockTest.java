@@ -96,7 +96,7 @@ public class BlockTest
 
     private void blockTest(int blockRestartInterval, List<BlockEntry> entries)
     {
-        BlockBuilder builder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval);
+        BlockBuilder builder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
 
         for (BlockEntry entry : entries) {
             builder.add(entry);

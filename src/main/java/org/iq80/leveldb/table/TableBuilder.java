@@ -9,6 +9,8 @@ import org.xerial.snappy.Snappy;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
+import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
+
 // todo byte order must be little endian
 public class TableBuilder
 {
@@ -58,8 +60,8 @@ public class TableBuilder
         blockSize = options.getBlockSize();
         compressionType = options.getCompressionType();
 
-        dataBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval);
-        indexBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), 1);
+        dataBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval, userComparator);
+        indexBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), 1, userComparator);
 
         lastKey = ChannelBuffers.dynamicBuffer(128);
         compressedOutput = ChannelBuffers.dynamicBuffer(128);
@@ -190,10 +192,9 @@ public class TableBuilder
         closed = true;
 
         // write (empty) meta index block
-        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval);
+        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
         // TODO(postrelease): Add stats and other meta blocks
         BlockHandle metaindexBlockHandle = writeBlock(metaIndexBlockBuilder);
-
 
         // add last handle to index block
         if (pendingIndexEntry) {

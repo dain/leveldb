@@ -25,11 +25,6 @@ public class BlockBuilder
     private boolean finished;
     private ChannelBuffer lastKey = ChannelBuffers.dynamicBuffer(128);
 
-    public BlockBuilder(ChannelBuffer buffer, int blockRestartInterval)
-    {
-        this(buffer, blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
-    }
-
     public BlockBuilder(ChannelBuffer buffer, int blockRestartInterval, Comparator<ChannelBuffer> comparator)
     {
         Preconditions.checkNotNull(buffer, "buffer is null");
@@ -95,8 +90,7 @@ public class BlockBuilder
         Preconditions.checkState(!finished, "block is finished");
         Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 
-        assert (comparator.compare(key, lastKey) > 0) : "key must be greater than last key";
-
+        Preconditions.checkArgument(!lastKey.readable() || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
 
         int sharedKeyBytes = 0;
         if (restartBlockEntryCount < blockRestartInterval) {
