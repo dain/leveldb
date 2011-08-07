@@ -286,7 +286,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             }
             ManualCompaction manualCompaction = new ManualCompaction(level, start, end);
             this.manualCompaction = manualCompaction;
-            // todo await completion of manual compaction
+
+            maybeScheduleCompaction();
 
             while (this.manualCompaction == manualCompaction) {
                 backgroundCondition.awaitUninterruptibly();
