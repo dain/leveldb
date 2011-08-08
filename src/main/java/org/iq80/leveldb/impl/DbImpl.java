@@ -128,7 +128,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 Preconditions.checkArgument(options.isCreateIfMissing(), "Database '%s' does not exist and the create if missing option is disabled", databaseDir);
             }
             else {
-                Preconditions.checkArgument(options.isErrorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
+                Preconditions.checkArgument(!options.isErrorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
 
             // load  (and recover) current version
