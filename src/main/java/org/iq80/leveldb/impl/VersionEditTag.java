@@ -204,7 +204,8 @@ public enum VersionEditTag
                 @Override
                 public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
                 {
-                    throw new UnsupportedOperationException();
+                    long previousLogNumber = VariableLengthQuantity.unpackLong(buffer);
+                    versionEdit.setPreviousLogNumber(previousLogNumber);
                 }
 
                 @Override

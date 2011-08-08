@@ -160,10 +160,10 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             VersionEdit edit = new VersionEdit();
             Collections.sort(logs);
             for (Long fileNumber : logs) {
-                long maxSequence = recoverLogFile(fileNumber, edit);
-                if (versions.getLastSequence() < maxSequence) {
-                    versions.setLastSequence(maxSequence);
-                }
+//                long maxSequence = recoverLogFile(fileNumber, edit);
+//                if (versions.getLastSequence() < maxSequence) {
+//                    versions.setLastSequence(maxSequence);
+//                }
             }
 
             // open transaction log
