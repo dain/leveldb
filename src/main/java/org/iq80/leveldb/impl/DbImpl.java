@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -196,11 +197,20 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
         mutex.lock();
         try {
+            makeRoomForWrite(true);
             while (backgroundCompaction != null) {
                 backgroundCondition.awaitUninterruptibly();
             }
         } finally {
             mutex.unlock();
+        }
+
+        compactionExecutor.shutdown();
+        try {
+            compactionExecutor.awaitTermination(1, TimeUnit.DAYS);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         dbLock.release();
@@ -321,7 +331,13 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 public Void call()
                         throws Exception
                 {
-                    backgroundCall();
+                    try {
+                        backgroundCall();
+                    }
+                    catch (Throwable e) {
+                        // todo add logging system
+                        e.printStackTrace();
+                    }
                     return null;
                 }
             });
@@ -701,9 +717,9 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         Version base = versions.getCurrent();
         writeLevel0Table(immutableMemTable, edit, base);
 
-        if (shuttingDown.get()) {
-            throw new IOException("Database shutdown during memtable compaction");
-        }
+//        if (shuttingDown.get()) {
+//            throw new IOException("Database shutdown during memtable compaction");
+//        }
 
         // Replace immutable memtable with the generated Table
         edit.setPreviousLogNumber(0);
@@ -895,9 +911,9 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 iterator.next();
             }
 
-            if (shuttingDown.get()) {
-                throw new IOException("DB shutdown during compaction");
-            }
+//            if (shuttingDown.get()) {
+//                throw new IOException("DB shutdown during compaction");
+//            }
             if (compactionState.builder != null) {
                 finishCompactionOutputFile(compactionState, iterator);
             }
