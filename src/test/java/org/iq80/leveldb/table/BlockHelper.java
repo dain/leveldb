@@ -6,6 +6,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.testng.Assert;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
@@ -31,11 +32,16 @@ public class BlockHelper
                 SIZE_OF_INT;
     }
 
-    public static void assertSequence(SeekingIterator<ChannelBuffer, ChannelBuffer> seekingIterator, Iterable<? extends Entry<ChannelBuffer, ChannelBuffer>> entries)
+    public static <K, V> void assertSequence(SeekingIterator<K, V> seekingIterator, Entry<K, V>... entries)
+    {
+        assertSequence(seekingIterator, Arrays.asList(entries));
+    }
+
+    public static <K, V> void assertSequence(SeekingIterator<K, V> seekingIterator, Iterable<? extends Entry<K, V>> entries)
     {
         Assert.assertNotNull(seekingIterator, "blockIterator is not null");
 
-        for (Entry<ChannelBuffer, ChannelBuffer> entry : entries) {
+        for (Entry<K, V> entry : entries) {
             assertTrue(seekingIterator.hasNext());
             assertEntryEquals(seekingIterator.peek(), entry);
             assertEntryEquals(seekingIterator.next(), entry);
@@ -56,11 +62,32 @@ public class BlockHelper
         }
     }
 
-    public static void assertEntryEquals(Entry<ChannelBuffer, ChannelBuffer> actual, Entry<ChannelBuffer, ChannelBuffer> expected)
+    public static <K, V> void assertEntryEquals(Entry<K, V> actual, Entry<K, V> expected)
     {
-        assertEquals(actual.getKey().toString(Charsets.UTF_8), expected.getKey().toString(Charsets.UTF_8));
-        assertEquals(actual.getValue().toString(Charsets.UTF_8), expected.getValue().toString(Charsets.UTF_8));
+        if (actual.getKey() instanceof ChannelBuffer) {
+            assertChannelBufferEquals((ChannelBuffer) actual.getKey(), (ChannelBuffer) expected.getKey());
+            assertChannelBufferEquals((ChannelBuffer) actual.getValue(), (ChannelBuffer) expected.getValue());
+        }
         assertEquals(actual, expected);
+    }
+
+    public static void assertChannelBufferEquals(ChannelBuffer actual, ChannelBuffer expected)
+    {
+        assertEquals(actual.toString(Charsets.UTF_8), expected.toString(Charsets.UTF_8));
+    }
+
+    public static String before(Entry<String, ?> expectedEntry)
+    {
+        String key = expectedEntry.getKey();
+        int lastByte = key.charAt(key.length() - 1);
+        return key.substring(0, key.length() - 1) + ((char) (lastByte - 1));
+    }
+
+    public static String after(Entry<String, ?> expectedEntry)
+    {
+        String key = expectedEntry.getKey();
+        int lastByte = key.charAt(key.length() - 1);
+        return key.substring(0, key.length() - 1) + ((char) (lastByte + 1));
     }
 
     public static ChannelBuffer before(Entry<ChannelBuffer, ?> expectedEntry)

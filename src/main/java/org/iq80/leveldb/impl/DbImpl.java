@@ -577,17 +577,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     {
         mutex.lock();
         try {
-            // merge together the memTable, immutableMemTable, and tables in version set
-            ImmutableList.Builder<SeekingIterator<InternalKey, ChannelBuffer>> iterators = ImmutableList.builder();
-            if (memTable != null && !memTable.isEmpty()) {
-                iterators.add(memTable.iterator());
-            }
-            if (immutableMemTable != null && !immutableMemTable.isEmpty()) {
-                iterators.add(immutableMemTable.iterator());
-            }
-            // todo only add if versions is not empty... makes debugging the iterators easier
-            iterators.add(versions.iterator());
-            SeekingIterator<InternalKey, ChannelBuffer> rawIterator = SeekingIterators.merge(iterators.build(), internalKeyComparator);
+            SeekingIterator<InternalKey, ChannelBuffer> rawIterator = internalIterator();
+
 
             // filter any entries not visible in our snapshot
             long snapshot = getSnapshotNumber(options);
@@ -598,6 +589,39 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                     INTERNAL_KEY_TO_USER_KEY,
                     createUserKeyToInternalKeyFunction(snapshot));
             return userIterator;
+        }
+        finally {
+            mutex.unlock();
+        }
+    }
+
+    SeekingIterable<InternalKey, ChannelBuffer> internalIterable()
+    {
+        return new SeekingIterable<InternalKey, ChannelBuffer>()
+        {
+            @Override
+            public SeekingIterator<InternalKey, ChannelBuffer> iterator()
+            {
+                return internalIterator();
+            }
+        };
+    }
+
+    SeekingIterator<InternalKey, ChannelBuffer> internalIterator()
+    {
+        mutex.lock();
+        try {
+            // merge together the memTable, immutableMemTable, and tables in version set
+            ImmutableList.Builder<SeekingIterator<InternalKey, ChannelBuffer>> iterators = ImmutableList.builder();
+            if (memTable != null && !memTable.isEmpty()) {
+                iterators.add(memTable.iterator());
+            }
+            if (immutableMemTable != null && !immutableMemTable.isEmpty()) {
+                iterators.add(immutableMemTable.iterator());
+            }
+            // todo only add if versions is not empty... makes debugging the iterators easier
+            iterators.add(versions.iterator());
+            return SeekingIterators.merge(iterators.build(), internalKeyComparator);
         }
         finally {
             mutex.unlock();
