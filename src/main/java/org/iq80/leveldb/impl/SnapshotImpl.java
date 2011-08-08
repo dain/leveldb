@@ -16,6 +16,6 @@ public class SnapshotImpl implements Snapshot
     public void release()
     {
         // todo
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
     }
 }
