@@ -302,7 +302,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
             // todo implement user comparator
             String editComparator = edit.getComparatorName();
             String userComparator = internalKeyComparator.getClass().getName();
-            Preconditions.checkArgument(editComparator != null && !editComparator.equals(userComparator),
+            Preconditions.checkArgument(editComparator == null || editComparator.equals(userComparator),
                     "Expected user comparator %s to match existing database comparator ", userComparator, editComparator);
 
             // apply edit
@@ -451,13 +451,13 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         List<FileMetaData> levelInputs;
         if (sizeCompaction) {
             level = current.getCompactionLevel();
-            Preconditions.checkState(level > 0);
+            Preconditions.checkState(level >= 0);
             Preconditions.checkState(level + 1 < NUM_LEVELS);
 
             // Pick the first file that comes after compact_pointer_[level]
             levelInputs = newArrayList();
             for (FileMetaData fileMetaData : current.getFiles(level)) {
-                if (compactPointers.containsKey(level) ||
+                if (!compactPointers.containsKey(level) ||
                         internalKeyComparator.compare(fileMetaData.getLargest(), compactPointers.get(level)) > 0) {
                     levelInputs.add(fileMetaData);
                     break;
