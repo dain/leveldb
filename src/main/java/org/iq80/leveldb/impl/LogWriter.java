@@ -1,35 +1,91 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
+import com.google.common.io.Closeables;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.jboss.netty.buffer.ChannelBuffer;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 
 public class LogWriter
 {
+    private final File file;
+    private final long fileNumber;
     private final FileChannel fileChannel;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
      * Current offset in the current block
      */
     private int blockOffset;
 
-    public LogWriter(FileChannel fileChannel)
+    public LogWriter(File file, long fileNumber)
+            throws FileNotFoundException
     {
-        this.fileChannel = fileChannel;
+        Preconditions.checkNotNull(file, "file is null");
+        Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
+
+        this.file = file;
+        this.fileNumber = fileNumber;
+        this.fileChannel = new FileOutputStream(file).getChannel();
+    }
+
+    public boolean isClosed()
+    {
+        return closed.get();
+    }
+
+    public synchronized void close()
+    {
+        closed.set(true);
+
+        // try to forces the log to disk
+        try {
+            fileChannel.force(true);
+        }
+        catch (IOException ignored) {
+        }
+
+        // close the channel
+        Closeables.closeQuietly(fileChannel);
+    }
+
+    public synchronized void delete()
+    {
+        closed.set(true);
+
+        // close the channel
+        Closeables.closeQuietly(fileChannel);
+
+        // try to delete the file
+        file.delete();
+    }
+
+    public File getFile()
+    {
+        return file;
+    }
+
+    public long getFileNumber()
+    {
+        return fileNumber;
     }
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
-
-    public void addRecord(ChannelBuffer record)
+    public synchronized void addRecord(ChannelBuffer record, boolean force)
             throws IOException
     {
+        Preconditions.checkState(!closed.get(), "Log has been closed");
+
         record = record.slice();
 
         // used to track first, middle and last blocks
@@ -91,6 +147,10 @@ public class LogWriter
             // we are no longer on the first chunk
             begin = false;
         } while (record.readable());
+
+        if (force) {
+            fileChannel.force(false);
+        }
     }
 
     private void writeChunk(LogChunkType type, ChannelBuffer buffer, int length)

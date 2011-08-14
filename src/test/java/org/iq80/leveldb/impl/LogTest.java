@@ -8,8 +8,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.List;
@@ -37,9 +37,7 @@ public class LogTest
         }
     };
 
-    private File file;
-    private RandomAccessFile randomAccessFile;
-    private FileChannel fileChannel;
+    private LogWriter writer;
 
     @Test
     public void testEmptyBlock()
@@ -102,38 +100,40 @@ public class LogTest
     private void testLog(List<ChannelBuffer> records)
             throws IOException
     {
-        LogWriter writer = new LogWriter(fileChannel);
-
         for (ChannelBuffer entry : records) {
-            writer.addRecord(entry);
+            writer.addRecord(entry, false);
         }
+        writer.close();
 
         // test readRecord
-        fileChannel.position(0);
-        LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
-        for (ChannelBuffer expected : records) {
-            ChannelBuffer actual = reader.readRecord();
-            assertEquals(actual, expected);
+        FileChannel fileChannel = new FileInputStream(writer.getFile()).getChannel();
+        try {
+            LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
+            for (ChannelBuffer expected : records) {
+                ChannelBuffer actual = reader.readRecord();
+                assertEquals(actual, expected);
+            }
+            assertNull(reader.readRecord());
         }
-        assertNull(reader.readRecord());
+        finally {
+            Closeables.closeQuietly(fileChannel);
+        }
     }
 
     @BeforeMethod
     public void setUp()
             throws Exception
     {
-        file = File.createTempFile("table", ".log");
-        randomAccessFile = new RandomAccessFile(file, "rw");
-        fileChannel = randomAccessFile.getChannel();
+        writer = new LogWriter(File.createTempFile("table", ".log"), 42);
     }
 
     @AfterMethod
     public void tearDown()
             throws Exception
     {
-        Closeables.closeQuietly(fileChannel);
-        Closeables.closeQuietly(randomAccessFile);
-        file.delete();
+        if (writer != null) {
+            writer.delete();
+        }
     }
 
     static ChannelBuffer toChannelBuffer(String value)

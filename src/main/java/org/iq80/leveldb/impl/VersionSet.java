@@ -8,11 +8,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
-import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import org.iq80.leveldb.SeekingIterable;
 import org.iq80.leveldb.SeekingIterator;
-import org.iq80.leveldb.table.Options;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -20,7 +18,6 @@ import org.jboss.netty.buffer.ChannelBuffers;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -64,11 +61,10 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
 
-    private FileChannel descriptorFile;
     private LogWriter descriptorLog;
     private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
 
-    public VersionSet(Options options, File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
@@ -203,39 +199,35 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
 
         finalizeVersion(version);
 
-        File newManifestFile = null;
+        boolean createdNewManifest = false;
         try {
             // Initialize new descriptor log file if necessary by creating
             // a temporary file that contains a snapshot of the current version.
             if (descriptorLog == null) {
-                Preconditions.checkState(descriptorFile == null);
-                newManifestFile = new File(databaseDir, Filename.descriptorFileName(manifestFileNumber));
                 edit.setNextFileNumber(nextFileNumber.get());
-                descriptorFile = new FileOutputStream(newManifestFile).getChannel();
-                descriptorLog = new LogWriter(descriptorFile);
+                descriptorLog = new LogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
                 writeSnapshot(descriptorLog);
+                createdNewManifest = true;
             }
 
             // Write new record to MANIFEST log
             ChannelBuffer record = ChannelBuffers.dynamicBuffer();
             edit.encodeTo(record);
-            descriptorLog.addRecord(record);
-            descriptorFile.force(false);
+            descriptorLog.addRecord(record, true);
 
             // If we just created a new descriptor file, install it by writing a
             // new CURRENT file that points to it.
-            if (newManifestFile != null) {
-                Filename.setCurrentFile(databaseDir, manifestFileNumber);
+            if (createdNewManifest) {
+                Filename.setCurrentFile(databaseDir, descriptorLog.getFileNumber());
             }
         }
         catch (IOException e) {
             // New manifest file was not installed, so clean up state and delete the file
-            if (newManifestFile != null) {
-                Closeables.closeQuietly(descriptorFile);
+            if (createdNewManifest) {
+                descriptorLog.close();
+                // todo add delete method to LogWriter
+                new File(databaseDir, Filename.logFileName(descriptorLog.getFileNumber())).delete();
                 descriptorLog = null;
-                descriptorFile = null;
-
-                newManifestFile.delete();
             }
             throw e;
         }
@@ -260,10 +252,9 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         // Save files
         edit.addFiles(current.getFiles());
 
-
         ChannelBuffer record = ChannelBuffers.dynamicBuffer();
         edit.encodeTo(record);
-        log.addRecord(record);
+        log.addRecord(record, false);
     }
 
     public void recover()
@@ -309,10 +300,10 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
             builder.apply(edit);
 
             // save edit values for verification below
-            logNumber = coalesce(logNumber, edit.getLogNumber());
-            prevLogNumber = coalesce(prevLogNumber, edit.getPreviousLogNumber());
-            nextFileNumber = coalesce(nextFileNumber, edit.getNextFileNumber());
-            lastSequence = coalesce(lastSequence, edit.getLastSequenceNumber());
+            logNumber = coalesce(edit.getLogNumber(), logNumber);
+            prevLogNumber = coalesce(edit.getPreviousLogNumber(), prevLogNumber);
+            nextFileNumber = coalesce(edit.getNextFileNumber(), nextFileNumber);
+            lastSequence = coalesce(edit.getLastSequenceNumber(), lastSequence);
         }
 
         List<String> problems = newArrayList();

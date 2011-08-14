@@ -19,6 +19,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -47,10 +48,9 @@ import static org.iq80.leveldb.impl.InternalKey.createUserKeyToInternalKeyFuncti
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
+import static org.iq80.leveldb.util.Buffers.readLengthPrefixedBytes;
 import static org.iq80.leveldb.util.Buffers.writeLengthPrefixedBytes;
 
-// todo needs a close method
-// todo implement remaining compaction methods
 // todo make thread safe and concurrent
 public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 {
@@ -66,8 +66,6 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     private final List<Long> pendingOutputs = newArrayList(); // todo
 
-    private FileChannel logChannel;
-    private long logFileNumber;
     private LogWriter log;
 
     private MemTable memTable;
@@ -112,7 +110,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyComparator), options.isVerifyChecksums());
 
         // create the version set
-        versions = new VersionSet(options, databaseDir, tableCache, internalKeyComparator);
+        versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
 
         // create the database dir if it does not already exist
         databaseDir.mkdirs();
@@ -161,20 +159,16 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             VersionEdit edit = new VersionEdit();
             Collections.sort(logs);
             for (Long fileNumber : logs) {
-//                long maxSequence = recoverLogFile(fileNumber, edit);
-//                if (versions.getLastSequence() < maxSequence) {
-//                    versions.setLastSequence(maxSequence);
-//                }
+                long maxSequence = recoverLogFile(fileNumber, edit);
+                if (versions.getLastSequence() < maxSequence) {
+                    versions.setLastSequence(maxSequence);
+                }
             }
 
             // open transaction log
-            long newLogNumber = versions.getNextFileNumber();
-            File logFile = new File(databaseDir, Filename.logFileName(newLogNumber));
-            FileChannel logChannel = new FileOutputStream(logFile).getChannel();
-            edit.setLogNumber(newLogNumber);
-            this.logChannel = logChannel;
-            this.logFileNumber = newLogNumber;
-            this.log = new LogWriter(logChannel);
+            long logFileNumber = versions.getNextFileNumber();
+            this.log = new LogWriter(new File(databaseDir, Filename.logFileName(logFileNumber)), logFileNumber);
+            edit.setLogNumber(log.getFileNumber());
 
             // apply recovered edits
             versions.logAndApply(edit);
@@ -197,7 +191,6 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
         mutex.lock();
         try {
-            makeRoomForWrite(true);
             while (backgroundCompaction != null) {
                 backgroundCondition.awaitUninterruptibly();
             }
@@ -212,6 +205,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+
+        log.close();
 
         dbLock.release();
     }
@@ -381,9 +376,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
-        if (immutableMemTable != null) {
-            compactMemTable();
-        }
+        compactMemTable();
 
         Compaction compaction;
         if (manualCompaction != null) {
@@ -396,7 +389,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
         if (compaction == null) {
             // no compaction
-        } else if (/* !isManual && */ compaction.isTrivialMove()) {
+        } else if (manualCompaction == null && compaction.isTrivialMove()) {
             // Move file to next level
             Preconditions.checkState(compaction.getLevelInputs().size() == 1);
             FileMetaData fileMetaData = compaction.getLevelInputs().get(0);
@@ -432,9 +425,57 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     }
 
     private long recoverLogFile(long fileNumber, VersionEdit edit)
+            throws IOException
     {
-        // todo implement tx log and recovery
-        throw new UnsupportedOperationException();
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+        File file = new File(databaseDir, Filename.logFileName(fileNumber));
+        FileChannel channel = new FileInputStream(file).getChannel();
+
+        LogMonitor logMonitor = LogMonitors.logMonitor();
+        LogReader logReader = new LogReader(channel, logMonitor, true, 0);
+
+        // Log(options_.info_log, "Recovering log #%llu", (unsigned long long) log_number);
+
+        // Read all the records and add to a memtable
+        long maxSequence = 0;
+        MemTable memTable = null;
+        for (ChannelBuffer record = logReader.readRecord(); record != null; record = logReader.readRecord()) {
+            // read header
+            if (record.readableBytes() < 12) {
+                logMonitor.corruption(record.readableBytes(), "log record too small");
+                continue;
+            }
+            long sequenceBegin = record.readLong();
+            int updateSize = record.readInt();
+
+            // read entries
+            WriteBatch writeBatch = readWriteBatch(record, updateSize);
+
+            // apply entries to memTable
+            if (memTable == null) {
+                memTable = new MemTable(internalKeyComparator);
+            }
+            writeBatch.forEach(new InsertIntoHandler(memTable, sequenceBegin));
+
+            // update the maxSequence
+            long lastSequence = sequenceBegin + updateSize - 1;
+            if (lastSequence > maxSequence) {
+                maxSequence = lastSequence;
+            }
+
+            // flush mem table if necessary
+            if (memTable.approximateMemoryUsage() > options.getWriteBufferSize()) {
+                writeLevel0Table(memTable, edit, null);
+                memTable = null;
+            }
+        }
+
+        // flush mem table
+        if (memTable != null) {
+            writeLevel0Table(memTable, edit, null);
+        }
+
+        return maxSequence;
     }
 
     public ChannelBuffer get(ChannelBuffer key)
@@ -511,54 +552,16 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             versions.setLastSequence(sequenceEnd);
 
             // Log write
-            final ChannelBuffer record = ChannelBuffers.dynamicBuffer();
-            record.writeLong(sequenceBegin);
-            record.writeInt(updates.size());
-            updates.forEach(new Handler()
-            {
-                @Override
-                public void put(ChannelBuffer key, ChannelBuffer value)
-                {
-                    record.writeByte(VALUE.getPersistentId());
-                    writeLengthPrefixedBytes(record, key.slice());
-                    writeLengthPrefixedBytes(record, value.slice());
-                }
-
-                @Override
-                public void delete(ChannelBuffer key)
-                {
-                    record.writeByte(DELETION.getPersistentId());
-                    writeLengthPrefixedBytes(record, key.slice());
-                }
-            });
+            ChannelBuffer record = writeWriteBatch(updates, sequenceBegin);
             try {
-                log.addRecord(record);
-                if (options.isSync()) {
-                    logChannel.force(false);
-                }
+                log.addRecord(record, options.isSync());
             }
             catch (IOException e) {
                 throw Throwables.propagate(e);
             }
 
             // Update memtable
-            final MemTable memTable = this.memTable;
-            updates.forEach(new Handler()
-            {
-                private long sequence = sequenceBegin;
-
-                @Override
-                public void put(ChannelBuffer key, ChannelBuffer value)
-                {
-                    memTable.add(sequence++, VALUE, key, value);
-                }
-
-                @Override
-                public void delete(ChannelBuffer key)
-                {
-                    memTable.add(sequence++, DELETION, key, ChannelBuffers.EMPTY_BUFFER);
-                }
-            });
+            updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
 
             return new SnapshotImpl(sequenceEnd);
         }
@@ -705,18 +708,13 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
                 // open a new log
                 long logNumber = versions.getNextFileNumber();
-                File file = new File(databaseDir, Filename.logFileName(logNumber));
-                FileChannel channel;
                 try {
-                    channel = new FileOutputStream(file).getChannel();
+                    this.log = new LogWriter(new File(databaseDir, Filename.logFileName(logNumber)), logNumber);
                 }
-                catch (FileNotFoundException e) {
-                    throw new RuntimeException("Unable to open new log file " + file.getAbsoluteFile(), e);
+                catch (IOException e) {
+                    throw new RuntimeException("Unable to open new log file " +
+                            new File(databaseDir, Filename.logFileName(logNumber)).getAbsoluteFile(), e);
                 }
-
-                this.log = new LogWriter(channel);
-                this.logChannel = channel;
-                this.logFileNumber = logNumber;
 
                 // create a new mem table
                 immutableMemTable = memTable;
@@ -734,25 +732,32 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             throws IOException
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
-        Preconditions.checkState(immutableMemTable != null);
+        if (immutableMemTable == null) {
+            return;
+        }
 
-        // Save the contents of the memtable as a new Table
-        VersionEdit edit = new VersionEdit();
-        Version base = versions.getCurrent();
-        writeLevel0Table(immutableMemTable, edit, base);
+        try {
+            // Save the contents of the memtable as a new Table
+            VersionEdit edit = new VersionEdit();
+            Version base = versions.getCurrent();
+            writeLevel0Table(immutableMemTable, edit, base);
 
-//        if (shuttingDown.get()) {
-//            throw new IOException("Database shutdown during memtable compaction");
-//        }
+            if (shuttingDown.get()) {
+                throw new IOException("Database shutdown during memtable compaction");
+            }
 
-        // Replace immutable memtable with the generated Table
-        edit.setPreviousLogNumber(0);
-        edit.setLogNumber(logFileNumber);  // Earlier logs no longer needed
-        versions.logAndApply(edit);
+            // Replace immutable memtable with the generated Table
+            edit.setPreviousLogNumber(0);
+            edit.setLogNumber(log.getFileNumber());  // Earlier logs no longer needed
+            versions.logAndApply(edit);
 
-        immutableMemTable = null;
+            immutableMemTable = null;
 
-        deleteObsoleteFiles();
+            deleteObsoleteFiles();
+        }
+        finally {
+            backgroundCondition.signalAll();
+        }
     }
 
     private void writeLevel0Table(MemTable memTable, VersionEdit edit, Version base)
@@ -768,6 +773,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         FileMetaData fileMetaData;
         mutex.unlock();
         try {
+            // todo must add file to pending files so it is not deleted out from under us by a compaction
             fileMetaData = buildTable(memTable);
         }
         finally {
@@ -857,24 +863,17 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
             while (iterator.hasNext() && !shuttingDown.get()) {
                 // always give priority to compacting the current mem table
-                if (immutableMemTable != null) {
-                    mutex.lock();
-                    try {
-                        compactMemTable();
-                    }
-                    finally {
-                        try {
-                            backgroundCondition.signalAll();
-                        }
-                        finally {
-                            mutex.unlock();
-                        }
-                    }
+                mutex.lock();
+                try {
+                    compactMemTable();
+                }
+                finally {
+                    mutex.unlock();
                 }
 
                 InternalKey key = iterator.peek().getKey();
                 if (compactionState.compaction.shouldStopBefore(key) && compactionState.builder != null) {
-                    finishCompactionOutputFile(compactionState, iterator);
+                    finishCompactionOutputFile(compactionState);
                 }
 
                 // Handle key/value, add to state, etc.
@@ -929,17 +928,17 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                     // Close output file if it is big enough
                     if (compactionState.builder.getFileSize() >=
                             compactionState.compaction.getMaxOutputFileSize()) {
-                        finishCompactionOutputFile(compactionState, iterator);
+                        finishCompactionOutputFile(compactionState);
                     }
                 }
                 iterator.next();
             }
 
-//            if (shuttingDown.get()) {
-//                throw new IOException("DB shutdown during compaction");
-//            }
+            if (shuttingDown.get()) {
+                throw new IOException("DB shutdown during compaction");
+            }
             if (compactionState.builder != null) {
-                finishCompactionOutputFile(compactionState, iterator);
+                finishCompactionOutputFile(compactionState);
             }
         }
         finally {
@@ -975,7 +974,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
-    private void finishCompactionOutputFile(CompactionState compactionState, SeekingIterator<InternalKey, ChannelBuffer> input)
+    private void finishCompactionOutputFile(CompactionState compactionState)
             throws IOException
     {
         Preconditions.checkNotNull(compactionState, "compactionState is null");
@@ -1100,6 +1099,82 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             this.level = level;
             this.begin = begin;
             this.end = end;
+        }
+    }
+
+    private WriteBatch readWriteBatch(ChannelBuffer record, int updateSize)
+            throws IOException
+    {
+        WriteBatch writeBatch = new WriteBatch();
+        int entries = 0;
+        while (record.readable()) {
+            entries++;
+            ValueType valueType = ValueType.getValueTypeByPersistentId(record.readByte());
+            if (valueType == VALUE) {
+                ChannelBuffer key = readLengthPrefixedBytes(record);
+                ChannelBuffer value = readLengthPrefixedBytes(record);
+                writeBatch.put(key, value);
+            } else if (valueType == VALUE) {
+                ChannelBuffer key = readLengthPrefixedBytes(record);
+                writeBatch.delete(key);
+            } else {
+                throw new IllegalStateException("Unexpected value type " + valueType);
+            }
+        }
+
+        if (entries != updateSize) {
+            throw new IOException(String.format("Expected %d entries in log record but found %s entries", updateSize, entries));
+        }
+
+        return writeBatch;
+    }
+
+    private ChannelBuffer writeWriteBatch(WriteBatch updates, long sequenceBegin)
+    {
+        final ChannelBuffer record = ChannelBuffers.dynamicBuffer();
+        record.writeLong(sequenceBegin);
+        record.writeInt(updates.size());
+        updates.forEach(new Handler()
+        {
+            @Override
+            public void put(ChannelBuffer key, ChannelBuffer value)
+            {
+                record.writeByte(VALUE.getPersistentId());
+                writeLengthPrefixedBytes(record, key.slice());
+                writeLengthPrefixedBytes(record, value.slice());
+            }
+
+            @Override
+            public void delete(ChannelBuffer key)
+            {
+                record.writeByte(DELETION.getPersistentId());
+                writeLengthPrefixedBytes(record, key.slice());
+            }
+        });
+        return record;
+    }
+
+    private static class InsertIntoHandler implements Handler
+    {
+        private long sequence;
+        private final MemTable memTable;
+
+        public InsertIntoHandler(MemTable memTable, long sequenceBegin)
+        {
+            this.memTable = memTable;
+            this.sequence = sequenceBegin;
+        }
+
+        @Override
+        public void put(ChannelBuffer key, ChannelBuffer value)
+        {
+            memTable.add(sequence++, VALUE, key, value);
+        }
+
+        @Override
+        public void delete(ChannelBuffer key)
+        {
+            memTable.add(sequence++, DELETION, key, ChannelBuffers.EMPTY_BUFFER);
         }
     }
 }
