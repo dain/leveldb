@@ -424,8 +424,37 @@ public class DbImplTest
     public void testApproximateSizesMixOfSmallAndLarge()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options(), databaseDir));
-        // todo implement
+        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options().setCompressionType(NONE), databaseDir));
+        Random random = new Random(301);
+        String big1 = randomString(random, 100000);
+        db.put(key(0), randomString(random, 10000));
+        db.put(key(1), randomString(random, 10000));
+        db.put(key(2), big1);
+        db.put(key(3), randomString(random, 10000));
+        db.put(key(4), big1);
+        db.put(key(5), randomString(random, 10000));
+        db.put(key(6), randomString(random, 300000));
+        db.put(key(7), randomString(random, 10000));
+
+        // Check sizes across recovery by reopening a few times
+        for (int run = 0; run < 3; run++) {
+            // todo reopen
+            db.compactMemTable();
+
+            assertBetween(db.size("", key(0)), 0, 0);
+            assertBetween(db.size("", key(1)), 10000, 11000);
+            assertBetween(db.size("", key(2)), 20000, 21000);
+            assertBetween(db.size("", key(3)), 120000, 121000);
+            assertBetween(db.size("", key(4)), 130000, 131000);
+            assertBetween(db.size("", key(5)), 230000, 231000);
+            assertBetween(db.size("", key(6)), 240000, 241000);
+            assertBetween(db.size("", key(7)), 540000, 541000);
+            assertBetween(db.size("", key(8)), 550000, 551000);
+
+            assertBetween(db.size(key(3), key(5)), 110000, 111000);
+
+            db.compactRange(0, key(0), key(100));
+        }
     }
 
     @Test
