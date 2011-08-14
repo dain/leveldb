@@ -94,7 +94,8 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         List<FileMetaData> fileMetaDataList = Lists.newArrayListWithCapacity(files.size());
         if (levelNumber == 0) {
             for (FileMetaData fileMetaData : files) {
-                if (internalKeyComparator.isOrdered(fileMetaData.getSmallest(), key.getInternalKey(), fileMetaData.getLargest())) {
+                if (internalKeyComparator.getUserComparator().compare(key.getUserKey(), fileMetaData.getSmallest().getUserKey()) >= 0 &&
+                        internalKeyComparator.getUserComparator().compare(key.getUserKey(), fileMetaData.getLargest().getUserKey()) <= 0) {
                     fileMetaDataList.add(fileMetaData);
                 }
             }
