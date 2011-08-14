@@ -604,6 +604,22 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         return Maps.immutableEntry(smallest, largest);
     }
 
+    public long getMaxNextLevelOverlappingBytes()
+    {
+        long result = 0;
+        for (int level = 1; level < NUM_LEVELS; level++) {
+            for (FileMetaData fileMetaData : current.getFiles(level)) {
+                List<FileMetaData> overlaps = getOverlappingInputs(level + 1, fileMetaData.getSmallest(), fileMetaData.getLargest());
+                long totalSize = 0;
+                for (FileMetaData overlap : overlaps) {
+                    totalSize += overlap.getFileSize();
+                }
+                result = Math.max(result, totalSize);
+            }
+        }
+        return result;
+    }
+
     /**
      * A helper class so we can efficiently apply a whole sequence
      * of edits to a particular state without creating intermediate

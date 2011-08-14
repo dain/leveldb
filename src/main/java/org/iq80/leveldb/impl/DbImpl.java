@@ -1053,6 +1053,11 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         return (limitOffset >= startOffset ? limitOffset - startOffset : 0);
     }
 
+    public long getMaxNextLevelOverlappingBytes()
+    {
+        return versions.getMaxNextLevelOverlappingBytes();
+    }
+
     private static class CompactionState
     {
         private final Compaction compaction;
