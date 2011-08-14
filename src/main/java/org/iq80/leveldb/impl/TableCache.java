@@ -47,6 +47,16 @@ public class TableCache
 
     public SeekingIterator<InternalKey, ChannelBuffer> newIterator(long number)
     {
+        Table table = getTable(number);
+        return SeekingIterators.transformKeys(table.iterator(), CHANNEL_BUFFER_TO_INTERNAL_KEY, INTERNAL_KEY_TO_CHANNEL_BUFFER);
+    }
+
+    public long getApproximateOffsetOf(FileMetaData file, ChannelBuffer key) {
+        return getTable(file.getNumber()).getApproximateOffsetOf(key);
+    }
+
+    private Table getTable(long number)
+    {
         Table table;
         try {
             table = cache.get(number).getTable();
@@ -58,7 +68,7 @@ public class TableCache
             }
             throw new RuntimeException("Could not open table " + number, cause);
         }
-        return SeekingIterators.transformKeys(table.iterator(), CHANNEL_BUFFER_TO_INTERNAL_KEY, INTERNAL_KEY_TO_CHANNEL_BUFFER);
+        return table;
     }
 
     public void evict(long number)

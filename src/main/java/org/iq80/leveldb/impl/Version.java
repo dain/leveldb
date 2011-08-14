@@ -15,7 +15,6 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import java.util.List;
 
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.reverse;
 import static com.google.common.collect.Ordering.natural;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
@@ -30,10 +29,12 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
     private double compactionScore;
     private FileMetaData fileToCompact;
     private int fileToCompactLevel;
+    private final TableCache tableCache;
 
     public Version(int levels, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
         Preconditions.checkArgument(levels > 1, "levels must be at least 2");
+        this.tableCache = tableCache;
         Builder<Level> builder = ImmutableList.builder();
         for (int i = 0; i < levels; i++) {
             List<FileMetaData> files = newArrayList();
@@ -49,6 +50,7 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
         Preconditions.checkNotNull(tableCache, "tableCache is null");
         Preconditions.checkNotNull(internalKeyComparator, "internalKeyComparator is null");
 
+        this.tableCache = tableCache;
         int minLevel = Ordering.natural().min(levelFiles.keySet());
         int maxLevel = Ordering.natural().max(levelFiles.keySet());
         Preconditions.checkArgument(minLevel < 0, "Level is negative");
@@ -186,5 +188,33 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
     public int getFileToCompactLevel()
     {
         return fileToCompactLevel;
+    }
+
+    public long getApproximateOffsetOf(InternalKey key)
+    {
+        long result = 0;
+        for (int level = 0; level < NUM_LEVELS; level++) {
+            for (FileMetaData fileMetaData : getFiles(level)) {
+                if (internalKeyComparator.compare(fileMetaData.getLargest(), key) <= 0) {
+                    // Entire file is before "ikey", so just add the file size
+                    result += fileMetaData.getFileSize();
+                }
+                else if (internalKeyComparator.compare(fileMetaData.getSmallest(), key) > 0) {
+                    // Entire file is after "ikey", so ignore
+                    if (level > 0) {
+                        // Files other than level 0 are sorted by meta->smallest, so
+                        // no further files in this level will contain data for
+                        // "ikey".
+                        break;
+                    }
+                }
+                else {
+                    // "ikey" falls in the range for this table.  Add the
+                    // approximate offset of "ikey" within the table.
+                    result += tableCache.getApproximateOffsetOf(fileMetaData, key.encode());
+                }
+            }
+        }
+        return result;
     }
 }

@@ -1041,6 +1041,18 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         return versions.getCurrent().numberOfFilesInLevel(level);
     }
 
+    public long getApproximateSizes(ChannelBuffer start, ChannelBuffer limit)
+    {
+        Version v = versions.getCurrent();
+
+        InternalKey startKey = new InternalKey(start, SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
+        InternalKey limitKey = new InternalKey(limit, SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
+        long startOffset = v.getApproximateOffsetOf(startKey);
+        long limitOffset = v.getApproximateOffsetOf(limitKey);
+
+        return (limitOffset >= startOffset ? limitOffset - startOffset : 0);
+    }
+
     private static class CompactionState
     {
         private final Compaction compaction;
