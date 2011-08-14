@@ -482,7 +482,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
             // Note that the next call will discard the file we placed in
             // c->inputs_[0] earlier and replace it with an overlapping set
             // which will include the picked file.
-            levelInputs.addAll(getOverlappingInputs(0, range.getKey(), range.getValue()));
+            levelInputs = getOverlappingInputs(0, range.getKey(), range.getValue());
 
             Preconditions.checkState(!levelInputs.isEmpty());
         }
@@ -541,7 +541,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         // (parent == level+1; grandparent == level+2)
         List<FileMetaData> grandparents = null;
         if (level + 2 < NUM_LEVELS) {
-            grandparents = getOverlappingInputs(level + 1, allStart, allLimit);
+            grandparents = getOverlappingInputs(level + 2, allStart, allLimit);
         }
 
 //        if (false) {
