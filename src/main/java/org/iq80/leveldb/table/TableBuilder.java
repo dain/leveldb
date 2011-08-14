@@ -76,7 +76,7 @@ public class TableBuilder
     public long getFileSize()
             throws IOException
     {
-        return fileChannel.position();
+        return fileChannel.position() + dataBlockBuilder.currentSizeEstimate();
     }
 
     public void add(BlockEntry blockEntry)
