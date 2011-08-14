@@ -276,8 +276,25 @@ public class DbImplTest
     public void testMinorCompactionsHappen()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options(), databaseDir));
-        // todo implement
+        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options().setVerifyChecksums(true).setWriteBufferSize(10000), databaseDir));
+
+        int n = 500;
+        int startingNumTables = db.totalTableFiles();
+        for (int i = 0; i < n; i++) {
+            db.put(key(i), key(i) + longString(1000, 'v'));
+        }
+        int endingNumTables = db.totalTableFiles();
+        assertTrue(endingNumTables > startingNumTables);
+
+        for (int i = 0; i < n; i++) {
+            assertEquals(db.get(key(i)), key(i) + longString(1000, 'v'));
+        }
+
+        // todo reopen
+        for (int i = 0; i < n; i++) {
+            assertEquals(db.get(key(i)), key(i) + longString(1000, 'v'));
+        }
+
     }
 
     @Test
@@ -413,17 +430,17 @@ public class DbImplTest
         assertTrue(db.numberOfFilesInLevel(0) > 0);
 
         assertEquals(big, db.get("foo", snapshot));
+        assertTrue(between(db.size("", "pastfoo"), 50000, 60000));
+        snapshot.release();
+        assertEquals(db.allEntriesFor("foo"), asList("tiny", big));
+        db.compactRange(0, "", "x");
+        assertEquals(db.allEntriesFor("foo"), asList("tiny"));
+        assertEquals(db.numberOfFilesInLevel(0), 0);
+        assertTrue(db.numberOfFilesInLevel(1) >= 1);
+        db.compactRange(1, "", "x");
+        assertEquals(db.allEntriesFor("foo"), asList("tiny"));
 
-        // todo port remaining code
-    }
-
-    private void fillLevels(DbStringWrapper db, String smallest, String largest)
-    {
-        for (int level = 0; level < NUM_LEVELS; level++) {
-            db.put(smallest, "begin");
-            db.put(largest, "end");
-            db.compactMemTable();
-        }
+        assertTrue(between(db.size("", "pastfoo"), 0, 1000));
     }
 
     @Test
@@ -660,6 +677,20 @@ public class DbImplTest
         return String.format("key%06d", i);
     }
 
+    private boolean between(long size, long left, long right)
+    {
+        return left <= size && size <= right;
+    }
+
+    private void fillLevels(DbStringWrapper db, String smallest, String largest)
+    {
+        for (int level = 0; level < NUM_LEVELS; level++) {
+            db.put(smallest, "begin");
+            db.put(largest, "end");
+            db.compactMemTable();
+        }
+    }
+
     private static class DbStringWrapper
     {
         private final DbImpl db;
@@ -749,6 +780,11 @@ public class DbImplTest
                 result += db.numberOfFilesInLevel(level);
             }
             return result;
+        }
+
+        public long size(String start, String limit)
+        {
+            return db.getApproximateSizes(toChannelBuffer(start), toChannelBuffer(limit));
         }
 
         private static class ChannelBufferToString implements Function<ChannelBuffer, String>
