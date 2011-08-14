@@ -92,7 +92,7 @@ public class TableCache
             fileChannel = new FileInputStream(tableFile).getChannel();
 
             try {
-                table = new Table(fileChannel, this.userComparator, verifyChecksums);
+                table = new Table(tableFile.getAbsolutePath(), fileChannel, this.userComparator, verifyChecksums);
             }
             catch (IOException e) {
                 Closeables.closeQuietly(fileChannel);

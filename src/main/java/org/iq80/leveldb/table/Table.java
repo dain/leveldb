@@ -21,6 +21,7 @@ import static org.iq80.leveldb.table.CompressionType.SNAPPY;
 
 public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 {
+    private final String name;
     private final FileChannel fileChannel;
     private final Comparator<ChannelBuffer> comparator;
 
@@ -29,13 +30,15 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private final Block indexBlock;
     private final BlockHandle metaindexBlockHandle;
 
-    public Table(FileChannel fileChannel, Comparator<ChannelBuffer> comparator, boolean verifyChecksums)
+    public Table(String name, FileChannel fileChannel, Comparator<ChannelBuffer> comparator, boolean verifyChecksums)
             throws IOException
     {
+        Preconditions.checkNotNull(name, "name is null");
         Preconditions.checkNotNull(fileChannel, "fileChannel is null");
         Preconditions.checkArgument(fileChannel.size() >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
         Preconditions.checkNotNull(comparator, "comparator is null");
 
+        this.name = name;
         this.fileChannel = fileChannel;
         this.verifyChecksums = verifyChecksums;
         this.comparator = comparator;
@@ -145,5 +148,17 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         buffer.position(0);
 
         return ChannelBuffers.wrappedBuffer(buffer);
+    }
+
+    @Override
+    public String toString()
+    {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("Table");
+        sb.append("{name='").append(name).append('\'');
+        sb.append(", comparator=").append(comparator);
+        sb.append(", verifyChecksums=").append(verifyChecksums);
+        sb.append('}');
+        return sb.toString();
     }
 }

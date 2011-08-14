@@ -30,7 +30,7 @@ public class TableTest
     public void testEmptyFile()
             throws Exception
     {
-        new Table(fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
+        new Table(file.getAbsolutePath(), fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
     }
 
     @Test
@@ -48,6 +48,7 @@ public class TableTest
         tableTest(Integer.MAX_VALUE, Integer.MAX_VALUE,
                 BlockHelper.createBlockEntry("name", "dain sundstrom"));
     }
+
     @Test
     public void testMultipleEntriesWithSingleBlock()
             throws Exception
@@ -101,7 +102,7 @@ public class TableTest
         }
         builder.finish();
 
-        Table table = new Table(fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
+        Table table = new Table(file.getAbsolutePath(), fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
 
         SeekingIterator<ChannelBuffer, ChannelBuffer> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);

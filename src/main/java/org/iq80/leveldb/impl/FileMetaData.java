@@ -80,4 +80,18 @@ public class FileMetaData
     {
         allowedSeeks.getAndDecrement();
     }
+
+    @Override
+    public String toString()
+    {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("FileMetaData");
+        sb.append("{number=").append(number);
+        sb.append(", fileSize=").append(fileSize);
+        sb.append(", smallest=").append(smallest);
+        sb.append(", largest=").append(largest);
+        sb.append(", allowedSeeks=").append(allowedSeeks);
+        sb.append('}');
+        return sb.toString();
+    }
 }
