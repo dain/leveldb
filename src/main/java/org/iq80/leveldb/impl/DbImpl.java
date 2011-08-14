@@ -968,7 +968,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
             File file = new File(databaseDir, Filename.tableFileName(fileNumber));
             compactionState.outfile = new FileOutputStream(file).getChannel();
-            compactionState.builder = new TableBuilder(options, compactionState.outfile, internalKeyComparator.getUserComparator());
+            compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
         }
         finally {
             mutex.unlock();
