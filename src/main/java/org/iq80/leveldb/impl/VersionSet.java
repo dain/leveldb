@@ -420,7 +420,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         return result;
     }
 
-    private static long maxFileSizeForLevel(int level)
+    public static long maxFileSizeForLevel(int level)
     {
         return TARGET_FILE_SIZE;  // We could vary per level to reduce number of files?
     }

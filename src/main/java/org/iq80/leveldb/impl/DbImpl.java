@@ -928,7 +928,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
                     // Close output file if it is big enough
                     if (compactionState.builder.getFileSize() >=
-                            compactionState.compaction.MaxOutputFileSize()) {
+                            compactionState.compaction.getMaxOutputFileSize()) {
                         finishCompactionOutputFile(compactionState, iterator);
                     }
                 }

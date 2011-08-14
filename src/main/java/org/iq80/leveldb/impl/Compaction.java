@@ -20,7 +20,7 @@ public class Compaction
     private final List<FileMetaData> levelUpInputs;
     private final List<FileMetaData> grandparents;
 
-    private long maxOutputFileSize;
+    private final long maxOutputFileSize;
     private final VersionEdit edit = new VersionEdit();
 
     // State used to check for number of of overlapping grandparent files
@@ -50,6 +50,7 @@ public class Compaction
         this.levelInputs = levelInputs;
         this.levelUpInputs = levelUpInputs;
         this.grandparents = grandparents;
+        this.maxOutputFileSize = VersionSet.maxFileSizeForLevel(level);
     }
 
     public int getLevel()
@@ -85,7 +86,7 @@ public class Compaction
     }
 
     // Maximum size of files to build during this compaction.
-    public long MaxOutputFileSize()
+    public long getMaxOutputFileSize()
     {
         return maxOutputFileSize;
     }
