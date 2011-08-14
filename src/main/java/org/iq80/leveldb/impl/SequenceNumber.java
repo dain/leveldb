@@ -23,6 +23,6 @@ public final class SequenceNumber
 
     public static long unpackSequenceNumber(long num)
     {
-        return num >> 8;
+        return num >>> 8;
     }
 }

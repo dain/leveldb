@@ -118,7 +118,7 @@ public class LogWriter
         ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE);
         header.putInt(crc);
         header.put((byte) (length & 0xff));
-        header.put((byte) (length >> 8));
+        header.put((byte) (length >>> 8));
         header.put((byte) (type.getPersistentId()));
 
         header.flip();

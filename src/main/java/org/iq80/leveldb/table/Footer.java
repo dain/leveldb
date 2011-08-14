@@ -71,7 +71,7 @@ public class Footer
 
         // write magic number as two (little endian) integers
         buffer.writeInt((int) TableBuilder.TABLE_MAGIC_NUMBER);
-        buffer.writeInt((int) (TableBuilder.TABLE_MAGIC_NUMBER >> 32));
+        buffer.writeInt((int) (TableBuilder.TABLE_MAGIC_NUMBER >>> 32));
     }
 
 }
