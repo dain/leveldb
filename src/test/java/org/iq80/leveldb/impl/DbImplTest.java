@@ -29,6 +29,7 @@ import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.table.BlockHelper.after;
 import static org.iq80.leveldb.table.BlockHelper.assertSequence;
 import static org.iq80.leveldb.table.BlockHelper.before;
+import static org.iq80.leveldb.table.CompressionType.NONE;
 import static org.iq80.leveldb.util.SeekingIterators.transformKeys;
 import static org.iq80.leveldb.util.SeekingIterators.transformValues;
 import static org.testng.Assert.assertEquals;
@@ -230,7 +231,7 @@ public class DbImplTest
     }
 
     // @Test
-    public void testReopen()
+    public void testRecover()
             throws Exception
     {
         DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options(), databaseDir));
@@ -338,16 +339,85 @@ public class DbImplTest
     public void testSparseMerge()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options(), databaseDir));
-        // todo implement
+        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options().setCompressionType(NONE), databaseDir));
+
+        fillLevels(db, "A", "Z");
+
+        // Suppose there is:
+        //    small amount of data with prefix A
+        //    large amount of data with prefix B
+        //    small amount of data with prefix C
+        // and that recent updates have made small changes to all three prefixes.
+        // Check that we do not do a compaction that merges all of B in one shot.
+        String value = longString(1000, 'x');
+        db.put("A", "va");
+
+        // Write approximately 100MB of "B" values
+        for (int i = 0; i < 100000; i++) {
+            String key = String.format("B%010d", i);
+            db.put(key, value);
+        }
+        db.put("C", "vc");
+        db.compactMemTable();
+        db.compactRange(0, "A", "Z");
+
+        // Make sparse update
+        db.put("A", "va2");
+        db.put("B100", "bvalue2");
+        db.put("C", "vc2");
+        db.compactMemTable();
+
+        // Compactions should not cause us to create a situation where
+        // a file overlaps too much data at the next level.
+        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20*1048576);
+        db.compactRange(0, "", "z");
+        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20*1048576);
+        db.compactRange(1, "", "z");
+        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20*1048576);
     }
 
     @Test
     public void testApproximateSizes()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options(), databaseDir));
-        // todo implement
+        DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options().setWriteBufferSize(100000000).setCompressionType(NONE), databaseDir));
+
+        assertBetween(db.size("", "xyz"), 0, 0);
+        // todo reopen
+        assertBetween(db.size("", "xyz"), 0, 0);
+
+        // Write 8MB (80 values, each 100K)
+        assertEquals(db.numberOfFilesInLevel(0), 0);
+        int n = 80;
+        Random random = new Random(301);
+        for (int i = 0; i < n; i++) {
+            db.put(key(i), randomString(random, 100000));
+        }
+
+        // 0 because GetApproximateSizes() does not account for memtable space
+        assertBetween(db.size("", key(50)), 0, 0);
+
+        // Check sizes across recovery by reopening a few times
+        for (int run = 0; run < 3; run++) {
+            // todo reopen
+            db.compactMemTable();
+
+            for (int compactStart = 0; compactStart < n; compactStart += 10) {
+                for (int i = 0; i < n; i += 10) {
+                    assertBetween(db.size("", key(i)), 100000 * i, 100000 * i + 10000);
+                    assertBetween(db.size("", key(i) + ".suffix"), 100000 * (i + 1), 100000 * (i + 1) + 10000);
+                    assertBetween(db.size(key(i), key(i + 10)), 100000 * 10, 100000 * 10 + 10000);
+                }
+                assertBetween(db.size("", key(50)), 5000000, 5010000);
+                assertBetween(db.size("", key(50) + ".suffix"), 5100000, 5110000);
+
+                db.compactRange(0, key(compactStart), key(compactStart + 9));
+            }
+
+            assertEquals(db.numberOfFilesInLevel(0), 0);
+            // todo why does this test expect there to be any level 1 files?
+            // assertTrue(db.numberOfFilesInLevel(1) > 0);
+        }
     }
 
     @Test
@@ -408,7 +478,6 @@ public class DbImplTest
         assertEquals("v4", db.get("foo"));
     }
 
-
     @Test
     public void testHiddenValuesAreRemoved()
             throws Exception
@@ -430,7 +499,7 @@ public class DbImplTest
         assertTrue(db.numberOfFilesInLevel(0) > 0);
 
         assertEquals(big, db.get("foo", snapshot));
-        assertTrue(between(db.size("", "pastfoo"), 50000, 60000));
+        assertBetween(db.size("", "pastFoo"), 50000, 60000);
         snapshot.release();
         assertEquals(db.allEntriesFor("foo"), asList("tiny", big));
         db.compactRange(0, "", "x");
@@ -440,7 +509,7 @@ public class DbImplTest
         db.compactRange(1, "", "x");
         assertEquals(db.allEntriesFor("foo"), asList("tiny"));
 
-        assertTrue(between(db.size("", "pastfoo"), 0, 1000));
+        assertBetween(db.size("", "pastFoo"), 0, 1000);
     }
 
     @Test
@@ -520,23 +589,6 @@ public class DbImplTest
     {
         DbStringWrapper db = new DbStringWrapper(new DbImpl(new Options(), databaseDir));
         // todo implement
-    }
-
-    private void assertNoNextElement(SeekingIterator<String, String> iterator)
-    {
-        assertFalse(iterator.hasNext());
-        try {
-            iterator.next();
-            fail("Expected NoSuchElementException");
-        }
-        catch (NoSuchElementException expected) {
-        }
-        try {
-            iterator.peek();
-            fail("Expected NoSuchElementException");
-        }
-        catch (NoSuchElementException expected) {
-        }
     }
 
     @Test
@@ -648,6 +700,29 @@ public class DbImplTest
         FileUtils.deleteRecursively(databaseDir);
     }
 
+    private void assertBetween(long actual, int smallest, int greatest)
+    {
+        if (!between(actual, smallest, greatest))  {
+            fail(String.format("Expected: %s to be between %s and %s", actual, smallest, greatest));
+        }
+    }
+
+    private void assertNoNextElement(SeekingIterator<String, String> iterator)
+    {
+        assertFalse(iterator.hasNext());
+        try {
+            iterator.next();
+            fail("Expected NoSuchElementException");
+        }
+        catch (NoSuchElementException expected) {
+        }
+        try {
+            iterator.peek();
+            fail("Expected NoSuchElementException");
+        }
+        catch (NoSuchElementException expected) {
+        }
+    }
 
     static ChannelBuffer toChannelBuffer(String value)
     {
@@ -787,6 +862,11 @@ public class DbImplTest
             return db.getApproximateSizes(toChannelBuffer(start), toChannelBuffer(limit));
         }
 
+        public long getMaxNextLevelOverlappingBytes()
+        {
+            return db.getMaxNextLevelOverlappingBytes();
+        }
+
         private static class ChannelBufferToString implements Function<ChannelBuffer, String>
         {
             @Override
@@ -804,7 +884,7 @@ public class DbImplTest
                 return toChannelBuffer(input);
             }
         }
-        
+
         private List<String> allEntriesFor(String userKey)
         {
             ImmutableList.Builder<String> result = ImmutableList.builder();
@@ -813,13 +893,14 @@ public class DbImplTest
                 if (entryKey.equals(userKey)) {
                     if (entry.getKey().getValueType() == ValueType.VALUE) {
                         result.add(entry.getValue().toString(UTF_8));
-                    } else {
+                    }
+                    else {
                         result.add("DEL");
                     }
                 }
             }
             return result.build();
         }
-    
+
     }
 }
