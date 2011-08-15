@@ -509,11 +509,15 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
         // Not in memTables; try live files in level order
         LookupResult lookupResult = versions.get(lookupKey);
+
+        // schedule compaction if necessary
+        if (versions.needsCompaction()) {
+            maybeScheduleCompaction();
+        }
+
         if (lookupResult != null) {
             return lookupResult.getValue();
         }
-
-        // todo schedule compaction
 
         return null;
     }
