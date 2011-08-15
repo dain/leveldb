@@ -8,7 +8,7 @@ copies of the C++ code.
 # Current status
 
 Currently the code base is basically functional, but only trivially tested.
-This code some places the code is a literal conversion of the C++ code and in
+In some places, this code is a literal conversion of the C++ code and in
 others it has been converted to a more natural Java style.  The plan is to
 leave the code closer to the C++ original until the baseline performance has
 been established.
@@ -18,6 +18,7 @@ been established.
 
 * Get, put, delete, batch writes and iteration implemented
 * Snapshots implemented (needs testing)
+* TX logging and recovery
 
 ## Storage
 
@@ -32,6 +33,9 @@ been established.
 * MemTable to Level0 compaction
 * Version persistence and VersionSet management
 * Read and write log files
+* Level0 compaction
+* Arbitrary range compaction
+* Compaction scheduling
 
 # Implementation Nodes
 
@@ -86,12 +90,6 @@ be rewritten).  Of course, all of this must be verified in a profiler.
 
 # TODO
 
-## Compaction
-
-* Level0 compaction
-* Arbitrary range compaction
-* Compaction scheduling
-
 ## Performance
 
 There has been no performance tests yet.
@@ -116,6 +114,5 @@ the drawing-board already.
 ## Other
 
 * Need logging interface
-* TX logging and recovery
 * Need iterator structure inspector for easier debugging
 * All buffers must be in little endian
