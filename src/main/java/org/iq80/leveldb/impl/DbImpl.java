@@ -1118,7 +1118,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 ChannelBuffer key = readLengthPrefixedBytes(record);
                 ChannelBuffer value = readLengthPrefixedBytes(record);
                 writeBatch.put(key, value);
-            } else if (valueType == VALUE) {
+            } else if (valueType == DELETION) {
                 ChannelBuffer key = readLengthPrefixedBytes(record);
                 writeBatch.delete(key);
             } else {
