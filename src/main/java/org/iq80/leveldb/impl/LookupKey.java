@@ -2,7 +2,7 @@ package org.iq80.leveldb.impl;
 
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
@@ -23,7 +23,7 @@ public class LookupKey
     {
         // A conservative estimate of the key length
         // todo add function to calculate exact size of packed int
-        key = ChannelBuffers.buffer(user_key.readableBytes() + 13);
+        key = Buffers.buffer(user_key.readableBytes() + 13);
 
         // write length
         VariableLengthQuantity.packInt(user_key.readableBytes() + 8, key);

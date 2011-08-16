@@ -1,12 +1,13 @@
 package org.iq80.leveldb.impl;
 
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.iq80.leveldb.impl.LogChunkType.BAD_CHUNK;
 import static org.iq80.leveldb.impl.LogChunkType.EOF;
 import static org.iq80.leveldb.impl.LogChunkType.UNKNOWN;
@@ -44,11 +45,11 @@ public class LogReader
      */
     private long endOfBufferOffset;
 
-    private ChannelBuffer scratch = ChannelBuffers.dynamicBuffer(BLOCK_SIZE);
+    private ChannelBuffer scratch = Buffers.dynamicBuffer(BLOCK_SIZE);
 
     private ChannelBuffer currentChunk;
 
-    private ByteBuffer currentBlock = ByteBuffer.allocate(BLOCK_SIZE);
+    private ByteBuffer currentBlock = Buffers.allocateByteBuffer(BLOCK_SIZE);
 
     public LogReader(FileChannel fileChannel, LogMonitor monitor, boolean verifyChecksums, long initialOffset)
     {
@@ -265,8 +266,10 @@ public class LogReader
 
         // set chunk ot valid slice of the block buffer
         ByteBuffer slice = currentBlock.duplicate();
+        // wow duplicate does not copy endianness!
+        slice.order(LITTLE_ENDIAN);
         slice.limit(slice.position() + length);
-        currentChunk = ChannelBuffers.wrappedBuffer(slice);
+        currentChunk = Buffers.wrappedBuffer(slice);
 
         // advance the blockBuffer to the end of this chunk
         currentBlock.position(currentBlock.position() + length);

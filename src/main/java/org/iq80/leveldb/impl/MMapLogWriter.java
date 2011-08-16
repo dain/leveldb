@@ -4,7 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closeables;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import sun.nio.ch.FileChannelImpl;
 
 import java.io.File;
@@ -60,7 +60,7 @@ public class MMapLogWriter implements LogWriter
         this.fileNumber = fileNumber;
         this.fileChannel = new RandomAccessFile(file, "rw").getChannel();
         mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, 0, PAGE_SIZE);
-        fileMap = ChannelBuffers.wrappedBuffer(mappedByteBuffer);
+        fileMap = Buffers.wrappedBuffer(mappedByteBuffer);
         fileMap.clear();
     }
 
@@ -213,7 +213,7 @@ public class MMapLogWriter implements LogWriter
             unmap();
 
             mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, fileOffset, PAGE_SIZE);
-            fileMap = ChannelBuffers.wrappedBuffer(mappedByteBuffer);
+            fileMap = Buffers.wrappedBuffer(mappedByteBuffer);
             fileMap.clear();
         }
     }
@@ -233,7 +233,7 @@ public class MMapLogWriter implements LogWriter
         int crc = getChunkChecksum(type.getPersistentId(), buffer.array(), buffer.arrayOffset() + buffer.readerIndex(), length);
 
         // Format the header
-        ChannelBuffer header = ChannelBuffers.buffer(HEADER_SIZE);
+        ChannelBuffer header = Buffers.buffer(HEADER_SIZE);
         header.writeInt(crc);
         header.writeByte((byte) (length & 0xff));
         header.writeByte((byte) (length >>> 8));

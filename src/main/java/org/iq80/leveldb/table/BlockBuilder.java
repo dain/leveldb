@@ -5,11 +5,10 @@ import com.google.common.primitives.Ints;
 import org.iq80.leveldb.util.IntVector;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.util.Comparator;
 
-import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 public class BlockBuilder
@@ -23,7 +22,7 @@ public class BlockBuilder
     private int restartBlockEntryCount;
 
     private boolean finished;
-    private ChannelBuffer lastKey = ChannelBuffers.dynamicBuffer(128);
+    private ChannelBuffer lastKey = Buffers.dynamicBuffer(128);
 
     public BlockBuilder(ChannelBuffer buffer, int blockRestartInterval, Comparator<ChannelBuffer> comparator)
     {
@@ -90,7 +89,9 @@ public class BlockBuilder
         Preconditions.checkState(!finished, "block is finished");
         Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 
-        Preconditions.checkArgument(!lastKey.readable() || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
+        if (lastKey.readable() && comparator.compare(key, lastKey) <= 0) {
+            Preconditions.checkArgument(!lastKey.readable() || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
+        }
 
         int sharedKeyBytes = 0;
         if (restartBlockEntryCount < blockRestartInterval) {

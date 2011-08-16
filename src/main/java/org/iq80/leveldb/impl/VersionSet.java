@@ -14,7 +14,7 @@ import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -220,7 +220,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
             }
 
             // Write new record to MANIFEST log
-            ChannelBuffer record = ChannelBuffers.dynamicBuffer();
+            ChannelBuffer record = Buffers.dynamicBuffer();
             edit.encodeTo(record);
             descriptorLog.addRecord(record, true);
 
@@ -261,7 +261,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         // Save files
         edit.addFiles(current.getFiles());
 
-        ChannelBuffer record = ChannelBuffers.dynamicBuffer();
+        ChannelBuffer record = Buffers.dynamicBuffer();
         edit.encodeTo(record);
         log.addRecord(record, false);
     }

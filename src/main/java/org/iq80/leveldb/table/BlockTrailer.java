@@ -2,7 +2,7 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 public class BlockTrailer
 {
@@ -79,7 +79,7 @@ public class BlockTrailer
 
     public static ChannelBuffer writeBlockTrailer(BlockTrailer blockTrailer)
     {
-        ChannelBuffer buffer = ChannelBuffers.buffer(ENCODED_LENGTH);
+        ChannelBuffer buffer = Buffers.buffer(ENCODED_LENGTH);
         writeBlockTrailer(blockTrailer, buffer);
         return buffer;
     }

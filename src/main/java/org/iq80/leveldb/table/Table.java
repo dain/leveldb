@@ -8,7 +8,7 @@ import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.xerial.snappy.Snappy;
 
 import java.io.EOFException;
@@ -96,7 +96,7 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         if (blockTrailer.getCompressionType() == SNAPPY) {
             // todo when code is change to direct buffers, use the buffer method instead
             int uncompressedLength = Snappy.uncompressedLength(data.array(), data.arrayOffset() + data.readerIndex(), blockHandle.getDataSize());
-            uncompressedData = ChannelBuffers.buffer(uncompressedLength);
+            uncompressedData = Buffers.buffer(uncompressedLength);
             Snappy.uncompress(data.array(), data.arrayOffset() + data.readerIndex(), blockHandle.getDataSize(), uncompressedData.array(), uncompressedData.arrayOffset());
             uncompressedData.writerIndex(uncompressedLength);
         }
@@ -134,8 +134,7 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     public static ChannelBuffer read(FileChannel channel, long position, int length)
             throws IOException
     {
-        ByteBuffer buffer = ByteBuffer.allocate(length);
-//        buffer.order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer buffer = Buffers.allocateByteBuffer(length);
 
         while (buffer.remaining() > 0) {
             int bytesRead = channel.read(buffer, position + buffer.position());
@@ -147,7 +146,7 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
         buffer.position(0);
 
-        return ChannelBuffers.wrappedBuffer(buffer);
+        return Buffers.wrappedBuffer(buffer);
     }
 
     @Override

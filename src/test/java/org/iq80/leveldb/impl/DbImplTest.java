@@ -8,7 +8,7 @@ import org.iq80.leveldb.Snapshot;
 import org.iq80.leveldb.table.Options;
 import org.iq80.leveldb.util.FileUtils;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -753,7 +753,7 @@ public class DbImplTest
             assertSequence(seekingIterator, nextEntries.subList(1, nextEntries.size()));
         }
 
-        ChannelBuffer endKey = ChannelBuffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+        ChannelBuffer endKey = Buffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey.toString(Charsets.UTF_8));
         assertSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
     }
@@ -799,7 +799,7 @@ public class DbImplTest
 
     static ChannelBuffer toChannelBuffer(String value)
     {
-        return ChannelBuffers.wrappedBuffer(value.getBytes(UTF_8));
+        return Buffers.wrappedBuffer(value.getBytes(UTF_8));
     }
 
 

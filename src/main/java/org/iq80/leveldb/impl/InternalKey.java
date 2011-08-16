@@ -3,7 +3,7 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
@@ -38,7 +38,7 @@ public class InternalKey
 
     public ChannelBuffer getUserKey()
     {
-        return userKey.duplicate();
+        return userKey;
     }
 
     public long getSequenceNumber()
@@ -53,10 +53,51 @@ public class InternalKey
 
     public ChannelBuffer encode()
     {
-        ChannelBuffer buffer = ChannelBuffers.buffer(userKey.readableBytes() + SIZE_OF_LONG);
+        ChannelBuffer buffer = Buffers.buffer(userKey.readableBytes() + SIZE_OF_LONG);
         buffer.writeBytes(userKey.slice());
         buffer.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
         return buffer;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        InternalKey that = (InternalKey) o;
+
+        if (sequenceNumber != that.sequenceNumber) {
+            return false;
+        }
+        if (userKey != null ? !userKey.equals(that.userKey) : that.userKey != null) {
+            return false;
+        }
+        if (valueType != that.valueType) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private int hash = 0;
+    @Override
+    public int hashCode()
+    {
+        if (hash == 0) {
+            int result = userKey != null ? userKey.hashCode() : 0;
+            result = 31 * result + (int) (sequenceNumber ^ (sequenceNumber >>> 32));
+            result = 31 * result + (valueType != null ? valueType.hashCode() : 0);
+            if (result == 0) {
+                result = 1;
+            }
+            hash = result;
+        }
+        return hash;
     }
 
     @Override

@@ -4,7 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
@@ -69,11 +69,11 @@ public class TableBuilder
         blockSize = options.getBlockSize();
         compressionType = options.getCompressionType();
 
-        dataBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval, userComparator);
-        indexBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), 1, userComparator);
+        dataBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), blockRestartInterval, userComparator);
+        indexBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), 1, userComparator);
 
-        lastKey = ChannelBuffers.dynamicBuffer(128);
-        compressedOutput = ChannelBuffers.dynamicBuffer(128);
+        lastKey = Buffers.dynamicBuffer(128);
+        compressedOutput = Buffers.dynamicBuffer(128);
 
     }
 
@@ -113,7 +113,7 @@ public class TableBuilder
 
             userComparator.findShortestSeparator(lastKey, key);
 
-            ChannelBuffer handleEncoding = ChannelBuffers.dynamicBuffer();
+            ChannelBuffer handleEncoding = Buffers.dynamicBuffer();
             BlockHandle.writeBlockHandle(pendingHandle, handleEncoding);
             indexBlockBuilder.add(lastKey, handleEncoding);
             pendingIndexEntry = false;
@@ -180,7 +180,7 @@ public class TableBuilder
         BlockHandle blockHandle = new BlockHandle(position, blockContents.readableBytes());
 
         // write data and trailer
-        position += fileChannel.write(ChannelBuffers.wrappedBuffer(blockContents, trailer).toByteBuffers());
+        position += fileChannel.write(Buffers.wrappedBuffer(blockContents, trailer).toByteBuffers());
 
         // clean up state
         compressedOutput.clear();
@@ -201,7 +201,7 @@ public class TableBuilder
         closed = true;
 
         // write (empty) meta index block
-        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
+        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
         // TODO(postrelease): Add stats and other meta blocks
         BlockHandle metaindexBlockHandle = writeBlock(metaIndexBlockBuilder);
 
@@ -209,7 +209,7 @@ public class TableBuilder
         if (pendingIndexEntry) {
             userComparator.findShortSuccessor(lastKey);
 
-            ChannelBuffer handleEncoding = ChannelBuffers.dynamicBuffer();
+            ChannelBuffer handleEncoding = Buffers.dynamicBuffer();
             BlockHandle.writeBlockHandle(pendingHandle, handleEncoding);
             indexBlockBuilder.add(lastKey, handleEncoding);
             pendingIndexEntry = false;

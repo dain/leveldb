@@ -4,7 +4,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 import org.iq80.leveldb.impl.DbConstants;
@@ -12,9 +11,9 @@ import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.impl.WriteBatch;
 import org.iq80.leveldb.impl.WriteOptions;
 import org.iq80.leveldb.table.Options;
+import org.iq80.leveldb.util.Buffers;
 import org.iq80.leveldb.util.FileUtils;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
 import org.xerial.snappy.Snappy;
 
 import java.io.File;
@@ -350,11 +349,11 @@ public class DbBenchmark
         }
     }
 
-    private static ChannelBuffer formatNumber(long n)
+    public static ChannelBuffer formatNumber(long n)
     {
         Preconditions.checkArgument(n >= 0, "number must be positive");
 
-        ChannelBuffer buffer = ChannelBuffers.buffer(16);
+        ChannelBuffer buffer = Buffers.buffer(16);
         buffer.writerIndex(16);
 
         int i = 15;
@@ -506,6 +505,7 @@ public class DbBenchmark
         //      stats       -- Print DB stats
         //      heapprofile -- Dump a heap profile (if supported by this port)
         benchmarks(ImmutableList.<String>of(
+                "fillseq",
                 "fillseq",
                 "fillseq",
                 "fillsync",
@@ -663,7 +663,7 @@ public class DbBenchmark
             // that it is larger than the compression window (32KB), and also
             // large enough to serve all typical value sizes we want to write.
             Random rnd = new Random(301);
-            data = ChannelBuffers.buffer(1048576 + 100);
+            data = Buffers.buffer(1048576 + 100);
             while (data.readableBytes() < 1048576) {
                 // Add a short fragment that is as compressible as specified
                 // by FLAGS_compression_ratio.
@@ -691,11 +691,11 @@ public class DbBenchmark
         if (raw < 1) {
             raw = 1;
         }
-        ChannelBuffer rawData = ChannelBuffers.buffer(raw);
+        ChannelBuffer rawData = Buffers.buffer(raw);
         RandomString(rnd, raw, rawData);
 
         // Duplicate the random data until we have filled "len" bytes
-        ChannelBuffer dst = ChannelBuffers.buffer(len + raw);
+        ChannelBuffer dst = Buffers.buffer(len + raw);
         while (dst.readableBytes() < len) {
             dst.writeBytes(rawData, rawData.readerIndex(), rawData.readableBytes());
         }

@@ -1,8 +1,8 @@
 package org.iq80.leveldb.table;
 
-import com.google.common.collect.Ordering;
+import org.iq80.leveldb.util.ChannelBufferComparator;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -19,7 +19,7 @@ public class BlockTest
     public void testEmptyBuffer()
             throws Exception
     {
-        new Block(ChannelBuffers.EMPTY_BUFFER, CHANNEL_BUFFER_COMPARATOR);
+        new Block(Buffers.EMPTY_BUFFER, CHANNEL_BUFFER_COMPARATOR);
     }
 
     @Test
@@ -96,7 +96,7 @@ public class BlockTest
 
     private void blockTest(int blockRestartInterval, List<BlockEntry> entries)
     {
-        BlockBuilder builder = new BlockBuilder(ChannelBuffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
+        BlockBuilder builder = new BlockBuilder(Buffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
 
         for (BlockEntry entry : entries) {
             builder.add(entry);
@@ -106,7 +106,7 @@ public class BlockTest
         ChannelBuffer blockBuffer = builder.finish();
         assertEquals(builder.currentSizeEstimate(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
-        Block block = new Block(blockBuffer, Ordering.<ChannelBuffer>natural());
+        Block block = new Block(blockBuffer, ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR);
         assertEquals(block.size(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
         BlockIterator blockIterator = block.iterator();
@@ -127,7 +127,7 @@ public class BlockTest
             BlockHelper.assertSequence(blockIterator, nextEntries.subList(1, nextEntries.size()));
         }
 
-        blockIterator.seek(ChannelBuffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}));
+        blockIterator.seek(Buffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}));
         BlockHelper.assertSequence(blockIterator, Collections.<BlockEntry>emptyList());
 
     }

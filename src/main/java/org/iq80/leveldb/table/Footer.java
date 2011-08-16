@@ -2,7 +2,7 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import static org.iq80.leveldb.table.BlockHandle.readBlockHandle;
 import static org.iq80.leveldb.table.BlockHandle.writeBlockHandle;
@@ -52,7 +52,7 @@ public class Footer
 
     public static ChannelBuffer writeFooter(Footer Footer)
     {
-        ChannelBuffer buffer = ChannelBuffers.buffer(ENCODED_LENGTH);
+        ChannelBuffer buffer = Buffers.buffer(ENCODED_LENGTH);
         writeFooter(Footer, buffer);
         return buffer;
     }

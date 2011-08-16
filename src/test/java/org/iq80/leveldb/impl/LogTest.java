@@ -3,7 +3,7 @@ package org.iq80.leveldb.impl;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closeables;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -161,7 +161,7 @@ public class LogTest
     static ChannelBuffer toChannelBuffer(String value, int times)
     {
         byte[] bytes = value.getBytes(UTF_8);
-        ChannelBuffer buffer = ChannelBuffers.buffer(bytes.length * times);
+        ChannelBuffer buffer = Buffers.buffer(bytes.length * times);
         for (int i = 0; i < times; i++) {
             buffer.writeBytes(bytes);
         }

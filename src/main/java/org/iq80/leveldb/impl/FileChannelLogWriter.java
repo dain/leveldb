@@ -2,6 +2,7 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.Closeables;
+import org.iq80.leveldb.util.Buffers;
 import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.io.File;
@@ -108,7 +109,7 @@ public class FileChannelLogWriter implements LogWriter
                 if (bytesRemainingInBlock > 0) {
                     // Fill the rest of the block with zeros
                     // todo lame... need a better way to write zeros
-                    fileChannel.write(ByteBuffer.wrap(new byte[bytesRemainingInBlock]));
+                    fileChannel.write(Buffers.byteBufferWrap(new byte[bytesRemainingInBlock]));
                 }
                 blockOffset = 0;
                 bytesRemainingInBlock = BLOCK_SIZE - blockOffset;
@@ -180,7 +181,7 @@ public class FileChannelLogWriter implements LogWriter
         int crc = Logs.getChunkChecksum(type.getPersistentId(), buffer.array(), buffer.arrayOffset() + buffer.readerIndex(), length);
 
         // Format the header
-        ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE);
+        ByteBuffer header = Buffers.allocateByteBuffer(HEADER_SIZE);
         header.putInt(crc);
         header.put((byte) (length & 0xff));
         header.put((byte) (length >>> 8));

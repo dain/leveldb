@@ -3,7 +3,7 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.table.UserComparator;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 
@@ -31,7 +31,7 @@ public class InternalUserComparator implements UserComparator
         ChannelBuffer startUserKey = new InternalKey(start).getUserKey();
         ChannelBuffer limitUserKey = new InternalKey(limit).getUserKey();
 
-        ChannelBuffer tmp = ChannelBuffers.directBuffer(startUserKey.readableBytes());
+        ChannelBuffer tmp = Buffers.directBuffer(startUserKey.readableBytes());
         tmp.writeBytes(startUserKey.duplicate());
 
         internalKeyComparator.getUserComparator().findShortestSeparator(tmp, limitUserKey);
@@ -54,7 +54,7 @@ public class InternalUserComparator implements UserComparator
     {
         ChannelBuffer userKey = new InternalKey(key).getUserKey();
 
-        ChannelBuffer tmp = ChannelBuffers.directBuffer(userKey.readableBytes());
+        ChannelBuffer tmp = Buffers.directBuffer(userKey.readableBytes());
         tmp.writeBytes(userKey.duplicate());
 
         internalKeyComparator.getUserComparator().findShortSuccessor(tmp.slice());

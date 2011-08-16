@@ -3,7 +3,7 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Charsets;
 import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.testng.Assert;
 
 import java.util.Arrays;
@@ -92,7 +92,7 @@ public class BlockHelper
 
     public static ChannelBuffer before(Entry<ChannelBuffer, ?> expectedEntry)
     {
-        ChannelBuffer channelBuffer = ChannelBuffers.copiedBuffer(expectedEntry.getKey());
+        ChannelBuffer channelBuffer = Buffers.copiedBuffer(expectedEntry.getKey());
         int lastByte = channelBuffer.readableBytes() - 1;
         channelBuffer.setByte(lastByte, channelBuffer.getByte(lastByte) - 1);
         return channelBuffer;
@@ -100,7 +100,7 @@ public class BlockHelper
 
     public static ChannelBuffer after(Entry<ChannelBuffer, ?> expectedEntry)
     {
-        ChannelBuffer channelBuffer = ChannelBuffers.copiedBuffer(expectedEntry.getKey());
+        ChannelBuffer channelBuffer = Buffers.copiedBuffer(expectedEntry.getKey());
         int lastByte = channelBuffer.readableBytes() - 1;
         channelBuffer.setByte(lastByte, channelBuffer.getByte(lastByte) + 1);
         return channelBuffer;
@@ -133,6 +133,6 @@ public class BlockHelper
 
     static BlockEntry createBlockEntry(String key, String value)
     {
-        return new BlockEntry(ChannelBuffers.copiedBuffer(key, UTF_8), ChannelBuffers.copiedBuffer(value, UTF_8));
+        return new BlockEntry(Buffers.copiedBuffer(key, UTF_8), Buffers.copiedBuffer(value, UTF_8));
     }
 }

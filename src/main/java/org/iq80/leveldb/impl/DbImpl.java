@@ -15,9 +15,8 @@ import org.iq80.leveldb.table.BasicUserComparator;
 import org.iq80.leveldb.table.Options;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.iq80.leveldb.util.SizeOf;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -51,7 +50,6 @@ import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 import static org.iq80.leveldb.util.Buffers.readLengthPrefixedBytes;
 import static org.iq80.leveldb.util.Buffers.writeLengthPrefixedBytes;
-import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
@@ -1156,7 +1154,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     private ChannelBuffer writeWriteBatch(WriteBatch updates, long sequenceBegin)
     {
-        final ChannelBuffer record = ChannelBuffers.buffer(SIZE_OF_LONG + SIZE_OF_INT + updates.getApproximateSize());
+        final ChannelBuffer record = Buffers.buffer(SIZE_OF_LONG + SIZE_OF_INT + updates.getApproximateSize());
         record.writeLong(sequenceBegin);
         record.writeInt(updates.size());
         updates.forEach(new Handler()
@@ -1199,7 +1197,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         @Override
         public void delete(ChannelBuffer key)
         {
-            memTable.add(sequence++, DELETION, key, ChannelBuffers.EMPTY_BUFFER);
+            memTable.add(sequence++, DELETION, key, Buffers.EMPTY_BUFFER);
         }
     }
 }

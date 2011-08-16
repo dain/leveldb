@@ -4,7 +4,7 @@ import com.google.common.base.Preconditions;
 import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.util.Comparator;
 import java.util.NoSuchElementException;
@@ -166,7 +166,7 @@ public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuff
         int valueLength = VariableLengthQuantity.unpackInt(data);
 
         // read key
-        ChannelBuffer key = ChannelBuffers.buffer(sharedKeyLength + nonSharedKeyLength);
+        ChannelBuffer key = Buffers.buffer(sharedKeyLength + nonSharedKeyLength);
         if (sharedKeyLength > 0) {
             Preconditions.checkState(previousEntry != null, "Entry has a shared key but no previous entry was provided");
             key.writeBytes(previousEntry.getKey(), 0, sharedKeyLength);

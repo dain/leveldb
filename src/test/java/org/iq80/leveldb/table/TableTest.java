@@ -4,7 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.io.Closeables;
 import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -129,7 +129,7 @@ public class TableTest
             lastApproximateOffset = approximateOffset;
         }
 
-        ChannelBuffer endKey = ChannelBuffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+        ChannelBuffer endKey = Buffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey);
         BlockHelper.assertSequence(seekingIterator, Collections.<BlockEntry>emptyList());
 

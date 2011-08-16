@@ -4,87 +4,51 @@ import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.util.Comparator;
 
-import static org.jboss.netty.buffer.ChannelBuffers.swapLong;
-
 public class ChannelBufferComparator implements Comparator<ChannelBuffer>
 {
     public static final ChannelBufferComparator CHANNEL_BUFFER_COMPARATOR = new ChannelBufferComparator();
 
     @Override
-    public int compare(ChannelBuffer bufferA, ChannelBuffer bufferB) {
-        final int aLen = bufferA.readableBytes();
-        final int bLen = bufferB.readableBytes();
-        final int minLength = Math.min(aLen, bLen);
-        final int longCount = minLength >>> 3;
-        final int byteCount = minLength & 7;
+    public int compare(ChannelBuffer bufferA, ChannelBuffer bufferB)
+    {
+        if (bufferA.isDirect() || bufferB.isDirect()) {
+            int aReadableBytes = bufferA.readableBytes();
+            int bReadableBytes = bufferB.readableBytes();
+            int minSize = Math.min(aReadableBytes, bReadableBytes);
 
-        int aIndex = bufferA.readerIndex();
-        int bIndex = bufferB.readerIndex();
+            int aBase = bufferA.readerIndex();
+            int bBase = bufferB.readerIndex();
 
-        if (bufferA.order() == bufferB.order()) {
-            for (int i = longCount; i > 0; i --) {
-                long va = bufferA.getLong(aIndex);
-                long vb = bufferB.getLong(bIndex);
-                if (va != vb) {
+            for (int i = 0; i < minSize; i++) {
+                int v1 = bufferA.getUnsignedByte(aBase + i);
+                int v2 = bufferB.getUnsignedByte(bBase + i);
 
-                    // if upper match, mask upper and compare
-                    // else shift upper to lower
-                    if (va >>> 32 == vb >>> 32) {
-                        va = va & 0xFFFFFFFFL;
-                        vb = vb & 0xFFFFFFFFL;
-                    } else {
-                        va = va >>> 32;
-                        vb = vb >>> 32;
-                    }
-
-                    if (va > vb) {
-                        return 1;
-                    } else if (va < vb) {
-                        return -1;
-                    }
+                if (v1 != v2) {
+                    return v1 - v2;
                 }
-                aIndex += 8;
-                bIndex += 8;
             }
-        } else {
-            for (int i = longCount; i > 0; i --) {
-                long va = bufferA.getLong(aIndex);
-                long vb = swapLong(bufferB.getLong(bIndex));
-                if (va != vb) {
+            return aReadableBytes - bReadableBytes;
+        }
+        else {
+            byte[] aArray = bufferA.array();
+            byte[] bArray = bufferB.array();
 
-                    // if upper match, mask upper and compare
-                    // else shift upper to lower
-                    if (va >>> 32 == vb >>> 32) {
-                        va = va & 0xFFFFFFFFL;
-                        vb = vb & 0xFFFFFFFFL;
-                    } else {
-                        va = va >>> 32;
-                        vb = vb >>> 32;
-                    }
+            int aBase = bufferA.arrayOffset() + bufferA.readerIndex();
+            int bBase = bufferB.arrayOffset() + bufferB.readerIndex();
 
-                    if (va > vb) {
-                        return 1;
-                    } else if (va < vb) {
-                        return -1;
-                    }
+            int aReadableBytes = bufferA.readableBytes();
+            int bReadableBytes = bufferB.readableBytes();
+            int minSize = Math.min(aReadableBytes, bReadableBytes);
+
+            for (int i = 0; i < minSize; i++) {
+                int v1 = aArray[aBase++] & 0xFF;
+                int v2 = bArray[bBase++] & 0xFF;
+
+                if (v1 != v2) {
+                    return v1 - v2;
                 }
-                aIndex += 8;
-                bIndex += 8;
             }
+            return aReadableBytes - bReadableBytes;
         }
-
-        for (int i = byteCount; i > 0; i --) {
-            int va = bufferA.getUnsignedByte(aIndex);
-            int vb = bufferB.getUnsignedByte(bIndex);
-            if (va > vb) {
-                return 1;
-            } else if (va < vb) {
-                return -1;
-            }
-            aIndex ++;
-            bIndex ++;
-        }
-
-        return aLen - bLen;
     }
 }

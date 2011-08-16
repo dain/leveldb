@@ -3,7 +3,7 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.util.Map.Entry;
 
@@ -28,7 +28,7 @@ public class InternalEntry implements Entry<InternalKey, ChannelBuffer>
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
         this.key = key;
-        this.value = ChannelBuffers.unmodifiableBuffer(value);
+        this.value = Buffers.unmodifiableBuffer(value);
     }
 
     @Override

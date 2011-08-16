@@ -3,11 +3,10 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.SeekingIterable;
 import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
+import org.iq80.leveldb.util.Buffers;
 
 import java.util.Comparator;
 
-import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 /**
@@ -79,8 +78,8 @@ public class Block implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             data = block.slice(0, restartOffset);
         }
         else {
-            data = ChannelBuffers.EMPTY_BUFFER;
-            restartPositions = ChannelBuffers.EMPTY_BUFFER;
+            data = Buffers.EMPTY_BUFFER;
+            restartPositions = Buffers.EMPTY_BUFFER;
         }
     }
 
