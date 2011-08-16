@@ -167,7 +167,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
             // open transaction log
             long logFileNumber = versions.getNextFileNumber();
-            this.log = new LogWriter(new File(databaseDir, Filename.logFileName(logFileNumber)), logFileNumber);
+            this.log = Logs.createLogWriter(new File(databaseDir, Filename.logFileName(logFileNumber)), logFileNumber);
             edit.setLogNumber(log.getFileNumber());
 
             // apply recovered edits
@@ -713,7 +713,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 // open a new log
                 long logNumber = versions.getNextFileNumber();
                 try {
-                    this.log = new LogWriter(new File(databaseDir, Filename.logFileName(logNumber)), logNumber);
+                    this.log = Logs.createLogWriter(new File(databaseDir, Filename.logFileName(logNumber)), logNumber);
                 }
                 catch (IOException e) {
                     throw new RuntimeException("Unable to open new log file " +

@@ -1,13 +1,11 @@
 package org.iq80.leveldb.impl;
 
-import com.google.common.collect.AbstractIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
 
 import static org.iq80.leveldb.impl.LogChunkType.BAD_CHUNK;
 import static org.iq80.leveldb.impl.LogChunkType.EOF;
@@ -16,7 +14,7 @@ import static org.iq80.leveldb.impl.LogChunkType.ZERO_TYPE;
 import static org.iq80.leveldb.impl.LogChunkType.getLogChunkTypeByPersistentId;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
-import static org.iq80.leveldb.impl.LogWriter.getChunkChecksum;
+import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
 
 public class LogReader
 {
