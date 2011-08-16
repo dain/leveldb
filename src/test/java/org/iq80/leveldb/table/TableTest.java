@@ -1,5 +1,6 @@
 package org.iq80.leveldb.table;
 
+import com.google.common.base.Preconditions;
 import com.google.common.io.Closeables;
 import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -94,6 +95,7 @@ public class TableTest
     private void tableTest(int blockSize, int blockRestartInterval, List<BlockEntry> entries)
             throws IOException
     {
+        reopenFile();
         Options options = new Options().setBlockSize(blockSize).setBlockRestartInterval(blockRestartInterval);
         TableBuilder builder = new TableBuilder(options, fileChannel, new BasicUserComparator());
 
@@ -140,7 +142,15 @@ public class TableTest
     public void setUp()
             throws Exception
     {
+        reopenFile();
+        Preconditions.checkState(0 == fileChannel.position(), "Expected fileChannel.position %s to be 0", fileChannel.position());
+    }
+
+    private void reopenFile()
+            throws IOException
+    {
         file = File.createTempFile("table", ".db");
+        file.delete();
         randomAccessFile = new RandomAccessFile(file, "rw");
         fileChannel = randomAccessFile.getChannel();
     }

@@ -1,6 +1,7 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -48,10 +49,18 @@ public class TableBuilder
 
     private final ChannelBuffer compressedOutput;
 
+    private long position;
+
     public TableBuilder(Options options, FileChannel fileChannel, UserComparator userComparator)
     {
         Preconditions.checkNotNull(options, "options is null");
         Preconditions.checkNotNull(fileChannel, "fileChannel is null");
+        try {
+            Preconditions.checkState(position == fileChannel.position(), "Expected position %s to equal fileChannel.position %s", position, fileChannel.position());
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
 
         this.fileChannel = fileChannel;
         this.userComparator = userComparator;
@@ -76,7 +85,7 @@ public class TableBuilder
     public long getFileSize()
             throws IOException
     {
-        return fileChannel.position() + dataBlockBuilder.currentSizeEstimate();
+        return position + dataBlockBuilder.currentSizeEstimate();
     }
 
     public void add(BlockEntry blockEntry)
@@ -168,10 +177,10 @@ public class TableBuilder
         ChannelBuffer trailer = BlockTrailer.writeBlockTrailer(blockTrailer);
 
         // create a handle to this block
-        BlockHandle blockHandle = new BlockHandle(fileChannel.position(), blockContents.readableBytes());
+        BlockHandle blockHandle = new BlockHandle(position, blockContents.readableBytes());
 
         // write data and trailer
-        fileChannel.write(ChannelBuffers.wrappedBuffer(blockContents, trailer).toByteBuffers());
+        position += fileChannel.write(ChannelBuffers.wrappedBuffer(blockContents, trailer).toByteBuffers());
 
         // clean up state
         compressedOutput.clear();
@@ -212,7 +221,7 @@ public class TableBuilder
         // write footer
         Footer footer = new Footer(metaindexBlockHandle, indexBlockHandle);
         ChannelBuffer footerEncoding = Footer.writeFooter(footer);
-        fileChannel.write(footerEncoding.toByteBuffers());
+        position += fileChannel.write(footerEncoding.toByteBuffers());
     }
 
     public void abandon()
