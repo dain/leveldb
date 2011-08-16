@@ -676,7 +676,9 @@ public class DbBenchmark
                 position = 0;
                 assert (length < data.readableBytes());
             }
-            ChannelBuffer slice = data.slice(position, length);
+            ChannelBuffer slice = data.duplicate();
+            slice.readerIndex(position);
+            slice.writerIndex(position + length);
             position += length;
             return slice;
         }

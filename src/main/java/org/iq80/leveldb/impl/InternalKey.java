@@ -33,7 +33,9 @@ public class InternalKey
 
     public ChannelBuffer getUserKey()
     {
-        return data.copy(0, data.readableBytes() - SIZE_OF_LONG);
+        ChannelBuffer buffer = data.duplicate();
+        buffer.writerIndex(data.readableBytes() - SIZE_OF_LONG);
+        return buffer;
     }
 
     public long getSequenceNumber()
