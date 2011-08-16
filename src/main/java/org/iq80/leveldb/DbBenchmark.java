@@ -1,6 +1,7 @@
 package org.iq80.leveldb;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -340,13 +341,32 @@ public class DbBenchmark
             WriteBatch batch = new WriteBatch();
             for (int j = 0; j < entries_per_batch; j++) {
                 int k = (order == SEQUENTIAL) ? i + j : rand_.nextInt(num_);
-                ChannelBuffer key = ChannelBuffers.copiedBuffer(String.format("%016d", k), Charsets.UTF_8);
+                ChannelBuffer key = formatNumber(k);
                 batch.put(key, gen_.generate(valueSize));
                 bytes_ += valueSize + key.readableBytes();
                 finishedSingleOp();
             }
             db_.write(writeOptions, batch);
         }
+    }
+
+    private static ChannelBuffer formatNumber(long n)
+    {
+        Preconditions.checkArgument(n >= 0, "number must be positive");
+
+        ChannelBuffer buffer = ChannelBuffers.buffer(16);
+        buffer.writerIndex(16);
+
+        int i = 15;
+        while (n > 0) {
+            buffer.setByte(i--, (int) ('0' + (n % 10)));
+            n /= 10;
+        }
+        while (i >= 0) {
+            buffer.setByte(i--, '0');
+        }
+
+        return buffer;
     }
 
     private void finishedSingleOp()
