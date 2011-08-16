@@ -44,7 +44,7 @@ public class MMapLogWriter implements LogWriter
     private final AtomicBoolean closed = new AtomicBoolean();
     private MappedByteBuffer mappedByteBuffer;
     private ChannelBuffer fileMap;
-    long fileOffset;
+    private long fileOffset;
     /**
      * Current offset in the current block
      */
@@ -70,19 +70,22 @@ public class MMapLogWriter implements LogWriter
     }
 
     public synchronized void close()
+            throws IOException
     {
         closed.set(true);
 
-        // try to forces the log to disk
-        mappedByteBuffer.force();
-
         destroyMappedByteBuffer();
+
+        if (fileChannel.isOpen()) {
+            fileChannel.truncate(fileOffset);
+        }
 
         // close the channel
         Closeables.closeQuietly(fileChannel);
     }
 
     public synchronized void delete()
+            throws IOException
     {
         close();
 
@@ -92,7 +95,10 @@ public class MMapLogWriter implements LogWriter
 
     private void destroyMappedByteBuffer()
     {
-        unmap();
+        if (mappedByteBuffer != null) {
+            fileOffset += fileMap.readableBytes();
+            unmap();
+        }
         mappedByteBuffer = null;
         fileMap = null;
     }
@@ -193,7 +199,7 @@ public class MMapLogWriter implements LogWriter
         // write the header and the payload
         ensureCapacity(header.readableBytes() + buffer.readableBytes());
         fileMap.writeBytes(header);
-        fileMap.writeBytes(buffer);
+        fileMap.writeBytes(buffer, length);
 
         blockOffset += HEADER_SIZE + length;
     }

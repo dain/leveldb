@@ -222,6 +222,7 @@ public class LogReader
         if (length > readableBytes(currentBlock)) {
             int dropSize = readableBytes(currentBlock) + HEADER_SIZE;
             currentBlock.clear();
+            currentBlock.limit(0);
             reportCorruption(dropSize, "Invalid chunk length");
             return BAD_CHUNK;
         }
@@ -231,6 +232,7 @@ public class LogReader
             // Skip zero length record without reporting any drops since
             // such records are produced by the writing code.
             currentBlock.clear();
+            currentBlock.limit(0);
             return BAD_CHUNK;
         }
 
@@ -243,6 +245,7 @@ public class LogReader
                 // like a valid log record.
                 int dropSize = readableBytes(currentBlock) + HEADER_SIZE;
                 currentBlock.clear();
+                currentBlock.limit(0);
                 reportCorruption(dropSize, "Invalid chunk checksum");
                 return BAD_CHUNK;
             }
@@ -296,6 +299,7 @@ public class LogReader
             }
             catch (IOException e) {
                 currentBlock.clear();
+                currentBlock.limit(0);
                 reportDrop(BLOCK_SIZE, e);
                 eof = true;
                 return false;

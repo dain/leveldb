@@ -205,8 +205,16 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-
-        log.close();
+        try {
+            versions.destroy();
+        }
+        catch (IOException ignored) {
+        }
+        try {
+            log.close();
+        }
+        catch (IOException ignored) {
+        }
 
         dbLock.release();
     }
@@ -709,6 +717,15 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             else {
                 // Attempt to switch to a new memtable and trigger compaction of old
                 Preconditions.checkState(versions.getPrevLogNumber() == 0);
+
+                // close the existing log
+                try {
+                    log.close();
+                }
+                catch (IOException e) {
+                    throw new RuntimeException("Unable to close log file " + log.getFile(), e);
+                }
+
 
                 // open a new log
                 long logNumber = versions.getNextFileNumber();

@@ -9,9 +9,11 @@ public interface LogWriter
 {
     boolean isClosed();
 
-    void close();
+    void close()
+            throws IOException;
 
-    void delete();
+    void delete()
+            throws IOException;
 
     File getFile();
 

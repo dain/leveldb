@@ -1,5 +1,6 @@
 package org.iq80.leveldb.impl;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closeables;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -46,13 +47,13 @@ public class LogTest
         testLog();
     }
 
-
     @Test
     public void testSmallRecord()
             throws Exception
     {
         testLog(toChannelBuffer("dain sundstrom"));
     }
+
 
     @Test
     public void testMultipleSmallRecords()
@@ -91,6 +92,13 @@ public class LogTest
         testLog(records);
     }
 
+    @Test
+    public void testReadWithoutProperClose()
+            throws Exception
+    {
+        testLog(ImmutableList.of(toChannelBuffer("something"), toChannelBuffer("something else")), false);
+    }
+
     private void testLog(ChannelBuffer... entries)
             throws IOException
     {
@@ -100,10 +108,19 @@ public class LogTest
     private void testLog(List<ChannelBuffer> records)
             throws IOException
     {
+        testLog(records, true);
+    }
+
+    private void testLog(List<ChannelBuffer> records, boolean closeWriter)
+            throws IOException
+    {
         for (ChannelBuffer entry : records) {
             writer.addRecord(entry, false);
         }
-        writer.close();
+
+        if (closeWriter) {
+            writer.close();
+        }
 
         // test readRecord
         FileChannel fileChannel = new FileInputStream(writer.getFile()).getChannel();

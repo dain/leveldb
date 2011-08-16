@@ -72,6 +72,15 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         appendVersion(new Version(NUM_LEVELS, tableCache, internalKeyComparator));
     }
 
+    public void destroy()
+            throws IOException
+    {
+        if (descriptorLog != null) {
+            descriptorLog.close();
+            descriptorLog = null;
+        }
+    }
+
     private void appendVersion(Version version)
     {
         Preconditions.checkNotNull(version, "version is null");
