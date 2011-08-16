@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
+import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
@@ -28,7 +29,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
     private final int levelNumber;
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
-    private List<FileMetaData> files;
+    private final List<FileMetaData> files;
 
     public Level(int levelNumber, List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
@@ -37,7 +38,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         Preconditions.checkNotNull(tableCache, "tableCache is null");
         Preconditions.checkNotNull(internalKeyComparator, "channelBufferOrdering is null");
 
-        this.files = ImmutableList.copyOf(files);
+        this.files = newArrayList(files);
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
         Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
@@ -207,7 +208,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
     public void addFile(FileMetaData fileMetaData)
     {
         // todo remove mutation
-        files = ImmutableList.<FileMetaData>builder().addAll(files).add(fileMetaData).build();
+        files.add(fileMetaData);
     }
 
     @Override
