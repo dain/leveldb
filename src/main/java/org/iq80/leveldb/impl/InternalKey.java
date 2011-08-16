@@ -10,16 +10,19 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class InternalKey
 {
+    private final ChannelBuffer userKey;
+    private final long sequenceNumber;
+    private final ValueType valueType;
+
     public InternalKey(ChannelBuffer userKey, long sequenceNumber, ValueType valueType)
     {
         Preconditions.checkNotNull(userKey, "userKey is null");
         Preconditions.checkArgument(sequenceNumber >= 0, "sequenceNumber is negative");
         Preconditions.checkNotNull(valueType, "valueType is null");
 
-        ChannelBuffer buffer = ChannelBuffers.buffer(userKey.readableBytes() + SIZE_OF_LONG);
-        buffer.writeBytes(userKey.slice());
-        buffer.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
-        data = ChannelBuffers.unmodifiableBuffer(buffer);
+        this.userKey = userKey.duplicate();
+        this.sequenceNumber = sequenceNumber;
+        this.valueType = valueType;
     }
 
     public InternalKey(ChannelBuffer data)
@@ -28,30 +31,32 @@ public class InternalKey
         if (data.readableBytes() < SIZE_OF_LONG) {
             Preconditions.checkArgument(data.readableBytes() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         }
-        this.data = data;
+        this.userKey = getUserKey(data);
+        this.sequenceNumber = getSequenceNumber(data);
+        this.valueType = getValueType(data);
     }
 
     public ChannelBuffer getUserKey()
     {
-        ChannelBuffer buffer = data.duplicate();
-        buffer.writerIndex(data.readableBytes() - SIZE_OF_LONG);
-        return buffer;
+        return userKey.duplicate();
     }
 
     public long getSequenceNumber()
     {
-        return SequenceNumber.unpackSequenceNumber(data.getLong(data.readableBytes() - SIZE_OF_LONG));
+        return sequenceNumber;
     }
 
     public ValueType getValueType()
     {
-        return SequenceNumber.unpackValueType(data.getLong(data.readableBytes() - SIZE_OF_LONG));
+        return valueType;
     }
 
     public ChannelBuffer encode()
     {
-        Preconditions.checkState(data.readable());
-        return data.duplicate();
+        ChannelBuffer buffer = ChannelBuffers.buffer(userKey.readableBytes() + SIZE_OF_LONG);
+        buffer.writeBytes(userKey.slice());
+        buffer.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
+        return buffer;
     }
 
     @Override
@@ -78,8 +83,6 @@ public class InternalKey
     {
         return new UserKeyInternalKeyFunction(sequenceNumber);
     }
-
-    private final ChannelBuffer data;
 
 
     private static class InternalKeyToChannelBufferFunction implements Function<InternalKey, ChannelBuffer>
@@ -124,4 +127,24 @@ public class InternalKey
             return new InternalKey(channelBuffer, sequenceNumber, ValueType.VALUE);
         }
     }
+
+
+    private static ChannelBuffer getUserKey(ChannelBuffer data)
+    {
+        ChannelBuffer buffer = data.duplicate();
+        buffer.writerIndex(data.readableBytes() - SIZE_OF_LONG);
+        return buffer;
+    }
+
+    private static long getSequenceNumber(ChannelBuffer data)
+    {
+        return SequenceNumber.unpackSequenceNumber(data.getLong(data.readableBytes() - SIZE_OF_LONG));
+    }
+
+    private static ValueType getValueType(ChannelBuffer data)
+    {
+        return SequenceNumber.unpackValueType(data.getLong(data.readableBytes() - SIZE_OF_LONG));
+    }
+
+
 }
