@@ -1,6 +1,7 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.collect.ComparisonChain;
+import com.google.common.primitives.Longs;
 import org.iq80.leveldb.table.UserComparator;
 
 import java.util.Arrays;
@@ -24,10 +25,12 @@ public class InternalKeyComparator implements Comparator<InternalKey>
     @Override
     public int compare(InternalKey left, InternalKey right)
     {
-        return ComparisonChain.start()
-                .compare(left.getUserKey(), right.getUserKey(), userComparator)
-                .compare(right.getSequenceNumber(), left.getSequenceNumber()) // reverse sorted version numbers
-                .result();
+        int result = userComparator.compare(left.getUserKey(), right.getUserKey());
+        if (result != 0) {
+            return result;
+        }
+
+        return Longs.compare(right.getSequenceNumber(), left.getSequenceNumber()); // reverse sorted version numbers
     }
 
     /**

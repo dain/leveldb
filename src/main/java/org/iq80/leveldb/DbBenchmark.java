@@ -507,6 +507,7 @@ public class DbBenchmark
         //      heapprofile -- Dump a heap profile (if supported by this port)
         benchmarks(ImmutableList.<String>of(
                 "fillseq",
+                "fillseq",
                 "fillsync",
                 "fillrandom",
                 "overwrite",
