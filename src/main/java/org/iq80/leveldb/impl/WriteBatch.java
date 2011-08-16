@@ -12,6 +12,12 @@ import static com.google.common.collect.Lists.newArrayList;
 public class WriteBatch
 {
     private List<Entry<ChannelBuffer, ChannelBuffer>> batch = newArrayList();
+    private int approximateSize;
+
+    public int getApproximateSize()
+    {
+        return approximateSize;
+    }
 
     public int size()
     {
@@ -23,6 +29,7 @@ public class WriteBatch
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
         batch.add(Maps.immutableEntry(key, value));
+        approximateSize += 12 + key.readableBytes() + value.readableBytes();
         return this;
     }
 
@@ -30,6 +37,7 @@ public class WriteBatch
     {
         Preconditions.checkNotNull(key, "key is null");
         batch.add(Maps.immutableEntry(key, (ChannelBuffer) null));
+        approximateSize += 6 + key.readableBytes();
         return this;
     }
 

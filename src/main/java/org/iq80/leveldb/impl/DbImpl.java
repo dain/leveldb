@@ -15,6 +15,7 @@ import org.iq80.leveldb.table.BasicUserComparator;
 import org.iq80.leveldb.table.Options;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.util.SeekingIterators;
+import org.iq80.leveldb.util.SizeOf;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 
@@ -50,6 +51,9 @@ import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 import static org.iq80.leveldb.util.Buffers.readLengthPrefixedBytes;
 import static org.iq80.leveldb.util.Buffers.writeLengthPrefixedBytes;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 // todo make thread safe and concurrent
 public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
@@ -1152,7 +1156,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
     private ChannelBuffer writeWriteBatch(WriteBatch updates, long sequenceBegin)
     {
-        final ChannelBuffer record = ChannelBuffers.dynamicBuffer();
+        final ChannelBuffer record = ChannelBuffers.buffer(SIZE_OF_LONG + SIZE_OF_INT + updates.getApproximateSize());
         record.writeLong(sequenceBegin);
         record.writeInt(updates.size());
         updates.forEach(new Handler()
@@ -1161,15 +1165,15 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             public void put(ChannelBuffer key, ChannelBuffer value)
             {
                 record.writeByte(VALUE.getPersistentId());
-                writeLengthPrefixedBytes(record, key.slice());
-                writeLengthPrefixedBytes(record, value.slice());
+                writeLengthPrefixedBytes(record, key.duplicate());
+                writeLengthPrefixedBytes(record, value.duplicate());
             }
 
             @Override
             public void delete(ChannelBuffer key)
             {
                 record.writeByte(DELETION.getPersistentId());
-                writeLengthPrefixedBytes(record, key.slice());
+                writeLengthPrefixedBytes(record, key.duplicate());
             }
         });
         return record;
