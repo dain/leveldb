@@ -339,6 +339,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                     try {
                         backgroundCall();
                     }
+                    catch (DatabaseShutdownException ignored) {
+                    }
                     catch (Throwable e) {
                         // todo add logging system
                         e.printStackTrace();
@@ -766,7 +768,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             writeLevel0Table(immutableMemTable, edit, base);
 
             if (shuttingDown.get()) {
-                throw new IOException("Database shutdown during memtable compaction");
+                throw new DatabaseShutdownException("Database shutdown during memtable compaction");
             }
 
             // Replace immutable memtable with the generated Table
@@ -958,7 +960,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             }
 
             if (shuttingDown.get()) {
-                throw new IOException("DB shutdown during compaction");
+                throw new DatabaseShutdownException("DB shutdown during compaction");
             }
             if (compactionState.builder != null) {
                 finishCompactionOutputFile(compactionState);
@@ -1198,6 +1200,17 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         public void delete(ChannelBuffer key)
         {
             memTable.add(sequence++, DELETION, key, Buffers.EMPTY_BUFFER);
+        }
+    }
+
+    public static class DatabaseShutdownException extends RuntimeException {
+        public DatabaseShutdownException()
+        {
+        }
+
+        public DatabaseShutdownException(String message)
+        {
+            super(message);
         }
     }
 }
