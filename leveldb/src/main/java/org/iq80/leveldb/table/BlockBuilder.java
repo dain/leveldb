@@ -19,10 +19,10 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
+import org.iq80.leveldb.util.DynamicSliceOutput;
 import org.iq80.leveldb.util.IntVector;
+import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
 
 import java.util.Comparator;
 
@@ -30,24 +30,24 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 public class BlockBuilder
 {
-    private final ChannelBuffer buffer;
     private final int blockRestartInterval;
     private final IntVector restartPositions;
-    private final Comparator<ChannelBuffer> comparator;
+    private final Comparator<Slice> comparator;
 
     private int entryCount;
     private int restartBlockEntryCount;
 
     private boolean finished;
-    private ChannelBuffer lastKey = Buffers.dynamicBuffer(128);
+    private final DynamicSliceOutput block;
+    private Slice lastKey;
 
-    public BlockBuilder(ChannelBuffer buffer, int blockRestartInterval, Comparator<ChannelBuffer> comparator)
+    public BlockBuilder(int estimatedSize, int blockRestartInterval, Comparator<Slice> comparator)
     {
-        Preconditions.checkNotNull(buffer, "buffer is null");
+        Preconditions.checkArgument(estimatedSize >= 0, "estimatedSize is negative");
         Preconditions.checkArgument(blockRestartInterval >= 0, "blockRestartInterval is negative");
         Preconditions.checkNotNull(comparator, "comparator is null");
 
-        this.buffer = buffer;
+        this.block = new DynamicSliceOutput(estimatedSize);
         this.blockRestartInterval = blockRestartInterval;
         this.comparator = comparator;
 
@@ -57,12 +57,12 @@ public class BlockBuilder
 
     public void reset()
     {
-        buffer.clear();
+        block.reset();
         entryCount = 0;
         restartPositions.clear();
         restartPositions.add(0); // first restart point must be 0
         restartBlockEntryCount = 0;
-        lastKey.clear();
+        lastKey = null;
         finished = false;
     }
 
@@ -80,15 +80,15 @@ public class BlockBuilder
     {
         // no need to estimate if closed
         if (finished) {
-            return buffer.readableBytes();
+            return block.size();
         }
 
         // no records is just a single int
-        if (buffer.readableBytes() == 0) {
+        if (block.size() == 0) {
             return SIZE_OF_INT;
         }
 
-        return buffer.readableBytes() +                    // raw data buffer
+        return block.size() +                              // raw data buffer
                 restartPositions.size() * SIZE_OF_INT +    // restart positions
                 SIZE_OF_INT;                               // restart position size
     }
@@ -99,16 +99,14 @@ public class BlockBuilder
         add(blockEntry.getKey(), blockEntry.getValue());
     }
 
-    public void add(ChannelBuffer key, ChannelBuffer value)
+    public void add(Slice key, Slice value)
     {
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
         Preconditions.checkState(!finished, "block is finished");
         Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 
-        if (lastKey.readable() && comparator.compare(key, lastKey) <= 0) {
-            Preconditions.checkArgument(!lastKey.readable() || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
-        }
+        Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
 
         int sharedKeyBytes = 0;
         if (restartBlockEntryCount < blockRestartInterval) {
@@ -116,39 +114,37 @@ public class BlockBuilder
         }
         else {
             // restart prefix compression
-            restartPositions.add(buffer.readableBytes());
+            restartPositions.add(block.size());
             restartBlockEntryCount = 0;
         }
 
-        int nonSharedKeyBytes = key.readableBytes() - sharedKeyBytes;
+        int nonSharedKeyBytes = key.length() - sharedKeyBytes;
 
         // write "<shared><non_shared><value_size>"
-        VariableLengthQuantity.packInt(sharedKeyBytes, buffer);
-        VariableLengthQuantity.packInt(nonSharedKeyBytes, buffer);
-        VariableLengthQuantity.packInt(value.readableBytes(), buffer);
+        VariableLengthQuantity.packInt(sharedKeyBytes, block);
+        VariableLengthQuantity.packInt(nonSharedKeyBytes, block);
+        VariableLengthQuantity.packInt(value.length(), block);
 
         // write non-shared key bytes
-        buffer.writeBytes(key, sharedKeyBytes, nonSharedKeyBytes);
+        block.writeBytes(key, sharedKeyBytes, nonSharedKeyBytes);
 
         // write value bytes
-        buffer.writeBytes(value, 0, value.readableBytes());
+        block.writeBytes(value, 0, value.length());
 
         // update last key
-        lastKey.writerIndex(sharedKeyBytes);
-        lastKey.writeBytes(key, sharedKeyBytes, nonSharedKeyBytes);
-        assert (lastKey.equals(key));
+        lastKey = key;
 
         // update state
         entryCount++;
         restartBlockEntryCount++;
     }
 
-    public static int calculateSharedBytes(ChannelBuffer leftKey, ChannelBuffer rightKey)
+    public static int calculateSharedBytes(Slice leftKey, Slice rightKey)
     {
         int sharedKeyBytes = 0;
 
         if (leftKey != null && rightKey != null) {
-            int minSharedKeyBytes = Ints.min(leftKey.readableBytes(), rightKey.readableBytes());
+            int minSharedKeyBytes = Ints.min(leftKey.length(), rightKey.length());
             while (sharedKeyBytes < minSharedKeyBytes && leftKey.getByte(sharedKeyBytes) == rightKey.getByte(sharedKeyBytes)) {
                 sharedKeyBytes++;
             }
@@ -157,20 +153,19 @@ public class BlockBuilder
         return sharedKeyBytes;
     }
 
-    public ChannelBuffer finish()
+    public Slice finish()
     {
         if (!finished) {
             finished = true;
 
             if (entryCount > 0) {
-                restartPositions.write(buffer);
-                buffer.writeInt(restartPositions.size());
+                restartPositions.write(block);
+                block.writeInt(restartPositions.size());
             }
             else {
-                buffer.writeInt(0);
+                block.writeInt(0);
             }
         }
-        return buffer.slice();
-
+        return block.slice();
     }
 }

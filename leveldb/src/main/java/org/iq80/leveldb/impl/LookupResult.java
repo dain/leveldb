@@ -1,29 +1,11 @@
-/**
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
 
 public class LookupResult
 {
-    public static LookupResult ok(LookupKey key, ChannelBuffer value)
+    public static LookupResult ok(LookupKey key, Slice value)
     {
         return new LookupResult(key, value, false);
     }
@@ -34,15 +16,15 @@ public class LookupResult
     }
 
     private final LookupKey key;
-    private final ChannelBuffer value;
+    private final Slice value;
     private final boolean deleted;
 
-    private LookupResult(LookupKey key, ChannelBuffer value, boolean deleted)
+    private LookupResult(LookupKey key, Slice value, boolean deleted)
     {
         Preconditions.checkNotNull(key, "key is null");
         this.key = key;
         if (value != null) {
-            this.value = Buffers.unmodifiableBuffer(value.slice());
+            this.value = value.slice();
         } else {
             this.value = null;
         }
@@ -54,12 +36,12 @@ public class LookupResult
         return key;
     }
 
-    public ChannelBuffer getValue()
+    public Slice getValue()
     {
         if (value == null) {
             return null;
         }
-        return value.duplicate();
+        return value;
     }
 
     public boolean isDeleted()

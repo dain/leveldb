@@ -27,8 +27,8 @@ import com.google.common.io.Closeables;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Finalizer;
+import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.io.Closeable;
 import java.io.File;
@@ -38,15 +38,15 @@ import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
-import static org.iq80.leveldb.impl.InternalKey.CHANNEL_BUFFER_TO_INTERNAL_KEY;
-import static org.iq80.leveldb.impl.InternalKey.INTERNAL_KEY_TO_CHANNEL_BUFFER;
+import static org.iq80.leveldb.impl.InternalKey.SLICE_TO_INTERNAL_KEY;
+import static org.iq80.leveldb.impl.InternalKey.INTERNAL_KEY_TO_SLICE;
 
 public class TableCache
 {
     private final Cache<Long, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<Table>(1);
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator channelBufferComparator, final boolean verifyChecksums)
+    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
     {
         Preconditions.checkNotNull(databaseDir, "databaseName is null");
 
@@ -65,23 +65,23 @@ public class TableCache
                     public TableAndFile load(Long fileNumber)
                             throws IOException
                     {
-                        return new TableAndFile(databaseDir, fileNumber, channelBufferComparator, verifyChecksums);
+                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
                     }
                 });
     }
 
-    public SeekingIterator<InternalKey, ChannelBuffer> newIterator(FileMetaData file)
+    public SeekingIterator<InternalKey, Slice> newIterator(FileMetaData file)
     {
         return newIterator(file.getNumber());
     }
 
-    public SeekingIterator<InternalKey, ChannelBuffer> newIterator(long number)
+    public SeekingIterator<InternalKey, Slice> newIterator(long number)
     {
         Table table = getTable(number);
-        return SeekingIterators.transformKeys(table.iterator(), CHANNEL_BUFFER_TO_INTERNAL_KEY, INTERNAL_KEY_TO_CHANNEL_BUFFER);
+        return SeekingIterators.transformKeys(table.iterator(), SLICE_TO_INTERNAL_KEY, INTERNAL_KEY_TO_SLICE);
     }
 
-    public long getApproximateOffsetOf(FileMetaData file, ChannelBuffer key) {
+    public long getApproximateOffsetOf(FileMetaData file, Slice key) {
         return getTable(file.getNumber()).getApproximateOffsetOf(key);
     }
 

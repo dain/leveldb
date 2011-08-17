@@ -17,58 +17,25 @@
  */
 package org.iq80.leveldb.impl;
 
-import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
-
-import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
+import org.iq80.leveldb.util.Slice;
 
 public class LookupKey
 {
-    // We construct a buffer of the form:
-    //    klength  varint32               <-- start_
-    //    userkey  char[klength]          <-- kstart_
-    //    tag      uint64
-    //                                    <-- end_
-    // The array is a suitable MemTable key.
-    // The suffix starting with "userkey" can be used as an InternalKey.
+    private final InternalKey key;
 
-    private final ChannelBuffer key;
-    private final int keyStart;
-
-    public LookupKey(ChannelBuffer user_key, long sequenceNumber)
+    public LookupKey(Slice userKey, long sequenceNumber)
     {
-        // A conservative estimate of the key length
-        // todo add function to calculate exact size of packed int
-        key = Buffers.buffer(user_key.readableBytes() + 13);
-
-        // write length
-        VariableLengthQuantity.packInt(user_key.readableBytes() + 8, key);
-        keyStart = key.readableBytes();
-
-        // write bytes
-        key.writeBytes(user_key, 0, user_key.readableBytes());
-
-        // write sequence number
-        key.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, ValueType.VALUE));
-    }
-
-    public ChannelBuffer getMemtableKey()
-    {
-        // full key
-        return key.duplicate();
+        key = new InternalKey(userKey, sequenceNumber, ValueType.VALUE);
     }
 
     public InternalKey getInternalKey()
     {
-        // user key + tag
-        return new InternalKey(key.slice(keyStart, key.readableBytes() - keyStart));
+        return key;
     }
 
-    public ChannelBuffer getUserKey()
+    public Slice getUserKey()
     {
-        // just user key part -- no key length and no tag
-        return key.slice(keyStart, key.readableBytes() - keyStart - SIZE_OF_LONG);
+        return key.getUserKey();
     }
 
     @Override

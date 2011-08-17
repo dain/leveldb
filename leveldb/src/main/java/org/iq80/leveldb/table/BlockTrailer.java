@@ -19,8 +19,10 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.CompressionType;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 
 public class BlockTrailer
 {
@@ -88,23 +90,24 @@ public class BlockTrailer
         return sb.toString();
     }
 
-    public static BlockTrailer readBlockTrailer(ChannelBuffer buffer)
+    public static BlockTrailer readBlockTrailer(Slice slice)
     {
-        CompressionType compressionType = CompressionType.getCompressionTypeByPersistentId(buffer.readUnsignedByte());
-        int crc32c = buffer.readInt();
+        SliceInput sliceInput = slice.input();
+        CompressionType compressionType = CompressionType.getCompressionTypeByPersistentId(sliceInput.readUnsignedByte());
+        int crc32c = sliceInput.readInt();
         return new BlockTrailer(compressionType, crc32c);
     }
 
-    public static ChannelBuffer writeBlockTrailer(BlockTrailer blockTrailer)
+    public static Slice writeBlockTrailer(BlockTrailer blockTrailer)
     {
-        ChannelBuffer buffer = Buffers.buffer(ENCODED_LENGTH);
-        writeBlockTrailer(blockTrailer, buffer);
-        return buffer;
+        Slice slice = Slices.allocate(ENCODED_LENGTH);
+        writeBlockTrailer(blockTrailer, slice.output());
+        return slice;
     }
 
-    public static void writeBlockTrailer(BlockTrailer blockTrailer, ChannelBuffer buffer)
+    public static void writeBlockTrailer(BlockTrailer blockTrailer, SliceOutput sliceOutput)
     {
-        buffer.writeByte(blockTrailer.getCompressionType().persistentId());
-        buffer.writeInt(blockTrailer.getCrc32c());
+        sliceOutput.writeByte(blockTrailer.getCompressionType().persistentId());
+        sliceOutput.writeInt(blockTrailer.getCrc32c());
     }
 }

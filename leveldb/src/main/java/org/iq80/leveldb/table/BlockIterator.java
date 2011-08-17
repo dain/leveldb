@@ -19,35 +19,37 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.impl.SeekingIterator;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.SliceOutput;
 
 import java.util.Comparator;
 import java.util.NoSuchElementException;
 
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
-public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuffer>
+public class BlockIterator implements SeekingIterator<Slice, Slice>
 {
-    private final ChannelBuffer data;
-    private final ChannelBuffer restartPositions;
+    private final SliceInput data;
+    private final Slice restartPositions;
     private final int restartCount;
-    private final Comparator<ChannelBuffer> comparator;
+    private final Comparator<Slice> comparator;
 
     private BlockEntry nextEntry;
 
-    public BlockIterator(ChannelBuffer data, ChannelBuffer restartPositions, Comparator<ChannelBuffer> comparator)
+    public BlockIterator(Slice data, Slice restartPositions, Comparator<Slice> comparator)
     {
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkNotNull(restartPositions, "restartPositions is null");
-        Preconditions.checkArgument(restartPositions.readableBytes() % SIZE_OF_INT == 0, "restartPositions.readableBytes() must be a multiple of %s", SIZE_OF_INT);
+        Preconditions.checkArgument(restartPositions.length() % SIZE_OF_INT == 0, "restartPositions.readableBytes() must be a multiple of %s", SIZE_OF_INT);
         Preconditions.checkNotNull(comparator, "comparator is null");
 
-        this.data = data.slice();
+        this.data = data.input();
 
         this.restartPositions = restartPositions.slice();
-        restartCount = this.restartPositions.readableBytes() / SIZE_OF_INT;
+        restartCount = this.restartPositions.length() / SIZE_OF_INT;
 
         this.comparator = comparator;
 
@@ -78,7 +80,7 @@ public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuff
 
         BlockEntry entry = nextEntry;
 
-        if (!data.readable()) {
+        if (!data.isReadable()) {
             nextEntry = null;
         }
         else {
@@ -110,7 +112,7 @@ public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuff
      * Repositions the iterator so the key of the next BlockElement returned greater than or equal to the specified targetKey.
      */
     @Override
-    public void seek(ChannelBuffer targetKey)
+    public void seek(Slice targetKey)
     {
         if (restartCount == 0) {
             return;
@@ -153,11 +155,11 @@ public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuff
      */
     private void seekToRestartPosition(int restartPosition)
     {
-        Preconditions.checkElementIndex(restartPosition, restartCount, "restartPosition");
+        Preconditions.checkPositionIndex(restartPosition, restartCount, "restartPosition");
 
         // seek data readIndex to the beginning of the restart block
         int offset = restartPositions.getInt(restartPosition * SIZE_OF_INT);
-        data.readerIndex(offset);
+        data.setPosition(offset);
 
         // clear the entries to assure key is not prefixed
         nextEntry = null;
@@ -173,7 +175,7 @@ public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuff
      *
      * @return true if an entry was read
      */
-    private static BlockEntry readEntry(ChannelBuffer data, BlockEntry previousEntry)
+    private static BlockEntry readEntry(SliceInput data, BlockEntry previousEntry)
     {
         Preconditions.checkNotNull(data, "data is null");
 
@@ -183,15 +185,16 @@ public class BlockIterator implements SeekingIterator<ChannelBuffer, ChannelBuff
         int valueLength = VariableLengthQuantity.unpackInt(data);
 
         // read key
-        ChannelBuffer key = Buffers.buffer(sharedKeyLength + nonSharedKeyLength);
+        Slice key = Slices.allocate(sharedKeyLength + nonSharedKeyLength);
+        SliceOutput sliceOutput = key.output();
         if (sharedKeyLength > 0) {
             Preconditions.checkState(previousEntry != null, "Entry has a shared key but no previous entry was provided");
-            key.writeBytes(previousEntry.getKey(), 0, sharedKeyLength);
+            sliceOutput.writeBytes(previousEntry.getKey(), 0, sharedKeyLength);
         }
-        key.writeBytes(data, nonSharedKeyLength);
+        sliceOutput.writeBytes(data, nonSharedKeyLength);
 
         // read value
-        ChannelBuffer value = data.readSlice(valueLength);
+        Slice value = data.readSlice(valueLength);
 
         return new BlockEntry(key, value);
     }

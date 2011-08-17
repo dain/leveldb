@@ -22,8 +22,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import org.iq80.leveldb.util.DynamicSliceOutput;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.util.Map;
 
@@ -42,12 +44,13 @@ public class VersionEdit
     {
     }
 
-    public VersionEdit(ChannelBuffer buffer)
+    public VersionEdit(Slice slice)
     {
-        while(buffer.readable()) {
-            int i = VariableLengthQuantity.unpackInt(buffer);
+        SliceInput sliceInput = slice.input();
+        while(sliceInput.isReadable()) {
+            int i = VariableLengthQuantity.unpackInt(sliceInput);
             VersionEditTag tag = VersionEditTag.getValueTypeByPersistentId(i);
-            tag.readValue(buffer, this);
+            tag.readValue(sliceInput, this);
         }
     }
 
@@ -156,11 +159,13 @@ public class VersionEdit
         deletedFiles.put(level, fileNumber);
     }
 
-    public void encodeTo(ChannelBuffer buffer)
+    public Slice encode()
     {
+        DynamicSliceOutput dynamicSliceOutput = new DynamicSliceOutput(4096);
         for (VersionEditTag versionEditTag : VersionEditTag.values()) {
-            versionEditTag.writeValue(buffer, this);
+            versionEditTag.writeValue(dynamicSliceOutput, this);
         }
+        return dynamicSliceOutput.slice();
     }
 
     @Override

@@ -17,19 +17,17 @@
  */
 package org.iq80.leveldb.util;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-
 public final class VariableLengthQuantity
 {
     private VariableLengthQuantity() {}
 
     // todo unroll the loops like coding.cc
 
-    public static void packInt(int numberToCompress, ChannelBuffer buffer) {
+    public static void packInt(int numberToCompress, SliceOutput sliceOutput) {
         // if key is 0 length
         if (numberToCompress == 0) {
             // write 0 into one byte
-            buffer.writeByte((byte)0);
+            sliceOutput.writeByte((byte) 0);
             return;
         }
 
@@ -41,20 +39,20 @@ public final class VariableLengthQuantity
             // if the there are no more 1s in the number, we are done
             if (numberToCompress == 0) {
                 // write a positive number to signal we are done
-                buffer.writeByte((byte) remainder);
+                sliceOutput.writeByte((byte) remainder);
                 return;
             }
 
             // write a negative number to signal there are more bytes to read
-            buffer.writeByte((byte) ~remainder);
+            sliceOutput.writeByte((byte) ~remainder);
         }
     }
 
-    public static void packLong(long numberToCompress, ChannelBuffer buffer) {
+    public static void packLong(long numberToCompress, SliceOutput sliceOutput) {
         // if key is 0 length
         if (numberToCompress == 0) {
             // write 0 into one byte
-            buffer.writeByte((byte)0);
+            sliceOutput.writeByte((byte) 0);
             return;
         }
 
@@ -66,21 +64,21 @@ public final class VariableLengthQuantity
             // if the there are no more 1s in the number, we are done
             if (numberToCompress == 0) {
                 // write a positive number to signal we are done
-                buffer.writeByte((byte) remainder);
+                sliceOutput.writeByte((byte) remainder);
                 return;
             }
 
             // write a negative number to signal there are more bytes to read
-            buffer.writeByte((byte) ~remainder);
+            sliceOutput.writeByte((byte) ~remainder);
         }
     }
 
-    public static int unpackInt(ChannelBuffer buffer) {
+    public static int unpackInt(SliceInput sliceInput) {
         // number is encoded as blocks of base 128 numbers
         int result = 0;
         for (long index = 0; true; index++) {
             // if the byte is positive, this is the last byte
-            int next = buffer.readByte();
+            int next = sliceInput.readByte();
             if (next >= 0) {
                 // shift the bits to the left and add them to the result
                 result ^= next << (7*index);
@@ -92,12 +90,12 @@ public final class VariableLengthQuantity
         }
     }
 
-    public static long unpackLong(ChannelBuffer buffer) {
+    public static long unpackLong(SliceInput sliceInput) {
         // number is encoded as blocks of base 128 numbers
         long result = 0;
         for (long index = 0; true; index++) {
             // if the byte is positive, this is the last byte
-            long next = buffer.readByte();
+            long next = sliceInput.readByte();
             if (next >= 0) {
                 // shift the bits to the left and add them to the result
                 result ^= next << (7*index);

@@ -26,9 +26,10 @@ import com.google.common.io.Files;
 import org.iq80.leveldb.impl.DbConstants;
 import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.impl.WriteBatch;
-import org.iq80.leveldb.util.Buffers;
 import org.iq80.leveldb.util.FileUtils;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 import org.xerial.snappy.Snappy;
 
 import java.io.File;
@@ -355,32 +356,31 @@ public class DbBenchmark
             WriteBatch batch = new WriteBatch();
             for (int j = 0; j < entries_per_batch; j++) {
                 int k = (order == SEQUENTIAL) ? i + j : rand_.nextInt(num_);
-                ChannelBuffer key = formatNumber(k);
+                Slice key = formatNumber(k);
                 batch.put(key, gen_.generate(valueSize));
-                bytes_ += valueSize + key.readableBytes();
+                bytes_ += valueSize + key.length();
                 finishedSingleOp();
             }
             db_.write(writeOptions, batch);
         }
     }
 
-    public static ChannelBuffer formatNumber(long n)
+    public static Slice formatNumber(long n)
     {
         Preconditions.checkArgument(n >= 0, "number must be positive");
 
-        ChannelBuffer buffer = Buffers.buffer(16);
-        buffer.writerIndex(16);
+        Slice slice = Slices.allocate(16);
 
         int i = 15;
         while (n > 0) {
-            buffer.setByte(i--, (int) ('0' + (n % 10)));
+            slice.setByte(i--, (int) ('0' + (n % 10)));
             n /= 10;
         }
         while (i >= 0) {
-            buffer.setByte(i--, '0');
+            slice.setByte(i--, '0');
         }
 
-        return buffer;
+        return slice;
     }
 
     private void finishedSingleOp()
@@ -669,7 +669,7 @@ public class DbBenchmark
     }
 
     private static class RandomGenerator {
-        private final ChannelBuffer data;
+        private final Slice data;
         private int position;
 
         private RandomGenerator(double compressionRatio)
@@ -678,53 +678,51 @@ public class DbBenchmark
             // that it is larger than the compression window (32KB), and also
             // large enough to serve all typical value sizes we want to write.
             Random rnd = new Random(301);
-            data = Buffers.buffer(1048576 + 100);
-            while (data.readableBytes() < 1048576) {
+            data = Slices.allocate(1048576 + 100);
+            SliceOutput sliceOutput = data.output();
+            while (sliceOutput.size() < 1048576) {
                 // Add a short fragment that is as compressible as specified
                 // by FLAGS_compression_ratio.
-                data.writeBytes(compressibleString(rnd, compressionRatio, 100));
+                sliceOutput.writeBytes(compressibleString(rnd, compressionRatio, 100));
             }
         }
 
-        private ChannelBuffer generate(int length)
+        private Slice generate(int length)
         {
-            if (position + length > data.readableBytes()) {
+            if (position + length > data.length()) {
                 position = 0;
-                assert (length < data.readableBytes());
+                assert (length < data.length());
             }
-            ChannelBuffer slice = data.duplicate();
-            slice.readerIndex(position);
-            slice.writerIndex(position + length);
+            Slice slice = data.slice(position, length);
             position += length;
             return slice;
         }
     }
 
-    private static ChannelBuffer compressibleString(Random rnd, double compressionRatio, int len)
+    private static Slice compressibleString(Random rnd, double compressionRatio, int len)
     {
         int raw = (int) (len * compressionRatio);
         if (raw < 1) {
             raw = 1;
         }
-        ChannelBuffer rawData = Buffers.buffer(raw);
-        RandomString(rnd, raw, rawData);
+        Slice rawData = generateRandomSlice(rnd, raw);
 
         // Duplicate the random data until we have filled "len" bytes
-        ChannelBuffer dst = Buffers.buffer(len + raw);
-        while (dst.readableBytes() < len) {
-            dst.writeBytes(rawData, rawData.readerIndex(), rawData.readableBytes());
+        Slice dst = Slices.allocate(len);
+        SliceOutput sliceOutput = dst.output();
+        while (sliceOutput.size() < len) {
+            sliceOutput.writeBytes(rawData, 0, Math.min(rawData.length(), sliceOutput.writableBytes()));
         }
-        dst.writerIndex(len);
-        return dst.slice();
+        return dst;
     }
 
-    private static ChannelBuffer RandomString(Random rnd, int len, ChannelBuffer dst)
+    private static Slice generateRandomSlice(Random random, int length)
     {
-        dst.clear();
-        for (int i = 0; i < len; i++) {
-            dst.writeByte((byte) (' ' + rnd.nextInt(95)));
+        Slice rawData = Slices.allocate(length);
+        SliceOutput sliceOutput = rawData.output();
+        while (sliceOutput.isWritable()) {
+            sliceOutput.writeByte((byte) (' ' + random.nextInt(95)));
         }
-        return dst.slice();
+        return rawData;
     }
-
 }

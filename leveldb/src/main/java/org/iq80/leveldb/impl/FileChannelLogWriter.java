@@ -19,8 +19,10 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.Closeables;
-import org.iq80.leveldb.util.Buffers;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -104,12 +106,12 @@ public class FileChannelLogWriter implements LogWriter
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
     @Override
-    public synchronized void addRecord(ChannelBuffer record, boolean force)
+    public synchronized void addRecord(Slice record, boolean force)
             throws IOException
     {
         Preconditions.checkState(!closed.get(), "Log has been closed");
 
-        record = record.slice();
+        SliceInput sliceInput = record.input();
 
         // used to track first, middle and last blocks
         boolean begin = true;
@@ -126,7 +128,7 @@ public class FileChannelLogWriter implements LogWriter
                 if (bytesRemainingInBlock > 0) {
                     // Fill the rest of the block with zeros
                     // todo lame... need a better way to write zeros
-                    fileChannel.write(Buffers.byteBufferWrap(new byte[bytesRemainingInBlock]));
+                    fileChannel.write(ByteBuffer.allocate(bytesRemainingInBlock));
                 }
                 blockOffset = 0;
                 bytesRemainingInBlock = BLOCK_SIZE - blockOffset;
@@ -140,13 +142,13 @@ public class FileChannelLogWriter implements LogWriter
             // fragment the record; otherwise write to the end of the record
             boolean end;
             int fragmentLength;
-            if (record.readableBytes() >= bytesAvailableInBlock) {
+            if (sliceInput.available() >= bytesAvailableInBlock) {
                 end = false;
                 fragmentLength = bytesAvailableInBlock;
             }
             else {
                 end = true;
-                fragmentLength = record.readableBytes();
+                fragmentLength = sliceInput.available();
             }
 
             // determine block type
@@ -165,48 +167,44 @@ public class FileChannelLogWriter implements LogWriter
             }
 
             // write the chunk
-            writeChunk(type, record, fragmentLength);
+            writeChunk(type, sliceInput.readSlice(fragmentLength));
 
             // we are no longer on the first chunk
             begin = false;
-        } while (record.readable());
+        } while (sliceInput.isReadable());
 
         if (force) {
             fileChannel.force(false);
         }
     }
 
-    private void writeChunk(LogChunkType type, ChannelBuffer buffer, int length)
+    private void writeChunk(LogChunkType type, Slice slice)
             throws IOException
     {
-        Preconditions.checkArgument(length <= 0xffff, "length %s is larger than two bytes", length);
-        Preconditions.checkArgument(blockOffset + HEADER_SIZE + length <= BLOCK_SIZE);
+        Preconditions.checkArgument(slice.length() <= 0xffff, "length %s is larger than two bytes", slice.length());
+        Preconditions.checkArgument(blockOffset + HEADER_SIZE <= BLOCK_SIZE);
 
         // create header
-        ByteBuffer header = newLogRecordHeader(type, buffer, length);
+        Slice header = newLogRecordHeader(type, slice, slice.length());
 
         // write the header and the payload
-        fileChannel.write(header);
-        fileChannel.write(buffer.toByteBuffers(buffer.readerIndex(), length));
-        buffer.skipBytes(length);
+        header.setBytes(0, fileChannel, header.length());
+        slice.setBytes(0, fileChannel, slice.length());
 
-        blockOffset += HEADER_SIZE + length;
+        blockOffset += HEADER_SIZE + slice.length();
     }
 
-    private ByteBuffer newLogRecordHeader(LogChunkType type, ChannelBuffer buffer, int length)
+    private Slice newLogRecordHeader(LogChunkType type, Slice slice, int length)
     {
-        int crc = Logs.getChunkChecksum(type.getPersistentId(), buffer.array(), buffer.arrayOffset() + buffer.readerIndex(), length);
+        int crc = Logs.getChunkChecksum(type.getPersistentId(), slice.getRawArray(), slice.getRawOffset(), length);
 
         // Format the header
-        ByteBuffer header = Buffers.allocateByteBuffer(HEADER_SIZE);
-        header.putInt(crc);
-        header.put((byte) (length & 0xff));
-        header.put((byte) (length >>> 8));
-        header.put((byte) (type.getPersistentId()));
+        SliceOutput header = Slices.allocate(HEADER_SIZE).output();
+        header.writeInt(crc);
+        header.writeByte((byte) (length & 0xff));
+        header.writeByte((byte) (length >>> 8));
+        header.writeByte((byte) (type.getPersistentId()));
 
-        header.flip();
-
-        return header;
+        return header.slice();
     }
-
 }

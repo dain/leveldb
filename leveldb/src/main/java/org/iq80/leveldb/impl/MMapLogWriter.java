@@ -20,8 +20,10 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closeables;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 import sun.nio.ch.FileChannelImpl;
 
 import java.io.File;
@@ -60,7 +62,6 @@ public class MMapLogWriter implements LogWriter
     private final FileChannel fileChannel;
     private final AtomicBoolean closed = new AtomicBoolean();
     private MappedByteBuffer mappedByteBuffer;
-    private ChannelBuffer fileMap;
     private long fileOffset;
     /**
      * Current offset in the current block
@@ -77,8 +78,6 @@ public class MMapLogWriter implements LogWriter
         this.fileNumber = fileNumber;
         this.fileChannel = new RandomAccessFile(file, "rw").getChannel();
         mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, 0, PAGE_SIZE);
-        fileMap = Buffers.wrappedBuffer(mappedByteBuffer);
-        fileMap.clear();
     }
 
     public boolean isClosed()
@@ -113,11 +112,10 @@ public class MMapLogWriter implements LogWriter
     private void destroyMappedByteBuffer()
     {
         if (mappedByteBuffer != null) {
-            fileOffset += fileMap.readableBytes();
+            fileOffset += mappedByteBuffer.position();
             unmap();
         }
         mappedByteBuffer = null;
-        fileMap = null;
     }
 
     public File getFile()
@@ -131,12 +129,12 @@ public class MMapLogWriter implements LogWriter
     }
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
-    public synchronized void addRecord(ChannelBuffer record, boolean force)
+    public synchronized void addRecord(Slice record, boolean force)
             throws IOException
     {
         Preconditions.checkState(!closed.get(), "Log has been closed");
 
-        record = record.slice();
+        SliceInput sliceInput = record.input();
 
         // used to track first, middle and last blocks
         boolean begin = true;
@@ -154,7 +152,7 @@ public class MMapLogWriter implements LogWriter
                     // Fill the rest of the block with zeros
                     // todo lame... need a better way to write zeros
                     ensureCapacity(bytesRemainingInBlock);
-                    fileMap.writeZero(bytesRemainingInBlock);
+                    mappedByteBuffer.put(new byte[bytesRemainingInBlock]);
                 }
                 blockOffset = 0;
                 bytesRemainingInBlock = BLOCK_SIZE - blockOffset;
@@ -168,13 +166,13 @@ public class MMapLogWriter implements LogWriter
             // fragment the record; otherwise write to the end of the record
             boolean end;
             int fragmentLength;
-            if (record.readableBytes() >= bytesAvailableInBlock) {
+            if (sliceInput.available() >= bytesAvailableInBlock) {
                 end = false;
                 fragmentLength = bytesAvailableInBlock;
             }
             else {
                 end = true;
-                fragmentLength = record.readableBytes();
+                fragmentLength = sliceInput.available();
             }
 
             // determine block type
@@ -193,45 +191,43 @@ public class MMapLogWriter implements LogWriter
             }
 
             // write the chunk
-            writeChunk(type, record, fragmentLength);
+            writeChunk(type, sliceInput.readBytes(fragmentLength));
 
             // we are no longer on the first chunk
             begin = false;
-        } while (record.readable());
+        } while (sliceInput.isReadable());
 
         if (force) {
             mappedByteBuffer.force();
         }
     }
 
-    private void writeChunk(LogChunkType type, ChannelBuffer buffer, int length)
+    private void writeChunk(LogChunkType type, Slice slice)
             throws IOException
     {
-        Preconditions.checkArgument(length <= 0xffff, "length %s is larger than two bytes", length);
-        Preconditions.checkArgument(blockOffset + HEADER_SIZE + length <= BLOCK_SIZE);
+        Preconditions.checkArgument(slice.length() <= 0xffff, "length %s is larger than two bytes", slice.length());
+        Preconditions.checkArgument(blockOffset + HEADER_SIZE <= BLOCK_SIZE);
 
         // create header
-        ChannelBuffer header = newLogRecordHeader(type, buffer, length);
+        Slice header = newLogRecordHeader(type, slice);
 
         // write the header and the payload
-        ensureCapacity(header.readableBytes() + buffer.readableBytes());
-        fileMap.writeBytes(header);
-        fileMap.writeBytes(buffer, length);
+        ensureCapacity(header.length() + slice.length());
+        header.getBytes(0, mappedByteBuffer);
+        slice.getBytes(0, mappedByteBuffer);
 
-        blockOffset += HEADER_SIZE + length;
+        blockOffset += HEADER_SIZE + slice.length();
     }
 
     private void ensureCapacity(int bytes)
             throws IOException
     {
-        if (fileMap.writableBytes() < bytes) {
+        if (mappedByteBuffer.remaining() < bytes) {
             // remap
-            fileOffset += fileMap.readableBytes();
+            fileOffset += mappedByteBuffer.position();
             unmap();
 
             mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, fileOffset, PAGE_SIZE);
-            fileMap = Buffers.wrappedBuffer(mappedByteBuffer);
-            fileMap.clear();
         }
     }
 
@@ -245,16 +241,17 @@ public class MMapLogWriter implements LogWriter
         }
     }
 
-    private ChannelBuffer newLogRecordHeader(LogChunkType type, ChannelBuffer buffer, int length)
+    private Slice newLogRecordHeader(LogChunkType type, Slice slice)
     {
-        int crc = getChunkChecksum(type.getPersistentId(), buffer.array(), buffer.arrayOffset() + buffer.readerIndex(), length);
+        int crc = getChunkChecksum(type.getPersistentId(), slice.getRawArray(), slice.getRawOffset(), slice.length());
 
         // Format the header
-        ChannelBuffer header = Buffers.buffer(HEADER_SIZE);
-        header.writeInt(crc);
-        header.writeByte((byte) (length & 0xff));
-        header.writeByte((byte) (length >>> 8));
-        header.writeByte((byte) (type.getPersistentId()));
+        Slice header = Slices.allocate(HEADER_SIZE);
+        SliceOutput sliceOutput = header.output();
+        sliceOutput.writeInt(crc);
+        sliceOutput.writeByte((byte) (slice.length() & 0xff));
+        sliceOutput.writeByte((byte) (slice.length() >>> 8));
+        sliceOutput.writeByte((byte) (type.getPersistentId()));
 
         return header;
     }

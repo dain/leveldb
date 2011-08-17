@@ -18,53 +18,54 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Charsets;
+import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.SliceOutput;
 
 import java.util.Map.Entry;
 
-import static org.iq80.leveldb.util.Buffers.readLengthPrefixedBytes;
-import static org.iq80.leveldb.util.Buffers.writeLengthPrefixedBytes;
+import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
+import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
 public enum VersionEditTag
 {
     COMPARATOR(1)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    byte[] bytes = new byte[VariableLengthQuantity.unpackInt(buffer)];
-                    buffer.readBytes(bytes);
+                    byte[] bytes = new byte[VariableLengthQuantity.unpackInt(sliceInput)];
+                    sliceInput.readBytes(bytes);
                     versionEdit.setComparatorName(new String(bytes, Charsets.UTF_8));
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     String comparatorName = versionEdit.getComparatorName();
                     if (comparatorName != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
                         byte[] bytes = comparatorName.getBytes(Charsets.UTF_8);
-                        VariableLengthQuantity.packInt(bytes.length, buffer);
-                        buffer.writeBytes(bytes);
+                        VariableLengthQuantity.packInt(bytes.length, sliceOutput);
+                        sliceOutput.writeBytes(bytes);
                     }
                 }
             },
     LOG_NUMBER(2)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    versionEdit.setLogNumber(VariableLengthQuantity.unpackLong(buffer));
+                    versionEdit.setLogNumber(VariableLengthQuantity.unpackLong(sliceInput));
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     Long logNumber = versionEdit.getLogNumber();
                     if (logNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
-                        VariableLengthQuantity.packLong(logNumber, buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.packLong(logNumber, sliceOutput);
                     }
                 }
             },
@@ -72,18 +73,18 @@ public enum VersionEditTag
     NEXT_FILE_NUMBER(3)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    versionEdit.setNextFileNumber(VariableLengthQuantity.unpackLong(buffer));
+                    versionEdit.setNextFileNumber(VariableLengthQuantity.unpackLong(sliceInput));
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     Long nextFileNumber = versionEdit.getNextFileNumber();
                     if (nextFileNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
-                        VariableLengthQuantity.packLong(nextFileNumber, buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.packLong(nextFileNumber, sliceOutput);
                     }
                 }
             },
@@ -91,18 +92,18 @@ public enum VersionEditTag
     LAST_SEQUENCE(4)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    versionEdit.setLastSequenceNumber(VariableLengthQuantity.unpackLong(buffer));
+                    versionEdit.setLastSequenceNumber(VariableLengthQuantity.unpackLong(sliceInput));
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     Long lastSequenceNumber = versionEdit.getLastSequenceNumber();
                     if (lastSequenceNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
-                        VariableLengthQuantity.packLong(lastSequenceNumber, buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.packLong(lastSequenceNumber, sliceOutput);
                     }
                 }
             },
@@ -110,28 +111,28 @@ public enum VersionEditTag
     COMPACT_POINTER(5)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
                     // level
-                    int level = VariableLengthQuantity.unpackInt(buffer);
+                    int level = VariableLengthQuantity.unpackInt(sliceInput);
 
                     // internal key
-                    InternalKey internalKey = new InternalKey(readLengthPrefixedBytes(buffer));
+                    InternalKey internalKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
 
                     versionEdit.setCompactPointer(level, internalKey);
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     for (Entry<Integer, InternalKey> entry : versionEdit.getCompactPointers().entrySet()) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
 
                         // level
-                        VariableLengthQuantity.packInt(entry.getKey(), buffer);
+                        VariableLengthQuantity.packInt(entry.getKey(), sliceOutput);
 
                         // internal key
-                        writeLengthPrefixedBytes(buffer, entry.getValue().encode());
+                        writeLengthPrefixedBytes(sliceOutput, entry.getValue().encode());
                     }
                 }
             },
@@ -139,28 +140,28 @@ public enum VersionEditTag
     DELETED_FILE(6)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
                     // level
-                    int level = VariableLengthQuantity.unpackInt(buffer);
+                    int level = VariableLengthQuantity.unpackInt(sliceInput);
 
                     // file number
-                    long fileNumber = VariableLengthQuantity.unpackLong(buffer);
+                    long fileNumber = VariableLengthQuantity.unpackLong(sliceInput);
 
                     versionEdit.deleteFile(level, fileNumber);
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     for (Entry<Integer, Long> entry : versionEdit.getDeletedFiles().entries()) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
 
                         // level
-                        VariableLengthQuantity.packInt(entry.getKey(), buffer);
+                        VariableLengthQuantity.packInt(entry.getKey(), sliceOutput);
 
                         // file number
-                        VariableLengthQuantity.packLong(entry.getValue(), buffer);
+                        VariableLengthQuantity.packLong(entry.getValue(), sliceOutput);
                     }
                 }
             },
@@ -168,48 +169,48 @@ public enum VersionEditTag
     NEW_FILE(7)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
                     // level
-                    int level = VariableLengthQuantity.unpackInt(buffer);
+                    int level = VariableLengthQuantity.unpackInt(sliceInput);
 
                     // file number
-                    long fileNumber = VariableLengthQuantity.unpackLong(buffer);
+                    long fileNumber = VariableLengthQuantity.unpackLong(sliceInput);
 
                     // file size
-                    long fileSize = VariableLengthQuantity.unpackLong(buffer);
+                    long fileSize = VariableLengthQuantity.unpackLong(sliceInput);
 
                     // smallest key
-                    InternalKey smallestKey = new InternalKey(readLengthPrefixedBytes(buffer));
+                    InternalKey smallestKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
 
                     // largest key
-                    InternalKey largestKey = new InternalKey(readLengthPrefixedBytes(buffer));
+                    InternalKey largestKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
 
                     versionEdit.addFile(level, fileNumber, fileSize, smallestKey, largestKey);
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     for (Entry<Integer, FileMetaData> entry : versionEdit.getNewFiles().entries()) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
 
                         // level
-                        VariableLengthQuantity.packInt(entry.getKey(), buffer);
+                        VariableLengthQuantity.packInt(entry.getKey(), sliceOutput);
 
 
                         // file number
                         FileMetaData fileMetaData = entry.getValue();
-                        VariableLengthQuantity.packLong(fileMetaData.getNumber(), buffer);
+                        VariableLengthQuantity.packLong(fileMetaData.getNumber(), sliceOutput);
 
                         // file size
-                        VariableLengthQuantity.packLong(fileMetaData.getFileSize(), buffer);
+                        VariableLengthQuantity.packLong(fileMetaData.getFileSize(), sliceOutput);
 
                         // smallest key
-                        writeLengthPrefixedBytes(buffer, fileMetaData.getSmallest().encode());
+                        writeLengthPrefixedBytes(sliceOutput, fileMetaData.getSmallest().encode());
 
                         // smallest key
-                        writeLengthPrefixedBytes(buffer, fileMetaData.getLargest().encode());
+                        writeLengthPrefixedBytes(sliceOutput, fileMetaData.getLargest().encode());
                     }
                 }
             },
@@ -219,19 +220,19 @@ public enum VersionEditTag
     PREVIOUS_LOG_NUMBER(9)
             {
                 @Override
-                public void readValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    long previousLogNumber = VariableLengthQuantity.unpackLong(buffer);
+                    long previousLogNumber = VariableLengthQuantity.unpackLong(sliceInput);
                     versionEdit.setPreviousLogNumber(previousLogNumber);
                 }
 
                 @Override
-                public void writeValue(ChannelBuffer buffer, VersionEdit versionEdit)
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     Long previousLogNumber = versionEdit.getPreviousLogNumber();
                     if (previousLogNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), buffer);
-                        VariableLengthQuantity.packLong(previousLogNumber, buffer);
+                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.packLong(previousLogNumber, sliceOutput);
                     }
                 }
             },;
@@ -258,7 +259,7 @@ public enum VersionEditTag
         return persistentId;
     }
 
-    public abstract void readValue(ChannelBuffer buffer, VersionEdit versionEdit);
+    public abstract void readValue(SliceInput sliceInput, VersionEdit versionEdit);
 
-    public abstract void writeValue(ChannelBuffer buffer, VersionEdit versionEdit);
+    public abstract void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit);
 }

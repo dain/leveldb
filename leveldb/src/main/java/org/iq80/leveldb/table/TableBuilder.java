@@ -22,16 +22,17 @@ import com.google.common.base.Throwables;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.PureJavaCrc32C;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
+import static org.iq80.leveldb.impl.VersionSet.TARGET_FILE_SIZE;
+import static org.iq80.leveldb.util.SliceComparator.SLICE_COMPARATOR;
 
-// todo byte order must be little endian
 public class TableBuilder
 {
     /**
@@ -48,7 +49,7 @@ public class TableBuilder
     private final FileChannel fileChannel;
     private final BlockBuilder dataBlockBuilder;
     private final BlockBuilder indexBlockBuilder;
-    private final ChannelBuffer lastKey;
+    private Slice lastKey;
     private final UserComparator userComparator;
 
     private long entryCount;
@@ -66,7 +67,7 @@ public class TableBuilder
     private boolean pendingIndexEntry;
     private BlockHandle pendingHandle;  // Handle to add to index block
 
-    private final ChannelBuffer compressedOutput;
+    private Slice compressedOutput;
 
     private long position;
 
@@ -88,12 +89,13 @@ public class TableBuilder
         blockSize = options.blockSize();
         compressionType = options.compressionType();
 
-        dataBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), blockRestartInterval, userComparator);
-        indexBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), 1, userComparator);
+        dataBlockBuilder = new BlockBuilder(TARGET_FILE_SIZE, blockRestartInterval, userComparator);
 
-        lastKey = Buffers.dynamicBuffer(128);
-        compressedOutput = Buffers.dynamicBuffer(128);
+        // with expected 50% compression
+        int expectedNumberOfBlocks = 1024;
+        indexBlockBuilder = new BlockBuilder(BlockHandle.MAX_ENCODED_LENGTH * expectedNumberOfBlocks, 1, userComparator);
 
+        lastKey = Slices.EMPTY_SLICE;
     }
 
     public long getEntryCount()
@@ -114,7 +116,7 @@ public class TableBuilder
         add(blockEntry.getKey(), blockEntry.getValue());
     }
 
-    public void add(ChannelBuffer key, ChannelBuffer value)
+    public void add(Slice key, Slice value)
             throws IOException
     {
         Preconditions.checkNotNull(key, "key is null");
@@ -130,16 +132,14 @@ public class TableBuilder
         if (pendingIndexEntry) {
             Preconditions.checkState(dataBlockBuilder.isEmpty(), "Internal error: Table has a pending index entry but data block builder is empty");
 
-            userComparator.findShortestSeparator(lastKey, key);
+            Slice shortestSeparator = userComparator.findShortestSeparator(lastKey, key);
 
-            ChannelBuffer handleEncoding = Buffers.dynamicBuffer();
-            BlockHandle.writeBlockHandle(pendingHandle, handleEncoding);
-            indexBlockBuilder.add(lastKey, handleEncoding);
+            Slice handleEncoding = BlockHandle.writeBlockHandle(pendingHandle);
+            indexBlockBuilder.add(shortestSeparator, handleEncoding);
             pendingIndexEntry = false;
         }
 
-        lastKey.clear();
-        lastKey.writeBytes(key, 0, key.readableBytes());
+        lastKey = key;
         entryCount++;
         dataBlockBuilder.add(key, value);
 
@@ -167,22 +167,19 @@ public class TableBuilder
             throws IOException
     {
         // close the block
-        ChannelBuffer raw = blockBuilder.finish();
+        Slice raw = blockBuilder.finish();
 
         // attempt to compress the block
-        ChannelBuffer blockContents = raw;
+        Slice blockContents = raw;
         CompressionType blockCompressionType = CompressionType.NONE;
         if (compressionType == CompressionType.SNAPPY) {
-            compressedOutput.ensureWritableBytes(Snappy.maxCompressedLength(raw.readableBytes()));
-            compressedOutput.clear();
-
+            ensureCompressedOutputCapacity(Snappy.maxCompressedLength(raw.length()));
             try {
-                int compressedSize = Snappy.compress(raw.array(), raw.arrayOffset() + raw.readerIndex(), raw.readableBytes(), compressedOutput.array(), 0);
-                compressedOutput.writerIndex(compressedSize);
+                int compressedSize = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
 
                 // Don't use the compressed data if compressed less than 12.5%,
-                if (compressedSize < raw.readableBytes() - (raw.readableBytes() / 8)) {
-                    blockContents = compressedOutput;
+                if (compressedSize < raw.length() - (raw.length() / 8)) {
+                    blockContents = compressedOutput.slice(0, compressedSize);
                     blockCompressionType = CompressionType.SNAPPY;
                 }
             }
@@ -193,16 +190,15 @@ public class TableBuilder
 
         // create block trailer
         BlockTrailer blockTrailer = new BlockTrailer(blockCompressionType, crc32c(blockContents, blockCompressionType));
-        ChannelBuffer trailer = BlockTrailer.writeBlockTrailer(blockTrailer);
+        Slice trailer = BlockTrailer.writeBlockTrailer(blockTrailer);
 
         // create a handle to this block
-        BlockHandle blockHandle = new BlockHandle(position, blockContents.readableBytes());
+        BlockHandle blockHandle = new BlockHandle(position, blockContents.length());
 
         // write data and trailer
-        position += fileChannel.write(Buffers.wrappedBuffer(blockContents, trailer).toByteBuffers());
+        position += fileChannel.write(new ByteBuffer[]{blockContents.toByteBuffer(), trailer.toByteBuffer()});
 
         // clean up state
-        compressedOutput.clear();
         blockBuilder.reset();
 
         return blockHandle;
@@ -220,17 +216,16 @@ public class TableBuilder
         closed = true;
 
         // write (empty) meta index block
-        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), blockRestartInterval, CHANNEL_BUFFER_COMPARATOR);
+        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(256, blockRestartInterval, SLICE_COMPARATOR);
         // TODO(postrelease): Add stats and other meta blocks
         BlockHandle metaindexBlockHandle = writeBlock(metaIndexBlockBuilder);
 
         // add last handle to index block
         if (pendingIndexEntry) {
-            userComparator.findShortSuccessor(lastKey);
+            Slice shortSuccessor = userComparator.findShortSuccessor(lastKey);
 
-            ChannelBuffer handleEncoding = Buffers.dynamicBuffer();
-            BlockHandle.writeBlockHandle(pendingHandle, handleEncoding);
-            indexBlockBuilder.add(lastKey, handleEncoding);
+            Slice handleEncoding = BlockHandle.writeBlockHandle(pendingHandle);
+            indexBlockBuilder.add(shortSuccessor, handleEncoding);
             pendingIndexEntry = false;
         }
 
@@ -239,8 +234,8 @@ public class TableBuilder
 
         // write footer
         Footer footer = new Footer(metaindexBlockHandle, indexBlockHandle);
-        ChannelBuffer footerEncoding = Footer.writeFooter(footer);
-        position += fileChannel.write(footerEncoding.toByteBuffers());
+        Slice footerEncoding = Footer.writeFooter(footer);
+        position += fileChannel.write(footerEncoding.toByteBuffer());
     }
 
     public void abandon()
@@ -249,14 +244,19 @@ public class TableBuilder
         closed = true;
     }
 
-    public static int crc32c(ChannelBuffer data, CompressionType type)
+    public static int crc32c(Slice data, CompressionType type)
     {
         PureJavaCrc32C crc32c = new PureJavaCrc32C();
-        crc32c.update(data.array(), data.arrayOffset() + data.readerIndex(), data.readableBytes());
+        crc32c.update(data.getRawArray(), data.getRawOffset(), data.length());
         crc32c.update(type.persistentId() & 0xFF);
         return crc32c.getMaskedValue();
     }
 
-
-
+    public void ensureCompressedOutputCapacity(int capacity)
+    {
+        if (compressedOutput != null && compressedOutput.length() > capacity) {
+            return;
+        }
+        compressedOutput = Slices.allocate(capacity);
+    }
 }

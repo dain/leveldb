@@ -17,18 +17,18 @@
  */
 package org.iq80.leveldb.impl;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.Slice;
 
 import java.util.Comparator;
 import java.util.Map.Entry;
 
-public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, ChannelBuffer>
+public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, Slice>
 {
-    private final Comparator<ChannelBuffer> userComparator;
-    private final SeekingIterator<InternalKey, ChannelBuffer> iterator;
+    private final Comparator<Slice> userComparator;
+    private final SeekingIterator<InternalKey, Slice> iterator;
     private final long snapshot;
 
-    public SnapshotSeekingIterator(SeekingIterator<InternalKey, ChannelBuffer> iterator, long snapshot, Comparator<ChannelBuffer> userComparator)
+    public SnapshotSeekingIterator(SeekingIterator<InternalKey, Slice> iterator, long snapshot, Comparator<Slice> userComparator)
     {
         this.iterator = iterator;
         this.snapshot = snapshot;
@@ -56,15 +56,15 @@ public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, Cha
     }
 
     @Override
-    public Entry<InternalKey, ChannelBuffer> peek()
+    public Entry<InternalKey, Slice> peek()
     {
         return iterator.peek();
     }
 
     @Override
-    public Entry<InternalKey, ChannelBuffer> next()
+    public Entry<InternalKey, Slice> next()
     {
-        Entry<InternalKey, ChannelBuffer> next = iterator.next();
+        Entry<InternalKey, Slice> next = iterator.next();
 
         // find the next user entry after the key we are about to return
         findNextUserEntry(next.getKey().getUserKey());
@@ -78,7 +78,7 @@ public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, Cha
         throw new UnsupportedOperationException();
     }
 
-    private void findNextUserEntry(ChannelBuffer deletedKey)
+    private void findNextUserEntry(Slice deletedKey)
     {
         // if there are no more entries, we are done
         if (!iterator.hasNext()) {

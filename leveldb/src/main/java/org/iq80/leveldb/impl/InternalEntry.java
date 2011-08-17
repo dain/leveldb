@@ -19,14 +19,13 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
 
 import java.util.Map.Entry;
 
 import static com.google.common.base.Charsets.UTF_8;
 
-public class InternalEntry implements Entry<InternalKey, ChannelBuffer>
+public class InternalEntry implements Entry<InternalKey, Slice>
 {
     public static final Function<InternalEntry, InternalKey> GET_KEY = new Function<InternalEntry, InternalKey>()
     {
@@ -38,14 +37,14 @@ public class InternalEntry implements Entry<InternalKey, ChannelBuffer>
     };
 
     private final InternalKey key;
-    private final ChannelBuffer value;
+    private final Slice value;
 
-    public InternalEntry(InternalKey key, ChannelBuffer value)
+    public InternalEntry(InternalKey key, Slice value)
     {
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
         this.key = key;
-        this.value = Buffers.unmodifiableBuffer(value);
+        this.value = value;
     }
 
     @Override
@@ -55,9 +54,9 @@ public class InternalEntry implements Entry<InternalKey, ChannelBuffer>
     }
 
     @Override
-    public ChannelBuffer getValue()
+    public Slice getValue()
     {
-        return value.duplicate();
+        return value;
     }
 
 
@@ -65,7 +64,7 @@ public class InternalEntry implements Entry<InternalKey, ChannelBuffer>
      * @throws UnsupportedOperationException always
      */
     @Override
-    public final ChannelBuffer setValue(ChannelBuffer value)
+    public final Slice setValue(Slice value)
     {
         throw new UnsupportedOperationException();
     }

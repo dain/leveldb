@@ -17,8 +17,11 @@
  */
 package org.iq80.leveldb.table;
 
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.SliceOutput;
 
 public class BlockHandle
 {
@@ -88,10 +91,10 @@ public class BlockHandle
         return sb.toString();
     }
 
-    public static BlockHandle readBlockHandle(ChannelBuffer buffer)
+    public static BlockHandle readBlockHandle(SliceInput sliceInput)
     {
-        long offset = VariableLengthQuantity.unpackLong(buffer);
-        long size = VariableLengthQuantity.unpackLong(buffer);
+        long offset = VariableLengthQuantity.unpackLong(sliceInput);
+        long size = VariableLengthQuantity.unpackLong(sliceInput);
 
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Blocks can not be larger than Integer.MAX_VALUE");
@@ -100,9 +103,16 @@ public class BlockHandle
         return new BlockHandle(offset, (int) size);
     }
 
-    public static void writeBlockHandle(BlockHandle blockHandle, ChannelBuffer buffer)
+    public static Slice writeBlockHandle(BlockHandle blockHandle)
     {
-        VariableLengthQuantity.packLong(blockHandle.offset, buffer);
-        VariableLengthQuantity.packLong(blockHandle.dataSize, buffer);
+        Slice slice = Slices.allocate(MAX_ENCODED_LENGTH);
+        SliceOutput sliceOutput = slice.output();
+        writeBlockHandleTo(blockHandle, sliceOutput);
+        return slice.slice();
+    }
+    public static void writeBlockHandleTo(BlockHandle blockHandle, SliceOutput sliceOutput)
+    {
+        VariableLengthQuantity.packLong(blockHandle.offset, sliceOutput);
+        VariableLengthQuantity.packLong(blockHandle.dataSize, sliceOutput);
     }
 }

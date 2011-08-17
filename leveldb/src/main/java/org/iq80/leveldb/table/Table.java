@@ -24,30 +24,30 @@ import org.iq80.leveldb.impl.SeekingIterable;
 import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 import org.xerial.snappy.Snappy;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
 import static org.iq80.leveldb.CompressionType.SNAPPY;
 
-public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
+public class Table implements SeekingIterable<Slice, Slice>
 {
     private final String name;
     private final FileChannel fileChannel;
-    private final Comparator<ChannelBuffer> comparator;
+    private final Comparator<Slice> comparator;
 
     private final boolean verifyChecksums;
 
     private final Block indexBlock;
     private final BlockHandle metaindexBlockHandle;
 
-    public Table(String name, FileChannel fileChannel, Comparator<ChannelBuffer> comparator, boolean verifyChecksums)
+    public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
             throws IOException
     {
         Preconditions.checkNotNull(name, "name is null");
@@ -60,22 +60,22 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         this.verifyChecksums = verifyChecksums;
         this.comparator = comparator;
 
-        ChannelBuffer footerBuffer = read(fileChannel, fileChannel.size() - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
-        Footer footer = Footer.readFooter(footerBuffer);
+        Slice footerSlice = read(fileChannel, fileChannel.size() - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
+        Footer footer = Footer.readFooter(footerSlice);
 
         indexBlock = readBlock(footer.getIndexBlockHandle());
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
     }
 
     @Override
-    public SeekingIterator<ChannelBuffer, ChannelBuffer> iterator()
+    public SeekingIterator<Slice, Slice> iterator()
     {
-        SeekingIterator<ChannelBuffer, BlockIterator> inputs = SeekingIterators.transformValues(indexBlock.iterator(), new Function<ChannelBuffer, BlockIterator>()
+        SeekingIterator<Slice, BlockIterator> inputs = SeekingIterators.transformValues(indexBlock.iterator(), new Function<Slice, BlockIterator>()
         {
             @Override
-            public BlockIterator apply(ChannelBuffer blockEntry)
+            public BlockIterator apply(Slice blockEntry)
             {
-                BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry);
+                BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry.input());
                 try {
                     Block dataBlock = readBlock(blockHandle);
                     return dataBlock.iterator();
@@ -93,7 +93,7 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             throws IOException
     {
         // read full block (data + trailer) into memory
-        ChannelBuffer data = read(fileChannel, blockHandle.getOffset(), blockHandle.getFullBlockSize());
+        Slice data = read(fileChannel, blockHandle.getOffset(), blockHandle.getFullBlockSize());
 
         // read block trailer
         BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(data.slice(blockHandle.getDataSize(), BlockTrailer.ENCODED_LENGTH));
@@ -102,23 +102,22 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         if (verifyChecksums) {
             // checksum data and the compression type in the trailer
             PureJavaCrc32C checksum = new PureJavaCrc32C();
-            checksum.update(data.array(), data.arrayOffset(), blockHandle.getDataSize() + 1);
+            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
             int actualCrc32c = checksum.getMaskedValue();
 
             Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
         }
 
         // decompress data
-        ChannelBuffer uncompressedData;
+        Slice uncompressedData;
         if (blockTrailer.getCompressionType() == SNAPPY) {
             // todo when code is change to direct buffers, use the buffer method instead
-            int uncompressedLength = Snappy.uncompressedLength(data.array(), data.arrayOffset() + data.readerIndex(), blockHandle.getDataSize());
-            uncompressedData = Buffers.buffer(uncompressedLength);
-            Snappy.uncompress(data.array(), data.arrayOffset() + data.readerIndex(), blockHandle.getDataSize(), uncompressedData.array(), uncompressedData.arrayOffset());
-            uncompressedData.writerIndex(uncompressedLength);
+            int uncompressedLength = Snappy.uncompressedLength(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize());
+            uncompressedData = Slices.allocate(uncompressedLength);
+            Snappy.uncompress(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize(), uncompressedData.getRawArray(), uncompressedData.getRawOffset());
         }
         else {
-            uncompressedData = data.slice(data.readerIndex(), blockHandle.getDataSize());
+            uncompressedData = data.slice(0, blockHandle.getDataSize());
         }
 
         return new Block(uncompressedData, comparator);
@@ -132,12 +131,12 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
      * For example, the approximate offset of the last key in the table will
      * be close to the file length.
      */
-    public long getApproximateOffsetOf(ChannelBuffer key)
+    public long getApproximateOffsetOf(Slice key)
     {
         BlockIterator iterator = indexBlock.iterator();
         iterator.seek(key);
         if (iterator.hasNext()) {
-            BlockHandle blockHandle = BlockHandle.readBlockHandle(iterator.next().getValue());
+            BlockHandle blockHandle = BlockHandle.readBlockHandle(iterator.next().getValue().input());
             return blockHandle.getOffset();
         }
 
@@ -148,22 +147,21 @@ public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     }
 
 
-    public static ChannelBuffer read(FileChannel channel, long position, int length)
+    public static Slice read(FileChannel channel, long position, int length)
             throws IOException
     {
-        ByteBuffer buffer = Buffers.allocateByteBuffer(length);
+        SliceOutput buffer = Slices.allocate(length).output();
 
-        while (buffer.remaining() > 0) {
-            int bytesRead = channel.read(buffer, position + buffer.position());
+        while (buffer.writableBytes() > 0) {
+            int bytesRead = buffer.writeBytes(channel, (int) position, buffer.writableBytes());
             if (bytesRead < 0) {
                 // error tried to read off the end of the file
                 throw new EOFException();
             }
 
         }
-        buffer.position(0);
 
-        return Buffers.wrappedBuffer(buffer);
+        return buffer.slice();
     }
 
     @Override

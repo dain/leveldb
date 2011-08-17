@@ -24,8 +24,8 @@ import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -39,7 +39,7 @@ import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 
 // todo this class should be immutable
-public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
+public class Level implements SeekingIterable<InternalKey, Slice>
 {
     private final int levelNumber;
     private final TableCache tableCache;
@@ -51,7 +51,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
         Preconditions.checkNotNull(files, "files is null");
         Preconditions.checkNotNull(tableCache, "tableCache is null");
-        Preconditions.checkNotNull(internalKeyComparator, "channelBufferOrdering is null");
+        Preconditions.checkNotNull(internalKeyComparator, "internalKeyComparator is null");
 
         this.files = newArrayList(files);
         this.tableCache = tableCache;
@@ -71,14 +71,14 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
     }
 
     @Override
-    public SeekingIterator<InternalKey, ChannelBuffer> iterator()
+    public SeekingIterator<InternalKey, Slice> iterator()
     {
         if (files.isEmpty()) {
             return SeekingIterators.emptyIterator();
         } else if (files.size() == 1) {
             return tableCache.newIterator(files.get(0));
         } else if (levelNumber == 0) {
-            Builder<SeekingIterator<InternalKey, ChannelBuffer>> builder = ImmutableList.builder();
+            Builder<SeekingIterator<InternalKey, Slice>> builder = ImmutableList.builder();
             for (FileMetaData file : files) {
                 builder.add(tableCache.newIterator(file));
             }
@@ -89,12 +89,12 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         }
     }
 
-    public static SeekingIterator<InternalKey, ChannelBuffer> createLevelConcatIterator(final TableCache tableCache, List<FileMetaData> files, InternalKeyComparator internalKeyComparator)
+    public static SeekingIterator<InternalKey, Slice> createLevelConcatIterator(final TableCache tableCache, List<FileMetaData> files, InternalKeyComparator internalKeyComparator)
     {
         FileMetaDataSeekingIterator fileMetaDataIterator = new FileMetaDataSeekingIterator(files, internalKeyComparator);
-        return SeekingIterators.concat(SeekingIterators.transformValues(fileMetaDataIterator, new Function<FileMetaData, SeekingIterator<InternalKey, ChannelBuffer>>()
+        return SeekingIterators.concat(SeekingIterators.transformValues(fileMetaDataIterator, new Function<FileMetaData, SeekingIterator<InternalKey, Slice>>()
         {
-            public SeekingIterator<InternalKey, ChannelBuffer> apply(FileMetaData fileMetaData)
+            public SeekingIterator<InternalKey, Slice> apply(FileMetaData fileMetaData)
             {
                 return tableCache.newIterator(fileMetaData);
             }
@@ -138,7 +138,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         readStats.clear();
         for (FileMetaData fileMetaData : fileMetaDataList) {
             // open the iterator
-            SeekingIterator<InternalKey, ChannelBuffer> iterator = tableCache.newIterator(fileMetaData);
+            SeekingIterator<InternalKey, Slice> iterator = tableCache.newIterator(fileMetaData);
 
             // seek to the key
             iterator.seek(key.getInternalKey());
@@ -149,7 +149,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
             }
 
             // parse the key in the block
-            Entry<InternalKey, ChannelBuffer> entry = iterator.next();
+            Entry<InternalKey, Slice> entry = iterator.next();
             InternalKey internalKey = entry.getKey();
             Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey());
 
@@ -182,7 +182,7 @@ public class Level implements SeekingIterable<InternalKey, ChannelBuffer>
         return insertionPoint;
     }
 
-    public boolean someFileOverlapsRange(ChannelBuffer smallestUserKey, ChannelBuffer largestUserKey)
+    public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
     {
         InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
         int index = findFile(smallestInternalKey);

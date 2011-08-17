@@ -19,41 +19,40 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class InternalKey
 {
-    private final ChannelBuffer userKey;
+    private final Slice userKey;
     private final long sequenceNumber;
     private final ValueType valueType;
 
-    public InternalKey(ChannelBuffer userKey, long sequenceNumber, ValueType valueType)
+    public InternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
     {
         Preconditions.checkNotNull(userKey, "userKey is null");
         Preconditions.checkArgument(sequenceNumber >= 0, "sequenceNumber is negative");
         Preconditions.checkNotNull(valueType, "valueType is null");
 
-        this.userKey = userKey.duplicate();
+        this.userKey = userKey;
         this.sequenceNumber = sequenceNumber;
         this.valueType = valueType;
     }
 
-    public InternalKey(ChannelBuffer data)
+    public InternalKey(Slice data)
     {
         Preconditions.checkNotNull(data, "data is null");
-        if (data.readableBytes() < SIZE_OF_LONG) {
-            Preconditions.checkArgument(data.readableBytes() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
-        }
+        Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.userKey = getUserKey(data);
         this.sequenceNumber = getSequenceNumber(data);
         this.valueType = getValueType(data);
     }
 
-    public ChannelBuffer getUserKey()
+    public Slice getUserKey()
     {
         return userKey;
     }
@@ -68,12 +67,13 @@ public class InternalKey
         return valueType;
     }
 
-    public ChannelBuffer encode()
+    public Slice encode()
     {
-        ChannelBuffer buffer = Buffers.buffer(userKey.readableBytes() + SIZE_OF_LONG);
-        buffer.writeBytes(userKey.slice());
-        buffer.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
-        return buffer;
+        Slice slice = Slices.allocate(userKey.length() + SIZE_OF_LONG);
+        SliceOutput sliceOutput = slice.output();
+        sliceOutput.writeBytes(userKey);
+        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
+        return slice;
     }
 
     @Override
@@ -131,46 +131,46 @@ public class InternalKey
 
     // todo find new home for these
 
-    public static final Function<InternalKey, ChannelBuffer> INTERNAL_KEY_TO_CHANNEL_BUFFER = new InternalKeyToChannelBufferFunction();
+    public static final Function<InternalKey, Slice> INTERNAL_KEY_TO_SLICE = new InternalKeyToSliceFunction();
 
-    public static final Function<ChannelBuffer, InternalKey> CHANNEL_BUFFER_TO_INTERNAL_KEY = new ChannelBufferToInternalKeyFunction();
+    public static final Function<Slice, InternalKey> SLICE_TO_INTERNAL_KEY = new SliceToInternalKeyFunction();
 
-    public static final Function<InternalKey, ChannelBuffer> INTERNAL_KEY_TO_USER_KEY = new InternalKeyToUserKeyFunction();
+    public static final Function<InternalKey, Slice> INTERNAL_KEY_TO_USER_KEY = new InternalKeyToUserKeyFunction();
 
-    public static Function<ChannelBuffer, InternalKey> createUserKeyToInternalKeyFunction(final long sequenceNumber)
+    public static Function<Slice, InternalKey> createUserKeyToInternalKeyFunction(final long sequenceNumber)
     {
         return new UserKeyInternalKeyFunction(sequenceNumber);
     }
 
 
-    private static class InternalKeyToChannelBufferFunction implements Function<InternalKey, ChannelBuffer>
+    private static class InternalKeyToSliceFunction implements Function<InternalKey, Slice>
     {
         @Override
-        public ChannelBuffer apply(InternalKey internalKey)
+        public Slice apply(InternalKey internalKey)
         {
             return internalKey.encode();
         }
     }
 
-    private static class InternalKeyToUserKeyFunction implements Function<InternalKey, ChannelBuffer>
+    private static class InternalKeyToUserKeyFunction implements Function<InternalKey, Slice>
     {
         @Override
-        public ChannelBuffer apply(InternalKey internalKey)
+        public Slice apply(InternalKey internalKey)
         {
             return internalKey.getUserKey();
         }
     }
 
-    private static class ChannelBufferToInternalKeyFunction implements Function<ChannelBuffer, InternalKey>
+    private static class SliceToInternalKeyFunction implements Function<Slice, InternalKey>
     {
         @Override
-        public InternalKey apply(ChannelBuffer channelBuffer)
+        public InternalKey apply(Slice slice)
         {
-            return new InternalKey(channelBuffer);
+            return new InternalKey(slice);
         }
     }
 
-    private static class UserKeyInternalKeyFunction implements Function<ChannelBuffer, InternalKey>
+    private static class UserKeyInternalKeyFunction implements Function<Slice, InternalKey>
     {
         private final long sequenceNumber;
 
@@ -180,28 +180,26 @@ public class InternalKey
         }
 
         @Override
-        public InternalKey apply(ChannelBuffer channelBuffer)
+        public InternalKey apply(Slice slice)
         {
-            return new InternalKey(channelBuffer, sequenceNumber, ValueType.VALUE);
+            return new InternalKey(slice, sequenceNumber, ValueType.VALUE);
         }
     }
 
 
-    private static ChannelBuffer getUserKey(ChannelBuffer data)
+    private static Slice getUserKey(Slice data)
     {
-        ChannelBuffer buffer = data.duplicate();
-        buffer.writerIndex(data.readableBytes() - SIZE_OF_LONG);
-        return buffer;
+        return data.slice(0, data.length() - SIZE_OF_LONG);
     }
 
-    private static long getSequenceNumber(ChannelBuffer data)
+    private static long getSequenceNumber(Slice data)
     {
-        return SequenceNumber.unpackSequenceNumber(data.getLong(data.readableBytes() - SIZE_OF_LONG));
+        return SequenceNumber.unpackSequenceNumber(data.getLong(data.length() - SIZE_OF_LONG));
     }
 
-    private static ValueType getValueType(ChannelBuffer data)
+    private static ValueType getValueType(Slice data)
     {
-        return SequenceNumber.unpackValueType(data.getLong(data.readableBytes() - SIZE_OF_LONG));
+        return SequenceNumber.unpackValueType(data.getLong(data.length() - SIZE_OF_LONG));
     }
 
 

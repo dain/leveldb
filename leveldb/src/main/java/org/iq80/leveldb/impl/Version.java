@@ -25,7 +25,7 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Ordering;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.Slice;
 
 import java.util.List;
 
@@ -34,7 +34,7 @@ import static com.google.common.collect.Ordering.natural;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
 // todo this class should be immutable
-public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
+public class Version implements SeekingIterable<InternalKey, Slice>
 {
     private final List<Level> levels;
     private final InternalKeyComparator internalKeyComparator;
@@ -109,14 +109,14 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
     }
 
     @Override
-    public SeekingIterator<InternalKey, ChannelBuffer> iterator()
+    public SeekingIterator<InternalKey, Slice> iterator()
     {
         return SeekingIterators.merge(getIterators(), internalKeyComparator);
     }
 
-    public List<SeekingIterator<InternalKey, ChannelBuffer>> getIterators()
+    public List<SeekingIterator<InternalKey, Slice>> getIterators()
     {
-        Builder<SeekingIterator<InternalKey, ChannelBuffer>> builder = ImmutableList.builder();
+        Builder<SeekingIterator<InternalKey, Slice>> builder = ImmutableList.builder();
         for (Level level : levels) {
             if (level.getFiles().size() > 0) {
                 builder.add(level.iterator());
@@ -141,9 +141,9 @@ public class Version implements SeekingIterable<InternalKey, ChannelBuffer>
         return null;
     }
 
-    public boolean overlapInLevel(int level, ChannelBuffer smallestUserKey, ChannelBuffer largestUserKey)
+    public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
     {
-        Preconditions.checkElementIndex(level, levels.size(), "Invalid level");
+        Preconditions.checkPositionIndex(level, levels.size(), "Invalid level");
         Preconditions.checkNotNull(smallestUserKey, "smallestUserKey is null");
         Preconditions.checkNotNull(largestUserKey, "largestUserKey is null");
         return levels.get(level).someFileOverlapsRange(smallestUserKey, largestUserKey);

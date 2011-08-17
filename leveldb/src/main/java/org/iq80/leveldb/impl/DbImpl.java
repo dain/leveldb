@@ -32,8 +32,10 @@ import org.iq80.leveldb.impl.WriteBatch.Handler;
 import org.iq80.leveldb.table.BasicUserComparator;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -65,13 +67,13 @@ import static org.iq80.leveldb.impl.InternalKey.createUserKeyToInternalKeyFuncti
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
-import static org.iq80.leveldb.util.Buffers.readLengthPrefixedBytes;
-import static org.iq80.leveldb.util.Buffers.writeLengthPrefixedBytes;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
+import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
+import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
 // todo make thread safe and concurrent
-public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
+public class DbImpl implements SeekingIterable<Slice, Slice>
 {
     private final Options options;
     private final File databaseDir;
@@ -304,7 +306,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
-    public void compactRange(int level, ChannelBuffer start, ChannelBuffer end)
+    public void compactRange(int level, Slice start, Slice end)
     {
         Preconditions.checkArgument(level >= 0, "level is negative");
         Preconditions.checkArgument(level + 1 < NUM_LEVELS, "level is greater than %s", NUM_LEVELS);
@@ -468,17 +470,18 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         // Read all the records and add to a memtable
         long maxSequence = 0;
         MemTable memTable = null;
-        for (ChannelBuffer record = logReader.readRecord(); record != null; record = logReader.readRecord()) {
+        for (Slice record = logReader.readRecord(); record != null; record = logReader.readRecord()) {
+            SliceInput sliceInput = record.input();
             // read header
-            if (record.readableBytes() < 12) {
-                logMonitor.corruption(record.readableBytes(), "log record too small");
+            if (sliceInput.available() < 12) {
+                logMonitor.corruption(sliceInput.available(), "log record too small");
                 continue;
             }
-            long sequenceBegin = record.readLong();
-            int updateSize = record.readInt();
+            long sequenceBegin = sliceInput.readLong();
+            int updateSize = sliceInput.readInt();
 
             // read entries
-            WriteBatch writeBatch = readWriteBatch(record, updateSize);
+            WriteBatch writeBatch = readWriteBatch(sliceInput, updateSize);
 
             // apply entries to memTable
             if (memTable == null) {
@@ -507,12 +510,12 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         return maxSequence;
     }
 
-    public ChannelBuffer get(ChannelBuffer key)
+    public Slice get(Slice key)
     {
         return get(new ReadOptions(), key);
     }
 
-    public ChannelBuffer get(ReadOptions options, ChannelBuffer key)
+    public Slice get(ReadOptions options, Slice key)
     {
         LookupKey lookupKey;
         mutex.lock();
@@ -551,22 +554,22 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         return null;
     }
 
-    public void put(ChannelBuffer key, ChannelBuffer value)
+    public void put(Slice key, Slice value)
     {
         put(new WriteOptions(), key, value);
     }
 
-    public void put(WriteOptions options, ChannelBuffer key, ChannelBuffer value)
+    public void put(WriteOptions options, Slice key, Slice value)
     {
         write(options, new WriteBatch().put(key, value));
     }
 
-    public void delete(ChannelBuffer key)
+    public void delete(Slice key)
     {
         write(new WriteOptions(), new WriteBatch().delete(key));
     }
 
-    public void delete(WriteOptions options, ChannelBuffer key)
+    public void delete(WriteOptions options, Slice key)
     {
         write(options, new WriteBatch().delete(key));
     }
@@ -585,7 +588,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             versions.setLastSequence(sequenceEnd);
 
             // Log write
-            ChannelBuffer record = writeWriteBatch(updates, sequenceBegin);
+            Slice record = writeWriteBatch(updates, sequenceBegin);
             try {
                 log.addRecord(record, options.sync());
             }
@@ -604,24 +607,24 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     }
 
     @Override
-    public SeekingIterator<ChannelBuffer, ChannelBuffer> iterator()
+    public SeekingIterator<Slice, Slice> iterator()
     {
         return iterator(new ReadOptions());
     }
 
-    public SeekingIterator<ChannelBuffer, ChannelBuffer> iterator(ReadOptions options)
+    public SeekingIterator<Slice, Slice> iterator(ReadOptions options)
     {
         mutex.lock();
         try {
-            SeekingIterator<InternalKey, ChannelBuffer> rawIterator = internalIterator();
+            SeekingIterator<InternalKey, Slice> rawIterator = internalIterator();
 
 
             // filter any entries not visible in our snapshot
             long snapshot = getSnapshotNumber(options);
-            SeekingIterator<InternalKey, ChannelBuffer> snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
+            SeekingIterator<InternalKey, Slice> snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
 
             // transform the keys user space
-            SeekingIterator<ChannelBuffer, ChannelBuffer> userIterator = SeekingIterators.transformKeys(snapshotIterator,
+            SeekingIterator<Slice, Slice> userIterator = SeekingIterators.transformKeys(snapshotIterator,
                     INTERNAL_KEY_TO_USER_KEY,
                     createUserKeyToInternalKeyFunction(snapshot));
             return userIterator;
@@ -631,24 +634,24 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
-    SeekingIterable<InternalKey, ChannelBuffer> internalIterable()
+    SeekingIterable<InternalKey, Slice> internalIterable()
     {
-        return new SeekingIterable<InternalKey, ChannelBuffer>()
+        return new SeekingIterable<InternalKey, Slice>()
         {
             @Override
-            public SeekingIterator<InternalKey, ChannelBuffer> iterator()
+            public SeekingIterator<InternalKey, Slice> iterator()
             {
                 return internalIterator();
             }
         };
     }
 
-    SeekingIterator<InternalKey, ChannelBuffer> internalIterator()
+    SeekingIterator<InternalKey, Slice> internalIterator()
     {
         mutex.lock();
         try {
             // merge together the memTable, immutableMemTable, and tables in version set
-            ImmutableList.Builder<SeekingIterator<InternalKey, ChannelBuffer>> iterators = ImmutableList.builder();
+            ImmutableList.Builder<SeekingIterator<InternalKey, Slice>> iterators = ImmutableList.builder();
             if (memTable != null && !memTable.isEmpty()) {
                 iterators.add(memTable.iterator());
             }
@@ -822,8 +825,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             mutex.lock();
         }
 
-        ChannelBuffer minUserKey = fileMetaData.getSmallest().getUserKey();
-        ChannelBuffer maxUserKey = fileMetaData.getLargest().getUserKey();
+        Slice minUserKey = fileMetaData.getSmallest().getUserKey();
+        Slice maxUserKey = fileMetaData.getLargest().getUserKey();
 
         int level = 0;
         if (base != null && !base.overlapInLevel(0, minUserKey, maxUserKey)) {
@@ -836,7 +839,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         edit.addFile(level, fileMetaData);
     }
 
-    private FileMetaData buildTable(SeekingIterable<InternalKey, ChannelBuffer> data)
+    private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data)
             throws IOException
     {
         long fileNumber = versions.getNextFileNumber();
@@ -849,7 +852,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 
             InternalKey smallest = null;
             InternalKey largest = null;
-            for (Entry<InternalKey, ChannelBuffer> entry : data) {
+            for (Entry<InternalKey, Slice> entry : data) {
                 // update keys
                 InternalKey key = entry.getKey();
                 if (smallest == null) {
@@ -897,9 +900,9 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         // Release mutex while we're actually doing the compaction work
         mutex.unlock();
         try {
-            SeekingIterator<InternalKey, ChannelBuffer> iterator = versions.makeInputIterator(compactionState.compaction);
+            SeekingIterator<InternalKey, Slice> iterator = versions.makeInputIterator(compactionState.compaction);
 
-            ChannelBuffer currentUserKey = null;
+            Slice currentUserKey = null;
             boolean hasCurrentUserKey = false;
 
             long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
@@ -1082,7 +1085,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         return versions.getCurrent().numberOfFilesInLevel(level);
     }
 
-    public long getApproximateSizes(ChannelBuffer start, ChannelBuffer limit)
+    public long getApproximateSizes(Slice start, Slice limit)
     {
         Version v = versions.getCurrent();
 
@@ -1133,10 +1136,10 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private static class ManualCompaction
     {
         private final int level;
-        private final ChannelBuffer begin;
-        private final ChannelBuffer end;
+        private final Slice begin;
+        private final Slice end;
 
-        private ManualCompaction(int level, ChannelBuffer begin, ChannelBuffer end)
+        private ManualCompaction(int level, Slice begin, Slice end)
         {
             this.level = level;
             this.begin = begin;
@@ -1144,20 +1147,20 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
     }
 
-    private WriteBatch readWriteBatch(ChannelBuffer record, int updateSize)
+    private WriteBatch readWriteBatch(SliceInput record, int updateSize)
             throws IOException
     {
         WriteBatch writeBatch = new WriteBatch();
         int entries = 0;
-        while (record.readable()) {
+        while (record.isReadable()) {
             entries++;
             ValueType valueType = ValueType.getValueTypeByPersistentId(record.readByte());
             if (valueType == VALUE) {
-                ChannelBuffer key = readLengthPrefixedBytes(record);
-                ChannelBuffer value = readLengthPrefixedBytes(record);
+                Slice key = readLengthPrefixedBytes(record);
+                Slice value = readLengthPrefixedBytes(record);
                 writeBatch.put(key, value);
             } else if (valueType == DELETION) {
-                ChannelBuffer key = readLengthPrefixedBytes(record);
+                Slice key = readLengthPrefixedBytes(record);
                 writeBatch.delete(key);
             } else {
                 throw new IllegalStateException("Unexpected value type " + valueType);
@@ -1171,29 +1174,30 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         return writeBatch;
     }
 
-    private ChannelBuffer writeWriteBatch(WriteBatch updates, long sequenceBegin)
+    private Slice writeWriteBatch(WriteBatch updates, long sequenceBegin)
     {
-        final ChannelBuffer record = Buffers.buffer(SIZE_OF_LONG + SIZE_OF_INT + updates.getApproximateSize());
-        record.writeLong(sequenceBegin);
-        record.writeInt(updates.size());
+        Slice record = Slices.allocate(SIZE_OF_LONG + SIZE_OF_INT + updates.getApproximateSize());
+        final SliceOutput sliceOutput = record.output();
+        sliceOutput.writeLong(sequenceBegin);
+        sliceOutput.writeInt(updates.size());
         updates.forEach(new Handler()
         {
             @Override
-            public void put(ChannelBuffer key, ChannelBuffer value)
+            public void put(Slice key, Slice value)
             {
-                record.writeByte(VALUE.getPersistentId());
-                writeLengthPrefixedBytes(record, key.duplicate());
-                writeLengthPrefixedBytes(record, value.duplicate());
+                sliceOutput.writeByte(VALUE.getPersistentId());
+                writeLengthPrefixedBytes(sliceOutput, key);
+                writeLengthPrefixedBytes(sliceOutput, value);
             }
 
             @Override
-            public void delete(ChannelBuffer key)
+            public void delete(Slice key)
             {
-                record.writeByte(DELETION.getPersistentId());
-                writeLengthPrefixedBytes(record, key.duplicate());
+                sliceOutput.writeByte(DELETION.getPersistentId());
+                writeLengthPrefixedBytes(sliceOutput, key);
             }
         });
-        return record;
+        return record.slice(0, sliceOutput.size());
     }
 
     private static class InsertIntoHandler implements Handler
@@ -1208,15 +1212,15 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         }
 
         @Override
-        public void put(ChannelBuffer key, ChannelBuffer value)
+        public void put(Slice key, Slice value)
         {
             memTable.add(sequence++, VALUE, key, value);
         }
 
         @Override
-        public void delete(ChannelBuffer key)
+        public void delete(Slice key)
         {
-            memTable.add(sequence++, DELETION, key, Buffers.EMPTY_BUFFER);
+            memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
         }
     }
 

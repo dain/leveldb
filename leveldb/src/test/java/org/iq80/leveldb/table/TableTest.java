@@ -21,8 +21,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.io.Closeables;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.SeekingIterator;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -36,7 +36,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static org.iq80.leveldb.util.ChannelBufferComparator.CHANNEL_BUFFER_COMPARATOR;
+import static org.iq80.leveldb.util.SliceComparator.SLICE_COMPARATOR;
 import static org.testng.Assert.assertTrue;
 
 public class TableTest
@@ -49,7 +49,7 @@ public class TableTest
     public void testEmptyFile()
             throws Exception
     {
-        new Table(file.getAbsolutePath(), fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
+        new Table(file.getAbsolutePath(), fileChannel, SLICE_COMPARATOR, true);
     }
 
     @Test
@@ -122,9 +122,9 @@ public class TableTest
         }
         builder.finish();
 
-        Table table = new Table(file.getAbsolutePath(), fileChannel, CHANNEL_BUFFER_COMPARATOR, true);
+        Table table = new Table(file.getAbsolutePath(), fileChannel, SLICE_COMPARATOR, true);
 
-        SeekingIterator<ChannelBuffer, ChannelBuffer> seekingIterator = table.iterator();
+        SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);
 
         seekingIterator.seekToFirst();
@@ -147,7 +147,7 @@ public class TableTest
             lastApproximateOffset = approximateOffset;
         }
 
-        ChannelBuffer endKey = Buffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+        Slice endKey = Slices.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey);
         BlockHelper.assertSequence(seekingIterator, Collections.<BlockEntry>emptyList());
 

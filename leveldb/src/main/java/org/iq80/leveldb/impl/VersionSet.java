@@ -27,9 +27,8 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SeekingIterators;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -53,11 +52,11 @@ import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
-public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
+public class VersionSet implements SeekingIterable<InternalKey, Slice>
 {
     private static final int L0_COMPACTION_TRIGGER = 4;
 
-    private static final int TARGET_FILE_SIZE = 2 * 1048576;
+    public static final int TARGET_FILE_SIZE = 2 * 1048576;
 
     // Maximum bytes of overlaps in grandparent (i.e., level+2) before we
     // stop building a single file in a level.level+1 compaction.
@@ -131,23 +130,23 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
     }
 
     @Override
-    public SeekingIterator<InternalKey, ChannelBuffer> iterator()
+    public SeekingIterator<InternalKey, Slice> iterator()
     {
         return current.iterator();
     }
 
-    public List<SeekingIterator<InternalKey, ChannelBuffer>> getIterators()
+    public List<SeekingIterator<InternalKey, Slice>> getIterators()
     {
         return current.getIterators();
     }
 
-    public SeekingIterator<InternalKey, ChannelBuffer> makeInputIterator(Compaction c)
+    public SeekingIterator<InternalKey, Slice> makeInputIterator(Compaction c)
     {
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
         int space = (c.getLevel() == 0 ? c.getLevelInputs().size() + 1 : 2);
-        List<SeekingIterator<InternalKey, ChannelBuffer>> list = newArrayList();
+        List<SeekingIterator<InternalKey, Slice>> list = newArrayList();
         int num = 0;
 
         if (c.getLevel() == 0) {
@@ -163,7 +162,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         list.add(Level.createLevelConcatIterator(tableCache, c.getLevelUpInputs(), internalKeyComparator));
 
         assert (num <= space);
-        SeekingIterator<InternalKey, ChannelBuffer> iterator = SeekingIterators.merge(list, internalKeyComparator);
+        SeekingIterator<InternalKey, Slice> iterator = SeekingIterators.merge(list, internalKeyComparator);
         return iterator;
     }
 
@@ -172,7 +171,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         return current.get(key);
     }
 
-    public boolean overlapInLevel(int level, ChannelBuffer smallestUserKey, ChannelBuffer largestUserKey)
+    public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
     {
         return current.overlapInLevel(level, smallestUserKey, largestUserKey);
     }
@@ -235,8 +234,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
             }
 
             // Write new record to MANIFEST log
-            ChannelBuffer record = Buffers.dynamicBuffer();
-            edit.encodeTo(record);
+            Slice record = edit.encode();
             descriptorLog.addRecord(record, true);
 
             // If we just created a new descriptor file, install it by writing a
@@ -276,8 +274,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         // Save files
         edit.addFiles(current.getFiles());
 
-        ChannelBuffer record = Buffers.dynamicBuffer();
-        edit.encodeTo(record);
+        Slice record = edit.encode();
         log.addRecord(record, false);
     }
 
@@ -309,7 +306,7 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
         Builder builder = new Builder(this, current);
 
         LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
-        for (ChannelBuffer record = reader.readRecord(); record != null; record = reader.readRecord()) {
+        for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
             // read version edit
             VersionEdit edit = new VersionEdit(record);
 
@@ -581,8 +578,8 @@ public class VersionSet implements SeekingIterable<InternalKey, ChannelBuffer>
     private List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
     {
         ImmutableList.Builder<FileMetaData> files = ImmutableList.builder();
-        ChannelBuffer userBegin = begin.getUserKey();
-        ChannelBuffer userEnd = end.getUserKey();
+        Slice userBegin = begin.getUserKey();
+        Slice userEnd = end.getUserKey();
         UserComparator userComparator = internalKeyComparator.getUserComparator();
         for (FileMetaData fileMetaData : current.getFiles(level)) {
             if (userComparator.compare(fileMetaData.getLargest().getUserKey(), userBegin) < 0 ||

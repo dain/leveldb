@@ -19,8 +19,8 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.impl.SeekingIterable;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 
 import java.util.Comparator;
 
@@ -60,18 +60,18 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
  * </tbody>
  * </table>
  */
-public class Block implements SeekingIterable<ChannelBuffer, ChannelBuffer>
+public class Block implements SeekingIterable<Slice, Slice>
 {
-    private final ChannelBuffer block;
-    private final Comparator<ChannelBuffer> comparator;
+    private final Slice block;
+    private final Comparator<Slice> comparator;
 
-    private final ChannelBuffer data;
-    private final ChannelBuffer restartPositions;
+    private final Slice data;
+    private final Slice restartPositions;
 
-    public Block(ChannelBuffer block, Comparator<ChannelBuffer> comparator)
+    public Block(Slice block, Comparator<Slice> comparator)
     {
         Preconditions.checkNotNull(block, "block is null");
-        Preconditions.checkArgument(block.capacity() >= SIZE_OF_INT, "Block is corrupt: size must be at least %s block", SIZE_OF_INT);
+        Preconditions.checkArgument(block.length() >= SIZE_OF_INT, "Block is corrupt: size must be at least %s block", SIZE_OF_INT);
         Preconditions.checkNotNull(comparator, "comparator is null");
 
         block = block.slice();
@@ -83,26 +83,26 @@ public class Block implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         // entire file sequentially.
 
         // key restart count is the last int of the block
-        int restartCount = block.getInt(block.capacity() - SIZE_OF_INT);
+        int restartCount = block.getInt(block.length() - SIZE_OF_INT);
 
         if (restartCount > 0) {
             // restarts are written at the end of the block
-            int restartOffset = block.readableBytes() - (1 + restartCount) * SIZE_OF_INT;
-            Preconditions.checkArgument(restartOffset < block.readableBytes() - SIZE_OF_INT, "Block is corrupt: restart offset count is greater than block size");
+            int restartOffset = block.length() - (1 + restartCount) * SIZE_OF_INT;
+            Preconditions.checkArgument(restartOffset < block.length() - SIZE_OF_INT, "Block is corrupt: restart offset count is greater than block size");
             restartPositions = block.slice(restartOffset, restartCount * SIZE_OF_INT);
 
             // data starts at 0 and extends to the restart index
             data = block.slice(0, restartOffset);
         }
         else {
-            data = Buffers.EMPTY_BUFFER;
-            restartPositions = Buffers.EMPTY_BUFFER;
+            data = Slices.EMPTY_SLICE;
+            restartPositions = Slices.EMPTY_SLICE;
         }
     }
 
     public long size()
     {
-        return block.capacity();
+        return block.length();
     }
 
     @Override

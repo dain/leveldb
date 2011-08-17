@@ -19,7 +19,7 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.Slice;
 
 import java.util.Map.Entry;
 
@@ -71,21 +71,21 @@ import static com.google.common.base.Charsets.UTF_8;
  * </tbody>
  * </table>
  */
-public class BlockEntry implements Entry<ChannelBuffer, ChannelBuffer>
+public class BlockEntry implements Entry<Slice, Slice>
 {
-    public static final Function<BlockEntry, ChannelBuffer> GET_KEY = new Function<BlockEntry, ChannelBuffer>()
+    public static final Function<BlockEntry, Slice> GET_KEY = new Function<BlockEntry, Slice>()
     {
         @Override
-        public ChannelBuffer apply(BlockEntry blockEntry)
+        public Slice apply(BlockEntry blockEntry)
         {
             return blockEntry.getKey();
         }
     };
 
-    private final ChannelBuffer key;
-    private final ChannelBuffer value;
+    private final Slice key;
+    private final Slice value;
 
-    public BlockEntry(ChannelBuffer key, ChannelBuffer value)
+    public BlockEntry(Slice key, Slice value)
     {
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
@@ -93,14 +93,14 @@ public class BlockEntry implements Entry<ChannelBuffer, ChannelBuffer>
         this.value = value;
     }
 
-    public ChannelBuffer getKey()
+    public Slice getKey()
     {
-        return key.duplicate();
+        return key;
     }
 
-    public ChannelBuffer getValue()
+    public Slice getValue()
     {
-        return value.duplicate();
+        return value;
     }
 
 
@@ -108,7 +108,7 @@ public class BlockEntry implements Entry<ChannelBuffer, ChannelBuffer>
      * @throws UnsupportedOperationException always
      */
     @Override
-    public final ChannelBuffer setValue(ChannelBuffer value)
+    public final Slice setValue(Slice value)
     {
         throw new UnsupportedOperationException();
     }

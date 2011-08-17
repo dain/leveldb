@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
+import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 
 import java.io.File;
@@ -32,6 +33,11 @@ public final class Logs
             throws IOException
     {
         return new MMapLogWriter(file, fileNumber);
+    }
+
+    public static int getChunkChecksum(int chunkTypeId, Slice slice)
+    {
+        return getChunkChecksum(chunkTypeId, slice.getRawArray(), slice.getRawOffset(), slice.length());
     }
 
     public static int getChunkChecksum(int chunkTypeId, byte[] buffer, int offset, int length)

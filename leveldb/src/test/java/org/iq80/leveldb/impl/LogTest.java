@@ -19,8 +19,9 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closeables;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -68,7 +69,7 @@ public class LogTest
     public void testSmallRecord()
             throws Exception
     {
-        testLog(toChannelBuffer("dain sundstrom"));
+        testLog(toSlice("dain sundstrom"));
     }
 
 
@@ -76,13 +77,13 @@ public class LogTest
     public void testMultipleSmallRecords()
             throws Exception
     {
-        List<ChannelBuffer> records = Arrays.asList(
-                toChannelBuffer("Lagunitas  Little Sumpin’ Sumpin’"),
-                toChannelBuffer("Lagunitas IPA"),
-                toChannelBuffer("Lagunitas Imperial Stout"),
-                toChannelBuffer("Oban 14"),
-                toChannelBuffer("Highland Park"),
-                toChannelBuffer("Lagavulin"));
+        List<Slice> records = Arrays.asList(
+                toSlice("Lagunitas  Little Sumpin’ Sumpin’"),
+                toSlice("Lagunitas IPA"),
+                toSlice("Lagunitas Imperial Stout"),
+                toSlice("Oban 14"),
+                toSlice("Highland Park"),
+                toSlice("Lagavulin"));
 
         testLog(records);
     }
@@ -91,20 +92,20 @@ public class LogTest
     public void testLargeRecord()
             throws Exception
     {
-        testLog(toChannelBuffer("dain sundstrom", 4000));
+        testLog(toSlice("dain sundstrom", 4000));
     }
 
     @Test
     public void testMultipleLargeRecords()
             throws Exception
     {
-        List<ChannelBuffer> records = Arrays.asList(
-                toChannelBuffer("Lagunitas  Little Sumpin’ Sumpin’", 4000),
-                toChannelBuffer("Lagunitas IPA", 4000),
-                toChannelBuffer("Lagunitas Imperial Stout", 4000),
-                toChannelBuffer("Oban 14", 4000),
-                toChannelBuffer("Highland Park", 4000),
-                toChannelBuffer("Lagavulin", 4000));
+        List<Slice> records = Arrays.asList(
+                toSlice("Lagunitas  Little Sumpin’ Sumpin’", 4000),
+                toSlice("Lagunitas IPA", 4000),
+                toSlice("Lagunitas Imperial Stout", 4000),
+                toSlice("Oban 14", 4000),
+                toSlice("Highland Park", 4000),
+                toSlice("Lagavulin", 4000));
 
         testLog(records);
     }
@@ -113,25 +114,25 @@ public class LogTest
     public void testReadWithoutProperClose()
             throws Exception
     {
-        testLog(ImmutableList.of(toChannelBuffer("something"), toChannelBuffer("something else")), false);
+        testLog(ImmutableList.of(toSlice("something"), toSlice("something else")), false);
     }
 
-    private void testLog(ChannelBuffer... entries)
+    private void testLog(Slice... entries)
             throws IOException
     {
         testLog(asList(entries));
     }
 
-    private void testLog(List<ChannelBuffer> records)
+    private void testLog(List<Slice> records)
             throws IOException
     {
         testLog(records, true);
     }
 
-    private void testLog(List<ChannelBuffer> records, boolean closeWriter)
+    private void testLog(List<Slice> records, boolean closeWriter)
             throws IOException
     {
-        for (ChannelBuffer entry : records) {
+        for (Slice entry : records) {
             writer.addRecord(entry, false);
         }
 
@@ -143,8 +144,8 @@ public class LogTest
         FileChannel fileChannel = new FileInputStream(writer.getFile()).getChannel();
         try {
             LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
-            for (ChannelBuffer expected : records) {
-                ChannelBuffer actual = reader.readRecord();
+            for (Slice expected : records) {
+                Slice actual = reader.readRecord();
                 assertEquals(actual, expected);
             }
             assertNull(reader.readRecord());
@@ -170,18 +171,19 @@ public class LogTest
         }
     }
 
-    static ChannelBuffer toChannelBuffer(String value)
+    static Slice toSlice(String value)
     {
-        return toChannelBuffer(value, 1);
+        return toSlice(value, 1);
     }
 
-    static ChannelBuffer toChannelBuffer(String value, int times)
+    static Slice toSlice(String value, int times)
     {
         byte[] bytes = value.getBytes(UTF_8);
-        ChannelBuffer buffer = Buffers.buffer(bytes.length * times);
+        Slice slice = Slices.allocate(bytes.length * times);
+        SliceOutput sliceOutput = slice.output();
         for (int i = 0; i < times; i++) {
-            buffer.writeBytes(bytes);
+            sliceOutput.writeBytes(bytes);
         }
-        return buffer;
+        return slice;
     }
 }

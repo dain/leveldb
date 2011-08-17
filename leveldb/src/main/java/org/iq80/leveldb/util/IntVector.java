@@ -18,7 +18,6 @@
 package org.iq80.leveldb.util;
 
 import com.google.common.base.Preconditions;
-import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.util.Arrays;
 
@@ -74,9 +73,9 @@ public class IntVector
         return Arrays.copyOf(values, size);
     }
 
-    public void write(ChannelBuffer buffer) {
+    public void write(SliceOutput sliceOutput) {
         for (int index = 0; index < size; index++) {
-            buffer.writeInt(values[index]);
+            sliceOutput.writeInt(values[index]);
         }
     }
 

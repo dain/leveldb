@@ -19,8 +19,8 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Charsets;
 import org.iq80.leveldb.impl.SeekingIterator;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 import org.testng.Assert;
 
 import java.util.Arrays;
@@ -81,64 +81,64 @@ public class BlockHelper
 
     public static <K, V> void assertEntryEquals(Entry<K, V> actual, Entry<K, V> expected)
     {
-        if (actual.getKey() instanceof ChannelBuffer) {
-            assertChannelBufferEquals((ChannelBuffer) actual.getKey(), (ChannelBuffer) expected.getKey());
-            assertChannelBufferEquals((ChannelBuffer) actual.getValue(), (ChannelBuffer) expected.getValue());
+        if (actual.getKey() instanceof Slice) {
+            assertSliceEquals((Slice) actual.getKey(), (Slice) expected.getKey());
+            assertSliceEquals((Slice) actual.getValue(), (Slice) expected.getValue());
         }
         assertEquals(actual, expected);
     }
 
-    public static void assertChannelBufferEquals(ChannelBuffer actual, ChannelBuffer expected)
+    public static void assertSliceEquals(Slice actual, Slice expected)
     {
         assertEquals(actual.toString(Charsets.UTF_8), expected.toString(Charsets.UTF_8));
     }
 
-    public static String before(Entry<String, ?> expectedEntry)
+    public static String beforeString(Entry<String, ?> expectedEntry)
     {
         String key = expectedEntry.getKey();
         int lastByte = key.charAt(key.length() - 1);
         return key.substring(0, key.length() - 1) + ((char) (lastByte - 1));
     }
 
-    public static String after(Entry<String, ?> expectedEntry)
+    public static String afterString(Entry<String, ?> expectedEntry)
     {
         String key = expectedEntry.getKey();
         int lastByte = key.charAt(key.length() - 1);
         return key.substring(0, key.length() - 1) + ((char) (lastByte + 1));
     }
 
-    public static ChannelBuffer before(Entry<ChannelBuffer, ?> expectedEntry)
+    public static Slice before(Entry<Slice, ?> expectedEntry)
     {
-        ChannelBuffer channelBuffer = Buffers.copiedBuffer(expectedEntry.getKey());
-        int lastByte = channelBuffer.readableBytes() - 1;
-        channelBuffer.setByte(lastByte, channelBuffer.getByte(lastByte) - 1);
-        return channelBuffer;
+        Slice slice = expectedEntry.getKey().copySlice(0, expectedEntry.getKey().length());
+        int lastByte = slice.length() - 1;
+        slice.setByte(lastByte, slice.getUnsignedByte(lastByte) - 1);
+        return slice;
     }
 
-    public static ChannelBuffer after(Entry<ChannelBuffer, ?> expectedEntry)
+    public static Slice after(Entry<Slice, ?> expectedEntry)
     {
-        ChannelBuffer channelBuffer = Buffers.copiedBuffer(expectedEntry.getKey());
-        int lastByte = channelBuffer.readableBytes() - 1;
-        channelBuffer.setByte(lastByte, channelBuffer.getByte(lastByte) + 1);
-        return channelBuffer;
+        Slice slice = expectedEntry.getKey().copySlice(0, expectedEntry.getKey().length());
+        int lastByte = slice.length() - 1;
+        slice.setByte(lastByte, slice.getUnsignedByte(lastByte) + 1);
+        return slice;
     }
 
     public static int estimateEntriesSize(int blockRestartInterval, List<BlockEntry> entries)
     {
         int size = 0;
-        ChannelBuffer previousKey = null;
+        Slice previousKey = null;
         int restartBlockCount = 0;
         for (BlockEntry entry : entries) {
             int nonSharedBytes;
             if (restartBlockCount < blockRestartInterval) {
-                nonSharedBytes = entry.getKey().readableBytes() - BlockBuilder.calculateSharedBytes(entry.getKey(), previousKey);
+                nonSharedBytes = entry.getKey().length() - BlockBuilder.calculateSharedBytes(entry.getKey(), previousKey);
             }
             else {
-                nonSharedBytes = entry.getKey().readableBytes();
+                nonSharedBytes = entry.getKey().length();
                 restartBlockCount = 0;
             }
             size += nonSharedBytes +
-                    entry.getValue().readableBytes() +
+                    entry.getValue().length() +
                     (SIZE_OF_BYTE * 3); // 3 bytes for sizes
 
             previousKey = entry.getKey();
@@ -150,6 +150,6 @@ public class BlockHelper
 
     static BlockEntry createBlockEntry(String key, String value)
     {
-        return new BlockEntry(Buffers.copiedBuffer(key, UTF_8), Buffers.copiedBuffer(value, UTF_8));
+        return new BlockEntry(Slices.copiedBuffer(key, UTF_8), Slices.copiedBuffer(value, UTF_8));
     }
 }

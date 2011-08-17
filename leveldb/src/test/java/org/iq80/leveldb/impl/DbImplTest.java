@@ -24,8 +24,8 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.ReadOptions;
 import org.iq80.leveldb.Snapshot;
 import org.iq80.leveldb.util.FileUtils;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -43,11 +43,11 @@ import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Arrays.asList;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.table.BlockHelper.after;
-import static org.iq80.leveldb.table.BlockHelper.assertSequence;
-import static org.iq80.leveldb.table.BlockHelper.before;
 import static org.iq80.leveldb.CompressionType.NONE;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.table.BlockHelper.afterString;
+import static org.iq80.leveldb.table.BlockHelper.assertSequence;
+import static org.iq80.leveldb.table.BlockHelper.beforeString;
 import static org.iq80.leveldb.util.SeekingIterators.transformKeys;
 import static org.iq80.leveldb.util.SeekingIterators.transformValues;
 import static org.testng.Assert.assertEquals;
@@ -628,11 +628,18 @@ public class DbImplTest
         db.compactMemTable();
         assertEquals(db.numberOfFilesInLevel(last), 1);
         assertEquals(db.numberOfFilesInLevel(last - 1), 1);
+        assertEquals(db.get("a"), "begin");
+        assertEquals(db.get("foo"), "v1");
+        assertEquals(db.get("z"), "end");
 
         db.delete("foo");
         db.put("foo", "v2");
         assertEquals(db.allEntriesFor("foo"), asList("v2", "DEL", "v1"));
         db.compactMemTable();  // Moves to level last-2
+        assertEquals(db.get("a"), "begin");
+        assertEquals(db.get("foo"), "v2");
+        assertEquals(db.get("z"), "end");
+
         assertEquals(db.allEntriesFor("foo"), asList("v2", "DEL", "v1"));
         db.compactRange(last - 2, "", "z");
 
@@ -763,14 +770,14 @@ public class DbImplTest
             seekingIterator.seek(entry.getKey());
             assertSequence(seekingIterator, nextEntries);
 
-            seekingIterator.seek(before(entry));
+            seekingIterator.seek(beforeString(entry));
             assertSequence(seekingIterator, nextEntries);
 
-            seekingIterator.seek(after(entry));
+            seekingIterator.seek(afterString(entry));
             assertSequence(seekingIterator, nextEntries.subList(1, nextEntries.size()));
         }
 
-        ChannelBuffer endKey = Buffers.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+        Slice endKey = Slices.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey.toString(Charsets.UTF_8));
         assertSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
     }
@@ -814,9 +821,9 @@ public class DbImplTest
         }
     }
 
-    static ChannelBuffer toChannelBuffer(String value)
+    static Slice toSlice(String value)
     {
-        return Buffers.wrappedBuffer(value.getBytes(UTF_8));
+        return Slices.wrappedBuffer(value.getBytes(UTF_8));
     }
 
 
@@ -872,35 +879,35 @@ public class DbImplTest
 
         public String get(String key)
         {
-            ChannelBuffer channelBuffer = db.get(toChannelBuffer(key));
-            if (channelBuffer == null) {
+            Slice slice = db.get(toSlice(key));
+            if (slice == null) {
                 return null;
             }
-            return channelBuffer.toString(Charsets.UTF_8);
+            return slice.toString(Charsets.UTF_8);
         }
 
         public String get(String key, Snapshot snapshot)
         {
-            ChannelBuffer channelBuffer = db.get(new ReadOptions().snapshot(snapshot), toChannelBuffer(key));
-            if (channelBuffer == null) {
+            Slice slice = db.get(new ReadOptions().snapshot(snapshot), toSlice(key));
+            if (slice == null) {
                 return null;
             }
-            return channelBuffer.toString(Charsets.UTF_8);
+            return slice.toString(Charsets.UTF_8);
         }
 
         public void put(String key, String value)
         {
-            db.put(toChannelBuffer(key), toChannelBuffer(value));
+            db.put(toSlice(key), toSlice(value));
         }
 
         public void delete(String key)
         {
-            db.delete(toChannelBuffer(key));
+            db.delete(toSlice(key));
         }
 
         public SeekingIterator<String, String> iterator()
         {
-            return transformValues(transformKeys(db.iterator(), new ChannelBufferToString(), new StringToChannelBuffer()), new ChannelBufferToString());
+            return transformValues(transformKeys(db.iterator(), new SliceToString(), new StringToSlice()), new SliceToString());
         }
 
         public Snapshot getSnapshot()
@@ -920,7 +927,7 @@ public class DbImplTest
 
         public void compactRange(int level, String start, String limit)
         {
-            db.compactRange(level, toChannelBuffer(start), toChannelBuffer(limit));
+            db.compactRange(level, toSlice(start), toSlice(limit));
         }
 
         public void compact(String start, String limit)
@@ -933,7 +940,7 @@ public class DbImplTest
                 }
             }
             for (int level = 0; level < maxLevelWithFiles; level++) {
-                db.compactRange(level, toChannelBuffer(""), toChannelBuffer("~"));
+                db.compactRange(level, toSlice(""), toSlice("~"));
             }
 
         }
@@ -954,7 +961,7 @@ public class DbImplTest
 
         public long size(String start, String limit)
         {
-            return db.getApproximateSizes(toChannelBuffer(start), toChannelBuffer(limit));
+            return db.getApproximateSizes(toSlice(start), toSlice(limit));
         }
 
         public long getMaxNextLevelOverlappingBytes()
@@ -975,28 +982,28 @@ public class DbImplTest
             db = new DbImpl(options.verifyChecksums(true).createIfMissing(false).errorIfExists(false), databaseDir);
         }
 
-        private static class ChannelBufferToString implements Function<ChannelBuffer, String>
+        private static class SliceToString implements Function<Slice, String>
         {
             @Override
-            public String apply(ChannelBuffer input)
+            public String apply(Slice input)
             {
                 return input.toString(Charsets.UTF_8);
             }
         }
 
-        private static class StringToChannelBuffer implements Function<String, ChannelBuffer>
+        private static class StringToSlice implements Function<String, Slice>
         {
             @Override
-            public ChannelBuffer apply(String input)
+            public Slice apply(String input)
             {
-                return toChannelBuffer(input);
+                return toSlice(input);
             }
         }
 
         private List<String> allEntriesFor(String userKey)
         {
             ImmutableList.Builder<String> result = ImmutableList.builder();
-            for (Entry<InternalKey, ChannelBuffer> entry : db.internalIterable()) {
+            for (Entry<InternalKey, Slice> entry : db.internalIterable()) {
                 String entryKey = entry.getKey().getUserKey().toString(UTF_8);
                 if (entryKey.equals(userKey)) {
                     if (entry.getKey().getValueType() == ValueType.VALUE) {

@@ -19,7 +19,7 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.table.UserComparator;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.iq80.leveldb.util.Slice;
 
 import java.util.List;
 
@@ -144,7 +144,7 @@ public class Compaction
     // Returns true if the information we have available guarantees that
     // the compaction is producing data in "level+1" for which no data exists
     // in levels greater than "level+1".
-    public boolean isBaseLevelForKey(ChannelBuffer userKey)
+    public boolean isBaseLevelForKey(Slice userKey)
     {
         // Maybe use binary search to find right entry instead of linear search?
         UserComparator userComparator = inputVersion.getInternalKeyComparator().getUserComparator();

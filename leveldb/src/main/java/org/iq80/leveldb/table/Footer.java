@@ -18,11 +18,13 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.iq80.leveldb.util.Buffers;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.SliceOutput;
 
 import static org.iq80.leveldb.table.BlockHandle.readBlockHandle;
-import static org.iq80.leveldb.table.BlockHandle.writeBlockHandle;
+import static org.iq80.leveldb.table.BlockHandle.writeBlockHandleTo;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class Footer
@@ -48,47 +50,49 @@ public class Footer
         return indexBlockHandle;
     }
 
-    public static Footer readFooter(ChannelBuffer buffer)
+    public static Footer readFooter(Slice slice)
     {
-        // remember the starting read index so we can calculate the padding
-        int startingReadIndex = buffer.readerIndex();
+        Preconditions.checkNotNull(slice, "slice is null");
+        Preconditions.checkArgument(slice.length() == ENCODED_LENGTH, "Expected slice.size to be %s but was %s", ENCODED_LENGTH, slice.length());
+
+        SliceInput sliceInput = slice.input();
 
         // read metaindex and index handles
-        BlockHandle metaindexBlockHandle = readBlockHandle(buffer);
-        BlockHandle indexBlockHandle = readBlockHandle(buffer);
+        BlockHandle metaindexBlockHandle = readBlockHandle(sliceInput);
+        BlockHandle indexBlockHandle = readBlockHandle(sliceInput);
 
         // skip padding
-        buffer.readerIndex(startingReadIndex + ENCODED_LENGTH - SIZE_OF_LONG);
+        sliceInput.setPosition(ENCODED_LENGTH - SIZE_OF_LONG);
 
         // verify magic number
-        long magicNumber = buffer.readUnsignedInt() | (buffer.readUnsignedInt() << 32);
+        long magicNumber = sliceInput.readUnsignedInt() | (sliceInput.readUnsignedInt() << 32);
         Preconditions.checkArgument(magicNumber == TableBuilder.TABLE_MAGIC_NUMBER, "File is not a table (bad magic number)");
 
         return new Footer(metaindexBlockHandle, indexBlockHandle);
     }
 
-    public static ChannelBuffer writeFooter(Footer Footer)
+    public static Slice writeFooter(Footer Footer)
     {
-        ChannelBuffer buffer = Buffers.buffer(ENCODED_LENGTH);
-        writeFooter(Footer, buffer);
-        return buffer;
+        Slice slice = Slices.allocate(ENCODED_LENGTH);
+        writeFooter(Footer, slice.output());
+        return slice;
     }
 
-    public static void writeFooter(Footer footer, ChannelBuffer buffer)
+    public static void writeFooter(Footer footer, SliceOutput sliceOutput)
     {
         // remember the starting write index so we can calculate the padding
-        int startingWriteIndex = buffer.writerIndex();
+        int startingWriteIndex = sliceOutput.size();
 
         // write metaindex and index handles
-        writeBlockHandle(footer.getMetaindexBlockHandle(), buffer);
-        writeBlockHandle(footer.getIndexBlockHandle(), buffer);
+        writeBlockHandleTo(footer.getMetaindexBlockHandle(), sliceOutput);
+        writeBlockHandleTo(footer.getIndexBlockHandle(), sliceOutput);
 
         // write padding
-        buffer.writeZero(ENCODED_LENGTH - SIZE_OF_LONG - (buffer.writerIndex() - startingWriteIndex));
+        sliceOutput.writeZero(ENCODED_LENGTH - SIZE_OF_LONG - (sliceOutput.size() - startingWriteIndex));
 
         // write magic number as two (little endian) integers
-        buffer.writeInt((int) TableBuilder.TABLE_MAGIC_NUMBER);
-        buffer.writeInt((int) (TableBuilder.TABLE_MAGIC_NUMBER >>> 32));
+        sliceOutput.writeInt((int) TableBuilder.TABLE_MAGIC_NUMBER);
+        sliceOutput.writeInt((int) (TableBuilder.TABLE_MAGIC_NUMBER >>> 32));
     }
 
 }
