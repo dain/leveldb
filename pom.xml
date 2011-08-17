@@ -16,6 +16,7 @@
     <url>http://github.com/dain/leveldb</url>
 
     <modules>
+        <module>leveldb-api</module>
         <module>leveldb</module>
     </modules>
 
