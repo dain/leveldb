@@ -15,32 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb.impl;
 
-public class WriteOptions
+import java.util.Map.Entry;
+
+public interface SeekingIterable<K, V> extends Iterable<Entry<K, V>>
 {
-    private boolean sync;
-    private boolean snapshot;
-
-
-    public boolean isSync()
-    {
-        return sync;
-    }
-
-    public WriteOptions setSync(boolean sync)
-    {
-        this.sync = sync;
-        return this;
-    }
-
-    public boolean isSnapshot() {
-        return snapshot;
-    }
-
-    public WriteOptions setSnapshot(boolean snapshot) {
-        this.snapshot = snapshot;
-        return this;
-    }
-
+    @Override
+    SeekingIterator<K, V> iterator();
 }

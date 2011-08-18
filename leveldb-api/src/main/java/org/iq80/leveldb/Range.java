@@ -15,13 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public interface Logger {
+public class Range {
 
-    public void log(String message);
+    final private byte[] start;
+    final private byte[] limit;
+
+    public byte[] limit() {
+        return limit;
+    }
+
+    public byte[] start() {
+        return start;
+    }
+
+    public Range(byte[] start, byte[] limit) {
+        Options.checkArgNotNull(start, "start");
+        Options.checkArgNotNull(limit, "limit");
+        this.limit = limit;
+        this.start = start;
+    }
 
 }

@@ -17,7 +17,11 @@
  */
 package org.iq80.leveldb;
 
-public class Leveldb
-{
-    // implementation is in DbImpl for now
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface Logger {
+
+    public void log(String message);
+
 }

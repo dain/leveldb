@@ -15,8 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb;
 
-public interface Snapshot extends Closable {
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public class DBException extends Exception {
+    public DBException() {
+    }
 
+    public DBException(String s) {
+        super(s);
+    }
+
+    public DBException(String s, Throwable throwable) {
+        super(s, throwable);
+    }
+
+    public DBException(Throwable throwable) {
+        super(throwable);
+    }
 }

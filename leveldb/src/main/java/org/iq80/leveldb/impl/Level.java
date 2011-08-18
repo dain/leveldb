@@ -23,8 +23,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.iq80.leveldb.SeekingIterable;
-import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;

@@ -18,7 +18,7 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
-import org.iq80.leveldb.SeekingIterable;
+import org.iq80.leveldb.impl.SeekingIterable;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.iq80.leveldb.util.Buffers;
 

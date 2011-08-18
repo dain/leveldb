@@ -20,8 +20,6 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
-import org.iq80.leveldb.SeekingIterable;
-import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.util.Map.Entry;

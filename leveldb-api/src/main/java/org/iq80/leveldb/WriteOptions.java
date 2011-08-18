@@ -15,20 +15,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb;
 
-import java.io.File;
-import java.io.IOException;
+public class WriteOptions
+{
+    private boolean sync;
+    private boolean snapshot;
 
-/**
- * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
- */
-public interface DBFactory {
 
-    public DB open(File path, Options options) throws IOException;
+    public boolean isSync()
+    {
+        return sync;
+    }
 
-    public void destroy(File path, Options options) throws IOException;
+    public WriteOptions setSync(boolean sync)
+    {
+        this.sync = sync;
+        return this;
+    }
 
-    public void repair(File path, Options options) throws IOException;
+    public boolean isSnapshot() {
+        return snapshot;
+    }
+
+    public WriteOptions setSnapshot(boolean snapshot) {
+        this.snapshot = snapshot;
+        return this;
+    }
 
 }

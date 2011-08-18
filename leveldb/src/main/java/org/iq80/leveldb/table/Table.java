@@ -20,8 +20,8 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import org.iq80.leveldb.SeekingIterable;
-import org.iq80.leveldb.SeekingIterator;
+import org.iq80.leveldb.impl.SeekingIterable;
+import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -34,7 +34,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
-import static org.iq80.leveldb.api.CompressionType.SNAPPY;
+import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 {

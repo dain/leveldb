@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import org.iq80.leveldb.SeekingIterator;
 import org.jboss.netty.buffer.ChannelBuffer;
 
 import java.util.Comparator;

@@ -23,8 +23,6 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
-import org.iq80.leveldb.api.Options;
-import org.iq80.leveldb.api.WriteOptions;
 import org.iq80.leveldb.impl.DbConstants;
 import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.impl.WriteBatch;

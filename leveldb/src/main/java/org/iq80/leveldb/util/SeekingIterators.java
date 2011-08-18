@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
-import org.iq80.leveldb.SeekingIterator;
+import org.iq80.leveldb.impl.SeekingIterator;
 
 import java.util.Comparator;
 import java.util.Map.Entry;

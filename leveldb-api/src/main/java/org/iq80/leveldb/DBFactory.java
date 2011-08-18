@@ -15,24 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb;
+
+import java.io.File;
+import java.io.IOException;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public class DBException extends Exception {
-    public DBException() {
-    }
+public interface DBFactory {
 
-    public DBException(String s) {
-        super(s);
-    }
+    public DB open(File path, Options options) throws IOException;
 
-    public DBException(String s, Throwable throwable) {
-        super(s, throwable);
-    }
+    public void destroy(File path, Options options) throws IOException;
 
-    public DBException(Throwable throwable) {
-        super(throwable);
-    }
+    public void repair(File path, Options options) throws IOException;
+
 }

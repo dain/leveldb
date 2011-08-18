@@ -24,7 +24,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.io.Closeables;
-import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Finalizer;

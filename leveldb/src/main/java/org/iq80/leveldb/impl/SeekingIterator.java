@@ -15,31 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb.impl;
 
-public enum CompressionType
+import com.google.common.collect.PeekingIterator;
+
+import java.util.Map.Entry;
+
+public interface SeekingIterator<K,V> extends PeekingIterator<Entry<K, V>>
 {
-    NONE(0x00),
-    SNAPPY(0x01);
+    /**
+     * Repositions the iterator so the beginning of this block.
+     */
+    void seekToFirst();
 
-    public static CompressionType getCompressionTypeByPersistentId(int persistentId) {
-        for (CompressionType compressionType : CompressionType.values()) {
-            if (compressionType.persistentId == persistentId) {
-                return compressionType;
-            }
-        }
-        throw new IllegalArgumentException("Unknown persistentId " + persistentId);
-    }
-
-    private final int persistentId;
-
-    CompressionType(int persistentId)
-    {
-        this.persistentId = persistentId;
-    }
-
-    public int getPersistentId()
-    {
-        return persistentId;
-    }
+    /**
+     * Repositions the iterator so the key of the next BlockElement returned greater than or equal to the specified targetKey.
+     */
+    void seek(K targetKey);
 }

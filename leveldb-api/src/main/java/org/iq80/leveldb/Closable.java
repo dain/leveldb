@@ -17,10 +17,11 @@
  */
 package org.iq80.leveldb;
 
-import java.util.Map.Entry;
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface Closable {
 
-public interface SeekingIterable<K, V> extends Iterable<Entry<K, V>>
-{
-    @Override
-    SeekingIterator<K, V> iterator();
+    public void close();
+
 }

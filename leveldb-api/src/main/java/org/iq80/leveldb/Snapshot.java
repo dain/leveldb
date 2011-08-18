@@ -15,13 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb;
 
-/**
- * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
- */
-public interface Closable {
-
-    public void close();
+public interface Snapshot extends Closable {
 
 }

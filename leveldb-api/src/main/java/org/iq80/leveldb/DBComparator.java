@@ -15,29 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.api;
+package org.iq80.leveldb;
+
+import java.util.Comparator;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public class Range {
+public interface DBComparator extends Comparator<byte[]>{
 
-    final private byte[] start;
-    final private byte[] limit;
+    public String name();
 
-    public byte[] limit() {
-        return limit;
-    }
+    /**
+     * If <code>start < limit</code>, returns a short key in [start,limit).
+     * Simple comparator implementations should return start unchanged,
+     *
+     * @param start
+     * @param limit
+     * @return
+     */
+    byte[] findShortestSeparator(byte[] start, byte[] limit);
 
-    public byte[] start() {
-        return start;
-    }
-
-    public Range(byte[] start, byte[] limit) {
-        Options.checkArgNotNull(start, "start");
-        Options.checkArgNotNull(limit, "limit");
-        this.limit = limit;
-        this.start = start;
-    }
+    /**
+     * returns a 'short key' where the 'short key' >= key.
+     * Simple comparator implementations should return key unchanged,
+     *
+     * @param key
+     */
+    byte[] findShortSuccessor(byte[] key);
 
 }

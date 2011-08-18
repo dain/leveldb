@@ -24,8 +24,6 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Ordering;
-import org.iq80.leveldb.SeekingIterable;
-import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
 

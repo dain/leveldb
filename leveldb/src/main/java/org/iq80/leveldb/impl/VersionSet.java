@@ -26,8 +26,6 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
-import org.iq80.leveldb.SeekingIterable;
-import org.iq80.leveldb.SeekingIterator;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.jboss.netty.buffer.ChannelBuffer;
