@@ -24,33 +24,35 @@ import java.util.Map;
  */
 public interface DB extends Iterable<Map.Entry<byte[], byte[]>>, Closable {
 
-    public byte[] get(byte[] key);
-    public byte[] get(byte[] key, ReadOptions options);
+    public byte[] get(byte[] key) throws DBException;
+    public byte[] get(byte[] key, ReadOptions options) throws DBException;
 
     public DBIterator iterator();
     public DBIterator iterator(ReadOptions options);
 
-    public void put(byte[] key, byte[] value);
-    public void delete(byte[] key);
-    public void write(WriteBatch updates);
+    public void put(byte[] key, byte[] value) throws DBException;
+    public void delete(byte[] key) throws DBException;
+    public void write(WriteBatch updates) throws DBException;
+
+    public WriteBatch createWriteBatch();
 
     /**
      * @return null if options.isSnapshot()==false otherwise returns a snapshot
      *         of the DB after this operation.
      */
-    public Snapshot put(byte[] key, byte[] value, WriteOptions options);
+    public Snapshot put(byte[] key, byte[] value, WriteOptions options) throws DBException;
 
     /**
      * @return null if options.isSnapshot()==false otherwise returns a snapshot
      *         of the DB after this operation.
      */
-    public Snapshot delete(byte[] key, WriteOptions options);
+    public Snapshot delete(byte[] key, WriteOptions options) throws DBException;
 
     /**
      * @return null if options.isSnapshot()==false otherwise returns a snapshot
      *         of the DB after this operation.
      */
-    public Snapshot write(WriteBatch updates, WriteOptions options);
+    public Snapshot write(WriteBatch updates, WriteOptions options) throws DBException;
 
     public Snapshot getSnapshot();
 
