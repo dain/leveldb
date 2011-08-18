@@ -38,7 +38,7 @@ public enum CompressionType
         this.persistentId = persistentId;
     }
 
-    public int getPersistentId()
+    public int persistentId()
     {
         return persistentId;
     }

@@ -114,7 +114,7 @@ public class TableTest
             throws IOException
     {
         reopenFile();
-        Options options = new Options().setBlockSize(blockSize).setBlockRestartInterval(blockRestartInterval);
+        Options options = new Options().blockSize(blockSize).blockRestartInterval(blockRestartInterval);
         TableBuilder builder = new TableBuilder(options, fileChannel, new BasicUserComparator());
 
         for (BlockEntry entry : entries) {

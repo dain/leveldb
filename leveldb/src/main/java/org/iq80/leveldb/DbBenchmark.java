@@ -141,7 +141,7 @@ public class DbBenchmark
                 write(new WriteOptions(), RANDOM, EXISTING, num_, valueSize, 1);
             }
             else if (benchmark.equals("fillsync")) {
-                write(new WriteOptions().setSync(true), RANDOM, FRESH, num_ / 1000, valueSize, 1);
+                write(new WriteOptions().sync(true), RANDOM, FRESH, num_ / 1000, valueSize, 1);
             }
             else if (benchmark.equals("fill100K")) {
                 write(new WriteOptions(), RANDOM, FRESH, num_ / 1000, 100 * 1000, 1);
@@ -276,10 +276,10 @@ public class DbBenchmark
             throws IOException
     {
         Options options = new Options();
-        options.setCreateIfMissing(!useExisting);
+        options.createIfMissing(!useExisting);
         // todo block cache
         if (writeBufferSize != null) {
-            options.setWriteBufferSize(writeBufferSize);
+            options.writeBufferSize(writeBufferSize);
         }
         db_ = new DbImpl(options, databaseDir);
     }

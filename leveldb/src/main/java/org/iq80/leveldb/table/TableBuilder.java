@@ -84,9 +84,9 @@ public class TableBuilder
         this.fileChannel = fileChannel;
         this.userComparator = userComparator;
 
-        blockRestartInterval = options.getBlockRestartInterval();
-        blockSize = options.getBlockSize();
-        compressionType = options.getCompressionType();
+        blockRestartInterval = options.blockRestartInterval();
+        blockSize = options.blockSize();
+        compressionType = options.compressionType();
 
         dataBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), blockRestartInterval, userComparator);
         indexBlockBuilder = new BlockBuilder(Buffers.dynamicBuffer(), 1, userComparator);
@@ -253,7 +253,7 @@ public class TableBuilder
     {
         PureJavaCrc32C crc32c = new PureJavaCrc32C();
         crc32c.update(data.array(), data.arrayOffset() + data.readerIndex(), data.readableBytes());
-        crc32c.update(type.getPersistentId() & 0xFF);
+        crc32c.update(type.persistentId() & 0xFF);
         return crc32c.getMaskedValue();
     }
 

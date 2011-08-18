@@ -101,7 +101,7 @@ public class DbImplTest
             throws Exception
     {
         // create db with small write buffer
-        DbStringWrapper db = new DbStringWrapper(new Options().setWriteBufferSize(100000), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().writeBufferSize(100000), databaseDir);
         db.put("foo", "v1");
         assertEquals(db.get("foo"), "v1");
 
@@ -293,7 +293,7 @@ public class DbImplTest
     public void testRecoverDuringMemtableCompaction()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new Options().setWriteBufferSize(1000000), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().writeBufferSize(1000000), databaseDir);
 
         // Trigger a long memtable compaction and reopen the database during it
         db.put("foo", "v1");                        // Goes to 1st log file
@@ -313,7 +313,7 @@ public class DbImplTest
     public void testMinorCompactionsHappen()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new Options().setWriteBufferSize(10000), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().writeBufferSize(10000), databaseDir);
 
         int n = 500;
         int startingNumTables = db.totalTableFiles();
@@ -350,7 +350,7 @@ public class DbImplTest
         db.put("small4", longString(10, '4'));
         assertEquals(db.numberOfFilesInLevel(0), 0);
 
-        db.reopen(new Options().setWriteBufferSize(100000));
+        db.reopen(new Options().writeBufferSize(100000));
         assertEquals(db.numberOfFilesInLevel(0), 3);
         assertEquals(db.get("big1"), longString(200000, '1'));
         assertEquals(db.get("big2"), longString(200000, '2'));
@@ -363,7 +363,7 @@ public class DbImplTest
     public void testCompactionsGenerateMultipleFiles()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new Options().setWriteBufferSize(100000000), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().writeBufferSize(100000000), databaseDir);
 
         // Write 8MB (80 values, each 100K)
         assertEquals(db.numberOfFilesInLevel(0), 0);
@@ -390,7 +390,7 @@ public class DbImplTest
     public void testRepeatedWritesToSameKey()
             throws Exception
     {
-        Options options = new Options().setWriteBufferSize(100000);
+        Options options = new Options().writeBufferSize(100000);
         DbStringWrapper db = new DbStringWrapper(options, databaseDir);
 
         // We must have at most one file per level except for level-0,
@@ -398,7 +398,7 @@ public class DbImplTest
         int maxFiles = NUM_LEVELS + DbConstants.L0_STOP_WRITES_TRIGGER;
 
         Random random = new Random(301);
-        String value = randomString(random, 2 * options.getWriteBufferSize());
+        String value = randomString(random, 2 * options.writeBufferSize());
         for (int i = 0; i < 5 * maxFiles; i++) {
             db.put("key", value);
             assertTrue(db.totalTableFiles() < maxFiles);
@@ -411,7 +411,7 @@ public class DbImplTest
     public void testSparseMerge()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new Options().setCompressionType(NONE), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().compressionType(NONE), databaseDir);
 
         fillLevels(db, "A", "Z");
 
@@ -452,7 +452,7 @@ public class DbImplTest
     public void testApproximateSizes()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new Options().setWriteBufferSize(100000000).setCompressionType(NONE), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().writeBufferSize(100000000).compressionType(NONE), databaseDir);
 
         assertBetween(db.size("", "xyz"), 0, 0);
         db.reopen();
@@ -494,7 +494,7 @@ public class DbImplTest
     public void testApproximateSizesMixOfSmallAndLarge()
             throws Exception
     {
-        DbStringWrapper db = new DbStringWrapper(new Options().setCompressionType(NONE), databaseDir);
+        DbStringWrapper db = new DbStringWrapper(new Options().compressionType(NONE), databaseDir);
         Random random = new Random(301);
         String big1 = randomString(random, 100000);
         db.put(key(0), randomString(random, 10000));
@@ -865,7 +865,7 @@ public class DbImplTest
         private DbStringWrapper(Options options, File databaseDir)
                 throws IOException
         {
-            this.options = options.setVerifyChecksums(true).setCreateIfMissing(true).setErrorIfExists(true);
+            this.options = options.verifyChecksums(true).createIfMissing(true).errorIfExists(true);
             this.databaseDir = databaseDir;
             this.db = new DbImpl(options, databaseDir);
         }
@@ -881,7 +881,7 @@ public class DbImplTest
 
         public String get(String key, Snapshot snapshot)
         {
-            ChannelBuffer channelBuffer = db.get(new ReadOptions().setSnapshot(snapshot), toChannelBuffer(key));
+            ChannelBuffer channelBuffer = db.get(new ReadOptions().snapshot(snapshot), toChannelBuffer(key));
             if (channelBuffer == null) {
                 return null;
             }
@@ -972,7 +972,7 @@ public class DbImplTest
                 throws IOException
         {
             db.close();
-            db = new DbImpl(options.setVerifyChecksums(true).setCreateIfMissing(false).setErrorIfExists(false), databaseDir);
+            db = new DbImpl(options.verifyChecksums(true).createIfMissing(false).errorIfExists(false), databaseDir);
         }
 
         private static class ChannelBufferToString implements Function<ChannelBuffer, String>

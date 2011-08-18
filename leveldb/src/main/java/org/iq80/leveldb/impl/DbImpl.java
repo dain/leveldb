@@ -125,8 +125,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
         compactionExecutor = Executors.newCachedThreadPool(compactionThreadFactory);
 
         // Reserve ten files or so for other uses and give the rest to TableCache.
-        int tableCacheSize = options.getMaxOpenFiles() - 10;
-        tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyComparator), options.isVerifyChecksums());
+        int tableCacheSize = options.maxOpenFiles() - 10;
+        tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyComparator), options.verifyChecksums());
 
         // create the version set
         versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
@@ -143,10 +143,10 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             // verify the "current" file
             File currentFile = new File(databaseDir, Filename.currentFileName());
             if (!currentFile.canRead()) {
-                Preconditions.checkArgument(options.isCreateIfMissing(), "Database '%s' does not exist and the create if missing option is disabled", databaseDir);
+                Preconditions.checkArgument(options.createIfMissing(), "Database '%s' does not exist and the create if missing option is disabled", databaseDir);
             }
             else {
-                Preconditions.checkArgument(!options.isErrorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
+                Preconditions.checkArgument(!options.errorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
 
             // load  (and recover) current version
@@ -493,7 +493,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             }
 
             // flush mem table if necessary
-            if (memTable.approximateMemoryUsage() > options.getWriteBufferSize()) {
+            if (memTable.approximateMemoryUsage() > options.writeBufferSize()) {
                 writeLevel0Table(memTable, edit, null);
                 memTable = null;
             }
@@ -587,7 +587,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
             // Log write
             ChannelBuffer record = writeWriteBatch(updates, sequenceBegin);
             try {
-                log.addRecord(record, options.isSync());
+                log.addRecord(record, options.sync());
             }
             catch (IOException e) {
                 throw Throwables.propagate(e);
@@ -678,8 +678,8 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
     private long getSnapshotNumber(ReadOptions options)
     {
         long snapshot;
-        if (options.getSnapshot() != null) {
-            snapshot = ((SnapshotImpl) options.getSnapshot()).snapshot;
+        if (options.snapshot() != null) {
+            snapshot = ((SnapshotImpl) options.snapshot()).snapshot;
         }
         else {
             snapshot = versions.getLastSequence();
@@ -721,7 +721,7 @@ public class DbImpl implements SeekingIterable<ChannelBuffer, ChannelBuffer>
                 // Do not delay a single write more than once
                 allowDelay = false;
             }
-            else if (!force && memTable.approximateMemoryUsage() <= options.getWriteBufferSize()) {
+            else if (!force && memTable.approximateMemoryUsage() <= options.writeBufferSize()) {
                 // There is room in current memtable
                 break;
             }

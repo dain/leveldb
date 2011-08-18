@@ -104,7 +104,7 @@ public class BlockTrailer
 
     public static void writeBlockTrailer(BlockTrailer blockTrailer, ChannelBuffer buffer)
     {
-        buffer.writeByte(blockTrailer.getCompressionType().getPersistentId());
+        buffer.writeByte(blockTrailer.getCompressionType().persistentId());
         buffer.writeInt(blockTrailer.getCrc32c());
     }
 }

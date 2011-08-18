@@ -40,128 +40,128 @@ public class Options {
         }
     }
 
-    public boolean isCreateIfMissing()
+    public boolean createIfMissing()
     {
         return createIfMissing;
     }
 
-    public Options setCreateIfMissing(boolean createIfMissing)
+    public Options createIfMissing(boolean createIfMissing)
     {
         this.createIfMissing = createIfMissing;
         return this;
     }
 
-    public boolean isErrorIfExists()
+    public boolean errorIfExists()
     {
         return errorIfExists;
     }
 
-    public Options setErrorIfExists(boolean errorIfExists)
+    public Options errorIfExists(boolean errorIfExists)
     {
         this.errorIfExists = errorIfExists;
         return this;
     }
 
-    public int getWriteBufferSize()
+    public int writeBufferSize()
     {
         return writeBufferSize;
     }
 
-    public Options setWriteBufferSize(int writeBufferSize)
+    public Options writeBufferSize(int writeBufferSize)
     {
         this.writeBufferSize = writeBufferSize;
         return this;
     }
 
-    public int getMaxOpenFiles()
+    public int maxOpenFiles()
     {
         return maxOpenFiles;
     }
 
-    public Options setMaxOpenFiles(int maxOpenFiles)
+    public Options maxOpenFiles(int maxOpenFiles)
     {
         this.maxOpenFiles = maxOpenFiles;
         return this;
     }
 
-    public int getBlockRestartInterval()
+    public int blockRestartInterval()
     {
         return blockRestartInterval;
     }
 
-    public Options setBlockRestartInterval(int blockRestartInterval)
+    public Options blockRestartInterval(int blockRestartInterval)
     {
         this.blockRestartInterval = blockRestartInterval;
         return this;
     }
 
-    public int getBlockSize()
+    public int blockSize()
     {
         return blockSize;
     }
 
-    public Options setBlockSize(int blockSize)
+    public Options blockSize(int blockSize)
     {
         this.blockSize = blockSize;
         return this;
     }
 
-    public CompressionType getCompressionType()
+    public CompressionType compressionType()
     {
         return compressionType;
     }
 
-    public Options setCompressionType(CompressionType compressionType)
+    public Options compressionType(CompressionType compressionType)
     {
         checkArgNotNull(compressionType, "compressionType");
         this.compressionType = compressionType;
         return this;
     }
 
-    public boolean isVerifyChecksums()
+    public boolean verifyChecksums()
     {
         return verifyChecksums;
     }
 
-    public Options setVerifyChecksums(boolean verifyChecksums)
+    public Options verifyChecksums(boolean verifyChecksums)
     {
         this.verifyChecksums = verifyChecksums;
         return this;
     }
 
 
-    public long getCacheSize() {
+    public long cacheSize() {
         return cacheSize;
     }
 
-    public Options setCacheSize(long cacheSize) {
+    public Options cacheSize(long cacheSize) {
         this.cacheSize = cacheSize;
         return this;
     }
 
-    public DBComparator getComparator() {
+    public DBComparator comparator() {
         return comparator;
     }
 
-    public Options setComparator(DBComparator comparator) {
+    public Options comparator(DBComparator comparator) {
         this.comparator = comparator;
         return this;
     }
 
-    public Logger getLogger() {
+    public Logger logger() {
         return logger;
     }
 
-    public Options setLogger(Logger logger) {
+    public Options logger(Logger logger) {
         this.logger = logger;
         return this;
     }
 
-    public boolean isParanoidChecks() {
+    public boolean paranoidChecks() {
         return paranoidChecks;
     }
 
-    public Options setParanoidChecks(boolean paranoidChecks) {
+    public Options paranoidChecks(boolean paranoidChecks) {
         this.paranoidChecks = paranoidChecks;
         return this;
     }
