@@ -15,12 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
-
-import org.iq80.leveldb.Snapshot;
+package org.iq80.leveldb.api;
 
 public class ReadOptions
 {
+    private boolean verifyChecksums = false;
+    private boolean fillCache = true;
     private Snapshot snapshot;
 
     public Snapshot getSnapshot()
@@ -31,6 +31,24 @@ public class ReadOptions
     public ReadOptions setSnapshot(Snapshot snapshot)
     {
         this.snapshot = snapshot;
+        return this;
+    }
+
+    public boolean isFillCache() {
+        return fillCache;
+    }
+
+    public ReadOptions setFillCache(boolean fillCache) {
+        this.fillCache = fillCache;
+        return this;
+    }
+
+    public boolean isVerifyChecksums() {
+        return verifyChecksums;
+    }
+
+    public ReadOptions setVerifyChecksums(boolean verifyChecksums) {
+        this.verifyChecksums = verifyChecksums;
         return this;
     }
 }

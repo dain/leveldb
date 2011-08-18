@@ -20,6 +20,7 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Closeables;
 import org.iq80.leveldb.SeekingIterator;
+import org.iq80.leveldb.api.Options;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.iq80.leveldb.util.Buffers;
 import org.testng.annotations.AfterMethod;

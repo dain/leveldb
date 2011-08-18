@@ -21,8 +21,9 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import org.iq80.leveldb.SeekingIterator;
-import org.iq80.leveldb.Snapshot;
-import org.iq80.leveldb.table.Options;
+import org.iq80.leveldb.api.Options;
+import org.iq80.leveldb.api.ReadOptions;
+import org.iq80.leveldb.api.Snapshot;
 import org.iq80.leveldb.util.FileUtils;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.iq80.leveldb.util.Buffers;
@@ -47,7 +48,7 @@ import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.table.BlockHelper.after;
 import static org.iq80.leveldb.table.BlockHelper.assertSequence;
 import static org.iq80.leveldb.table.BlockHelper.before;
-import static org.iq80.leveldb.table.CompressionType.NONE;
+import static org.iq80.leveldb.api.CompressionType.NONE;
 import static org.iq80.leveldb.util.SeekingIterators.transformKeys;
 import static org.iq80.leveldb.util.SeekingIterators.transformValues;
 import static org.testng.Assert.assertEquals;
@@ -144,7 +145,7 @@ public class DbImplTest
             db.compactMemTable();
             assertEquals(db.get(key), "v2");
             assertEquals(db.get(key, s1), "v1");
-            s1.release();
+            s1.close();
         }
     }
 
@@ -563,16 +564,16 @@ public class DbImplTest
         assertEquals("v3", db.get("foo", s3));
         assertEquals("v4", db.get("foo"));
 
-        s3.release();
+        s3.close();
         assertEquals("v1", db.get("foo", s1));
         assertEquals("v2", db.get("foo", s2));
         assertEquals("v4", db.get("foo"));
 
-        s1.release();
+        s1.close();
         assertEquals("v2", db.get("foo", s2));
         assertEquals("v4", db.get("foo"));
 
-        s2.release();
+        s2.close();
         assertEquals("v4", db.get("foo"));
     }
 
@@ -598,7 +599,7 @@ public class DbImplTest
 
         assertEquals(big, db.get("foo", snapshot));
         assertBetween(db.size("", "pastFoo"), 50000, 60000);
-        snapshot.release();
+        snapshot.close();
         assertEquals(db.allEntriesFor("foo"), asList("tiny", big));
         db.compactRange(0, "", "x");
         assertEquals(db.allEntriesFor("foo"), asList("tiny"));

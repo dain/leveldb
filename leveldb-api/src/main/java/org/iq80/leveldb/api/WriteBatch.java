@@ -15,24 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
+package org.iq80.leveldb.api;
 
-import org.iq80.leveldb.api.Snapshot;
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface WriteBatch extends Closable {
 
-// todo implement snapshot tracking and cleanup
-public class SnapshotImpl implements Snapshot
-{
-    final long snapshot;
+    public void put(byte[] key, byte[] value);
+    public void delete(byte[] key);
 
-    SnapshotImpl(long snapshot)
-    {
-        this.snapshot = snapshot;
-    }
-
-    @Override
-    public void close()
-    {
-        // todo
-//        throw new UnsupportedOperationException();
-    }
 }

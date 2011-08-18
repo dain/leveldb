@@ -19,6 +19,8 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import org.iq80.leveldb.api.CompressionType;
+import org.iq80.leveldb.api.Options;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.iq80.leveldb.util.Buffers;

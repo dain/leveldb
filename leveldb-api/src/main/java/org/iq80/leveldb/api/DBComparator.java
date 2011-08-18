@@ -15,24 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
+package org.iq80.leveldb.api;
 
-import org.iq80.leveldb.api.Snapshot;
+import java.util.Comparator;
 
-// todo implement snapshot tracking and cleanup
-public class SnapshotImpl implements Snapshot
-{
-    final long snapshot;
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface DBComparator extends Comparator<byte[]>{
 
-    SnapshotImpl(long snapshot)
-    {
-        this.snapshot = snapshot;
-    }
+    public String name();
 
-    @Override
-    public void close()
-    {
-        // todo
-//        throw new UnsupportedOperationException();
-    }
+    /**
+     * If <code>start < limit</code>, returns a short key in [start,limit).
+     * Simple comparator implementations should return start unchanged,
+     *
+     * @param start
+     * @param limit
+     * @return
+     */
+    byte[] findShortestSeparator(byte[] start, byte[] limit);
+
+    /**
+     * returns a 'short key' where the 'short key' >= key.
+     * Simple comparator implementations should return key unchanged,
+     *
+     * @param key
+     */
+    byte[] findShortSuccessor(byte[] key);
+
 }

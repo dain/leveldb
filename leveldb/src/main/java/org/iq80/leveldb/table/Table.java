@@ -34,7 +34,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
-import static org.iq80.leveldb.table.CompressionType.SNAPPY;
+import static org.iq80.leveldb.api.CompressionType.SNAPPY;
 
 public class Table implements SeekingIterable<ChannelBuffer, ChannelBuffer>
 {

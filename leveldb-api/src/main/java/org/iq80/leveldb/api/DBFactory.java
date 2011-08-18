@@ -15,24 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
+package org.iq80.leveldb.api;
 
-import org.iq80.leveldb.api.Snapshot;
+import java.io.File;
+import java.io.IOException;
 
-// todo implement snapshot tracking and cleanup
-public class SnapshotImpl implements Snapshot
-{
-    final long snapshot;
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface DBFactory {
 
-    SnapshotImpl(long snapshot)
-    {
-        this.snapshot = snapshot;
-    }
+    public DB open(File path, Options options) throws IOException;
 
-    @Override
-    public void close()
-    {
-        // todo
-//        throw new UnsupportedOperationException();
-    }
+    public void destroy(File path, Options options) throws IOException;
+
+    public void repair(File path, Options options) throws IOException;
+
 }

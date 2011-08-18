@@ -15,10 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.api;
 
-public class Options
-{
+public class Options {
+
     private boolean createIfMissing = true;
     private boolean errorIfExists;
     private int writeBufferSize = 4 << 20;
@@ -29,6 +29,16 @@ public class Options
     private int blockSize = 4 * 1024;
     private CompressionType compressionType = CompressionType.SNAPPY;
     private boolean verifyChecksums = true;
+    private boolean paranoidChecks = false;
+    private DBComparator comparator;
+    private Logger logger = null;
+    private long cacheSize;
+
+    static void checkArgNotNull(Object value, String name) {
+        if(value==null) {
+            throw new IllegalArgumentException("The "+name+" argument cannot be null");
+        }
+    }
 
     public boolean isCreateIfMissing()
     {
@@ -103,6 +113,7 @@ public class Options
 
     public Options setCompressionType(CompressionType compressionType)
     {
+        checkArgNotNull(compressionType, "compressionType");
         this.compressionType = compressionType;
         return this;
     }
@@ -115,6 +126,43 @@ public class Options
     public Options setVerifyChecksums(boolean verifyChecksums)
     {
         this.verifyChecksums = verifyChecksums;
+        return this;
+    }
+
+
+    public long getCacheSize() {
+        return cacheSize;
+    }
+
+    public Options setCacheSize(long cacheSize) {
+        this.cacheSize = cacheSize;
+        return this;
+    }
+
+    public DBComparator getComparator() {
+        return comparator;
+    }
+
+    public Options setComparator(DBComparator comparator) {
+        this.comparator = comparator;
+        return this;
+    }
+
+    public Logger getLogger() {
+        return logger;
+    }
+
+    public Options setLogger(Logger logger) {
+        this.logger = logger;
+        return this;
+    }
+
+    public boolean isParanoidChecks() {
+        return paranoidChecks;
+    }
+
+    public Options setParanoidChecks(boolean paranoidChecks) {
+        this.paranoidChecks = paranoidChecks;
         return this;
     }
 }

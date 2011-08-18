@@ -15,31 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.api;
 
-public enum CompressionType
-{
-    NONE(0x00),
-    SNAPPY(0x01);
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface Logger {
 
-    public static CompressionType getCompressionTypeByPersistentId(int persistentId) {
-        for (CompressionType compressionType : CompressionType.values()) {
-            if (compressionType.persistentId == persistentId) {
-                return compressionType;
-            }
-        }
-        throw new IllegalArgumentException("Unknown persistentId " + persistentId);
-    }
+    public void log(String message);
 
-    private final int persistentId;
-
-    CompressionType(int persistentId)
-    {
-        this.persistentId = persistentId;
-    }
-
-    public int getPersistentId()
-    {
-        return persistentId;
-    }
 }

@@ -15,24 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
+package org.iq80.leveldb.api;
 
-import org.iq80.leveldb.api.Snapshot;
-
-// todo implement snapshot tracking and cleanup
-public class SnapshotImpl implements Snapshot
+public enum CompressionType
 {
-    final long snapshot;
+    NONE(0x00),
+    SNAPPY(0x01);
 
-    SnapshotImpl(long snapshot)
-    {
-        this.snapshot = snapshot;
+    public static CompressionType getCompressionTypeByPersistentId(int persistentId) {
+        for (CompressionType compressionType : CompressionType.values()) {
+            if (compressionType.persistentId == persistentId) {
+                return compressionType;
+            }
+        }
+        throw new IllegalArgumentException("Unknown persistentId " + persistentId);
     }
 
-    @Override
-    public void close()
+    private final int persistentId;
+
+    CompressionType(int persistentId)
     {
-        // todo
-//        throw new UnsupportedOperationException();
+        this.persistentId = persistentId;
+    }
+
+    public int getPersistentId()
+    {
+        return persistentId;
     }
 }

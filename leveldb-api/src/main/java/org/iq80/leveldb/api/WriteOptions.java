@@ -15,24 +15,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
+package org.iq80.leveldb.api;
 
-import org.iq80.leveldb.api.Snapshot;
-
-// todo implement snapshot tracking and cleanup
-public class SnapshotImpl implements Snapshot
+public class WriteOptions
 {
-    final long snapshot;
+    private boolean sync;
+    private boolean snapshot;
 
-    SnapshotImpl(long snapshot)
+
+    public boolean isSync()
     {
+        return sync;
+    }
+
+    public WriteOptions setSync(boolean sync)
+    {
+        this.sync = sync;
+        return this;
+    }
+
+    public boolean isSnapshot() {
+        return snapshot;
+    }
+
+    public WriteOptions setSnapshot(boolean snapshot) {
         this.snapshot = snapshot;
+        return this;
     }
 
-    @Override
-    public void close()
-    {
-        // todo
-//        throw new UnsupportedOperationException();
-    }
 }

@@ -15,35 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.impl;
+package org.iq80.leveldb.api;
 
-import org.iq80.leveldb.Snapshot;
+/**
+ * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
+ */
+public interface Closable {
 
-public class WriteOptions
-{
-    private boolean sync;
-    private Snapshot postWriteSnapshot;
+    public void close();
 
-
-    public boolean isSync()
-    {
-        return sync;
-    }
-
-    public WriteOptions setSync(boolean sync)
-    {
-        this.sync = sync;
-        return this;
-    }
-
-    public Snapshot getPostWriteSnapshot()
-    {
-        return postWriteSnapshot;
-    }
-
-    public WriteOptions setPostWriteSnapshot(Snapshot postWriteSnapshot)
-    {
-        this.postWriteSnapshot = postWriteSnapshot;
-        return this;
-    }
 }
