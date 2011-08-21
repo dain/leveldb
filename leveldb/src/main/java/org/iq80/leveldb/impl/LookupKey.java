@@ -41,6 +41,6 @@ public class LookupKey
     @Override
     public String toString()
     {
-        return getInternalKey().toString();
+        return key.toString();
     }
 }

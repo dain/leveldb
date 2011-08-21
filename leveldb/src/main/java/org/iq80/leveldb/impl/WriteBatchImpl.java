@@ -19,14 +19,16 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
 
 import java.util.List;
 import java.util.Map.Entry;
 
 import static com.google.common.collect.Lists.newArrayList;
 
-public class WriteBatch
+public class WriteBatchImpl implements WriteBatch
 {
     private List<Entry<Slice, Slice>> batch = newArrayList();
     private int approximateSize;
@@ -41,7 +43,17 @@ public class WriteBatch
         return batch.size();
     }
 
-    public WriteBatch put(Slice key, Slice value)
+    @Override
+    public WriteBatchImpl put(byte[] key, byte[] value)
+    {
+        Preconditions.checkNotNull(key, "key is null");
+        Preconditions.checkNotNull(value, "value is null");
+        batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), Slices.wrappedBuffer(value)));
+        approximateSize += 12 + key.length + value.length;
+        return this;
+    }
+
+    public WriteBatchImpl put(Slice key, Slice value)
     {
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
@@ -50,7 +62,16 @@ public class WriteBatch
         return this;
     }
 
-    public WriteBatch delete(Slice key)
+    @Override
+    public WriteBatchImpl delete(byte[] key)
+    {
+        Preconditions.checkNotNull(key, "key is null");
+        batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), (Slice) null));
+        approximateSize += 6 + key.length;
+        return this;
+    }
+
+    public WriteBatchImpl delete(Slice key)
     {
         Preconditions.checkNotNull(key, "key is null");
         batch.add(Maps.immutableEntry(key, (Slice) null));
@@ -58,20 +79,27 @@ public class WriteBatch
         return this;
     }
 
-    public void forEach(Handler handler) {
+    @Override
+    public void close()
+    {
+    }
+
+    public void forEach(Handler handler)
+    {
         for (Entry<Slice, Slice> entry : batch) {
             Slice key = entry.getKey();
             Slice value = entry.getValue();
             if (value != null) {
                 handler.put(key, value);
-            } else {
+            }
+            else {
                 handler.delete(key);
             }
         }
     }
 
-    public static interface  Handler {
-
+    public static interface Handler
+    {
         void put(Slice key, Slice value);
 
         void delete(Slice key);

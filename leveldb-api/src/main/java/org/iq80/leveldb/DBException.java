@@ -20,7 +20,7 @@ package org.iq80.leveldb;
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public class DBException extends Exception {
+public class DBException extends RuntimeException {
     public DBException() {
     }
 

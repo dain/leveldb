@@ -25,7 +25,7 @@ import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 import org.iq80.leveldb.impl.DbConstants;
 import org.iq80.leveldb.impl.DbImpl;
-import org.iq80.leveldb.impl.WriteBatch;
+import org.iq80.leveldb.impl.WriteBatchImpl;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -48,8 +48,6 @@ import static org.iq80.leveldb.DbBenchmark.Order.SEQUENTIAL;
 
 public class DbBenchmark
 {
-
-
     private boolean useExisting;
     private Integer writeBufferSize;
     private File databaseDir;
@@ -353,7 +351,7 @@ public class DbBenchmark
         }
 
         for (int i = 0; i < numEntries; i += entries_per_batch) {
-            WriteBatch batch = new WriteBatch();
+            WriteBatchImpl batch = new WriteBatchImpl();
             for (int j = 0; j < entries_per_batch; j++) {
                 int k = (order == SEQUENTIAL) ? i + j : rand_.nextInt(num_);
                 Slice key = formatNumber(k);
@@ -361,7 +359,7 @@ public class DbBenchmark
                 bytes_ += valueSize + key.length();
                 finishedSingleOp();
             }
-            db_.write(writeOptions, batch);
+            db_.write(batch, writeOptions);
         }
     }
 

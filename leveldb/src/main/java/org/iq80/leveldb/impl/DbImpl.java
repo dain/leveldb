@@ -22,13 +22,18 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBException;
+import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
+import org.iq80.leveldb.Range;
 import org.iq80.leveldb.ReadOptions;
 import org.iq80.leveldb.Snapshot;
+import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.impl.Filename.FileInfo;
 import org.iq80.leveldb.impl.Filename.FileType;
-import org.iq80.leveldb.impl.WriteBatch.Handler;
+import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BasicUserComparator;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.util.SeekingIterators;
@@ -73,7 +78,7 @@ import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
 import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
 // todo make thread safe and concurrent
-public class DbImpl implements SeekingIterable<Slice, Slice>
+public class DbImpl implements DB
 {
     private final Options options;
     private final File databaseDir;
@@ -238,6 +243,12 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
         }
 
         dbLock.release();
+    }
+
+    @Override
+    public String getProperty(String name)
+    {
+        return null;
     }
 
     private void deleteObsoleteFiles()
@@ -481,7 +492,7 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
             int updateSize = sliceInput.readInt();
 
             // read entries
-            WriteBatch writeBatch = readWriteBatch(sliceInput, updateSize);
+            WriteBatchImpl writeBatch = readWriteBatch(sliceInput, updateSize);
 
             // apply entries to memTable
             if (memTable == null) {
@@ -510,28 +521,36 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
         return maxSequence;
     }
 
-    public Slice get(Slice key)
+    @Override
+    public byte[] get(byte[] key)
+            throws DBException
     {
-        return get(new ReadOptions(), key);
+        return get(key, new ReadOptions());
     }
 
-    public Slice get(ReadOptions options, Slice key)
+    @Override
+    public byte[] get(byte[] key, ReadOptions options)
+            throws DBException
     {
         LookupKey lookupKey;
         mutex.lock();
         try {
             long snapshot = getSnapshotNumber(options);
-            lookupKey = new LookupKey(key, snapshot);
+            lookupKey = new LookupKey(Slices.wrappedBuffer(key), snapshot);
 
             // First look in the memtable, then in the immutable memtable (if any).
             LookupResult lookupResult = memTable.get(lookupKey);
             if (lookupResult != null) {
-                return lookupResult.getValue();
+                Slice value = lookupResult.getValue();
+                if (value == null) {
+                    return null;
+                }
+                return value.getBytes();
             }
             if (immutableMemTable != null) {
                 lookupResult = immutableMemTable.get(lookupKey);
                 if (lookupResult != null) {
-                    return lookupResult.getValue();
+                    return lookupResult.getValue().getBytes();
                 }
             }
         }
@@ -548,33 +567,56 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
         }
 
         if (lookupResult != null) {
-            return lookupResult.getValue();
+            return lookupResult.getValue().getBytes();
         }
 
         return null;
     }
 
-    public void put(Slice key, Slice value)
+    @Override
+    public void put(byte[] key, byte[] value)
+            throws DBException
     {
-        put(new WriteOptions(), key, value);
+        put(key, value, new WriteOptions());
     }
 
-    public void put(WriteOptions options, Slice key, Slice value)
+    @Override
+    public Snapshot put(byte[] key, byte[] value, WriteOptions options)
+            throws DBException
     {
-        write(options, new WriteBatch().put(key, value));
+        return writeInternal(new WriteBatchImpl().put(key, value), options);
     }
 
-    public void delete(Slice key)
+    @Override
+    public void delete(byte[] key)
+            throws DBException
     {
-        write(new WriteOptions(), new WriteBatch().delete(key));
+        writeInternal(new WriteBatchImpl().delete(key), new WriteOptions());
     }
 
-    public void delete(WriteOptions options, Slice key)
+    @Override
+    public Snapshot delete(byte[] key, WriteOptions options)
+            throws DBException
     {
-        write(options, new WriteBatch().delete(key));
+        return writeInternal(new WriteBatchImpl().delete(key), options);
     }
 
-    public Snapshot write(WriteOptions options, WriteBatch updates)
+    @Override
+    public void write(WriteBatch updates)
+            throws DBException
+    {
+        writeInternal((WriteBatchImpl) updates, new WriteOptions());
+    }
+
+    @Override
+    public Snapshot write(WriteBatch updates, WriteOptions options)
+            throws DBException
+    {
+        return writeInternal((WriteBatchImpl) updates, options);
+    }
+
+    public Snapshot writeInternal(WriteBatchImpl updates, WriteOptions options)
+            throws DBException
     {
         mutex.lock();
         try {
@@ -607,12 +649,18 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
     }
 
     @Override
-    public SeekingIterator<Slice, Slice> iterator()
+    public WriteBatch createWriteBatch()
+    {
+        return new WriteBatchImpl();
+    }
+
+    @Override
+    public DBIterator iterator()
     {
         return iterator(new ReadOptions());
     }
 
-    public SeekingIterator<Slice, Slice> iterator(ReadOptions options)
+    public DBIterator iterator(ReadOptions options)
     {
         mutex.lock();
         try {
@@ -627,7 +675,7 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
             SeekingIterator<Slice, Slice> userIterator = SeekingIterators.transformKeys(snapshotIterator,
                     INTERNAL_KEY_TO_USER_KEY,
                     createUserKeyToInternalKeyFunction(snapshot));
-            return userIterator;
+            return new SeekingIteratorAdapter(userIterator);
         }
         finally {
             mutex.unlock();
@@ -1085,12 +1133,24 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
         return versions.getCurrent().numberOfFilesInLevel(level);
     }
 
-    public long getApproximateSizes(Slice start, Slice limit)
+    @Override
+    public long[] getApproximateSizes(Range... ranges)
+    {
+        Preconditions.checkNotNull(ranges, "ranges is null");
+        long[] sizes = new long[ranges.length];
+        for (int i = 0; i < ranges.length; i++) {
+            Range range = ranges[i];
+            sizes[i] = getApproximateSizes(range);
+        }
+        return sizes;
+    }
+
+    public long getApproximateSizes(Range range)
     {
         Version v = versions.getCurrent();
 
-        InternalKey startKey = new InternalKey(start, SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-        InternalKey limitKey = new InternalKey(limit, SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
+        InternalKey startKey = new InternalKey(Slices.wrappedBuffer(range.start()), SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
+        InternalKey limitKey = new InternalKey(Slices.wrappedBuffer(range.limit()), SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
         long startOffset = v.getApproximateOffsetOf(startKey);
         long limitOffset = v.getApproximateOffsetOf(limitKey);
 
@@ -1147,10 +1207,10 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
         }
     }
 
-    private WriteBatch readWriteBatch(SliceInput record, int updateSize)
+    private WriteBatchImpl readWriteBatch(SliceInput record, int updateSize)
             throws IOException
     {
-        WriteBatch writeBatch = new WriteBatch();
+        WriteBatchImpl writeBatch = new WriteBatchImpl();
         int entries = 0;
         while (record.isReadable()) {
             entries++;
@@ -1174,7 +1234,7 @@ public class DbImpl implements SeekingIterable<Slice, Slice>
         return writeBatch;
     }
 
-    private Slice writeWriteBatch(WriteBatch updates, long sequenceBegin)
+    private Slice writeWriteBatch(WriteBatchImpl updates, long sequenceBegin)
     {
         Slice record = Slices.allocate(SIZE_OF_LONG + SIZE_OF_INT + updates.getApproximateSize());
         final SliceOutput sliceOutput = record.output();

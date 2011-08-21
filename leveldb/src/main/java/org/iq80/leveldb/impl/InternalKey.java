@@ -52,6 +52,11 @@ public class InternalKey
         this.valueType = getValueType(data);
     }
 
+    public InternalKey(byte[] data)
+    {
+        this(Slices.wrappedBuffer(data));
+    }
+
     public Slice getUserKey()
     {
         return userKey;
@@ -164,9 +169,9 @@ public class InternalKey
     private static class SliceToInternalKeyFunction implements Function<Slice, InternalKey>
     {
         @Override
-        public InternalKey apply(Slice slice)
+        public InternalKey apply(Slice bytes)
         {
-            return new InternalKey(slice);
+            return new InternalKey(bytes);
         }
     }
 
@@ -180,12 +185,11 @@ public class InternalKey
         }
 
         @Override
-        public InternalKey apply(Slice slice)
+        public InternalKey apply(Slice userKey)
         {
-            return new InternalKey(slice, sequenceNumber, ValueType.VALUE);
+            return new InternalKey(userKey, sequenceNumber, ValueType.VALUE);
         }
     }
-
 
     private static Slice getUserKey(Slice data)
     {

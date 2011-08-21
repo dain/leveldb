@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static org.iq80.leveldb.util.SliceComparator.SLICE_COMPARATOR;
 import static org.testng.Assert.assertTrue;
 
 public class TableTest
@@ -49,7 +48,7 @@ public class TableTest
     public void testEmptyFile()
             throws Exception
     {
-        new Table(file.getAbsolutePath(), fileChannel, SLICE_COMPARATOR, true);
+        new Table(file.getAbsolutePath(), fileChannel, new BasicUserComparator(), true);
     }
 
     @Test
@@ -122,7 +121,7 @@ public class TableTest
         }
         builder.finish();
 
-        Table table = new Table(file.getAbsolutePath(), fileChannel, SLICE_COMPARATOR, true);
+        Table table = new Table(file.getAbsolutePath(), fileChannel, new BasicUserComparator(), true);
 
         SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);

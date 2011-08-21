@@ -18,7 +18,6 @@
 package org.iq80.leveldb.table;
 
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceComparator;
 import org.iq80.leveldb.util.Slices;
 import org.testng.annotations.Test;
 
@@ -27,7 +26,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static org.iq80.leveldb.util.SliceComparator.SLICE_COMPARATOR;
 import static org.testng.Assert.assertEquals;
 
 public class BlockTest
@@ -36,7 +34,7 @@ public class BlockTest
     public void testEmptyBuffer()
             throws Exception
     {
-        new Block(Slices.EMPTY_SLICE, SLICE_COMPARATOR);
+        new Block(Slices.EMPTY_SLICE, new BasicUserComparator());
     }
 
     @Test
@@ -113,7 +111,7 @@ public class BlockTest
 
     private void blockTest(int blockRestartInterval, List<BlockEntry> entries)
     {
-        BlockBuilder builder = new BlockBuilder(256, blockRestartInterval, SLICE_COMPARATOR);
+        BlockBuilder builder = new BlockBuilder(256, blockRestartInterval, new BasicUserComparator());
 
         for (BlockEntry entry : entries) {
             builder.add(entry);
@@ -123,7 +121,7 @@ public class BlockTest
         Slice blockSlice = builder.finish();
         assertEquals(builder.currentSizeEstimate(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
-        Block block = new Block(blockSlice, SliceComparator.SLICE_COMPARATOR);
+        Block block = new Block(blockSlice, new BasicUserComparator());
         assertEquals(block.size(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
         BlockIterator blockIterator = block.iterator();

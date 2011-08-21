@@ -22,7 +22,6 @@ package org.iq80.leveldb;
  */
 public interface WriteBatch extends Closable {
 
-    public void put(byte[] key, byte[] value);
-    public void delete(byte[] key);
-
+    public WriteBatch put(byte[] key, byte[] value);
+    public WriteBatch delete(byte[] key);
 }

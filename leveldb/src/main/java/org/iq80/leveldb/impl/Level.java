@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
+import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
@@ -151,7 +152,7 @@ public class Level implements SeekingIterable<InternalKey, Slice>
             // parse the key in the block
             Entry<InternalKey, Slice> entry = iterator.next();
             InternalKey internalKey = entry.getKey();
-            Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey());
+            Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey().toString(UTF_8));
 
             // if this is a value key (not a delete) and the keys match, return the value
             if (key.getUserKey().equals(internalKey.getUserKey())) {

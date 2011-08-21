@@ -31,7 +31,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 import static org.iq80.leveldb.impl.VersionSet.TARGET_FILE_SIZE;
-import static org.iq80.leveldb.util.SliceComparator.SLICE_COMPARATOR;
 
 public class TableBuilder
 {
@@ -89,7 +88,7 @@ public class TableBuilder
         blockSize = options.blockSize();
         compressionType = options.compressionType();
 
-        dataBlockBuilder = new BlockBuilder(TARGET_FILE_SIZE, blockRestartInterval, userComparator);
+        dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
 
         // with expected 50% compression
         int expectedNumberOfBlocks = 1024;
@@ -216,7 +215,7 @@ public class TableBuilder
         closed = true;
 
         // write (empty) meta index block
-        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(256, blockRestartInterval, SLICE_COMPARATOR);
+        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(256, blockRestartInterval, new BasicUserComparator());
         // TODO(postrelease): Add stats and other meta blocks
         BlockHandle metaindexBlockHandle = writeBlock(metaIndexBlockBuilder);
 

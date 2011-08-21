@@ -44,7 +44,7 @@ public class BasicUserComparator implements UserComparator
                 Slice result = start.copySlice(0, sharedBytes + 1);
                 result.setByte(sharedBytes, lastSharedByte + 1);
 
-                assert (compare(start, limit) < 0) : "start must be less than last limit";
+                assert (compare(result, limit) < 0) : "start must be less than last limit";
                 return result;
             }
         }

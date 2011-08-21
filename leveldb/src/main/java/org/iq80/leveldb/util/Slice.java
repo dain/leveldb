@@ -205,6 +205,23 @@ public final class Slice implements Comparable<Slice>
         System.arraycopy(data, index, destination, destinationIndex, length);
     }
 
+    public byte[] getBytes()
+    {
+        return getBytes(0, length);
+    }
+
+    public byte[] getBytes(int index, int length)
+    {
+        index += offset;
+        if (index == 0) {
+            return Arrays.copyOf(data, length);
+        } else {
+            byte[] value = new byte[length];
+            System.arraycopy(data, index, value, 0, length);
+            return value;
+        }
+    }
+
     /**
      * Transfers this buffer's data to the specified destination starting at
      * the specified absolute {@code index} until the destination's position

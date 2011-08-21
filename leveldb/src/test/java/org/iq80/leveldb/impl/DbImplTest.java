@@ -18,9 +18,11 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
+import org.iq80.leveldb.Range;
 import org.iq80.leveldb.ReadOptions;
 import org.iq80.leveldb.Snapshot;
 import org.iq80.leveldb.util.FileUtils;
@@ -48,8 +50,6 @@ import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.table.BlockHelper.afterString;
 import static org.iq80.leveldb.table.BlockHelper.assertSequence;
 import static org.iq80.leveldb.table.BlockHelper.beforeString;
-import static org.iq80.leveldb.util.SeekingIterators.transformKeys;
-import static org.iq80.leveldb.util.SeekingIterators.transformValues;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -299,7 +299,7 @@ public class DbImplTest
         db.put("foo", "v1");                        // Goes to 1st log file
         db.put("big1", longString(10000000, 'x'));  // Fills memtable
         db.put("big2", longString(1000, 'y'));      // Triggers compaction
-        db.put("bar", "v2") ;                       // Goes to new log file
+        db.put("bar", "v2");                       // Goes to new log file
 
         db.reopen();
         assertEquals(db.get("foo"), "v1");
@@ -441,11 +441,11 @@ public class DbImplTest
 
         // Compactions should not cause us to create a situation where
         // a file overlaps too much data at the next level.
-        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20*1048576);
+        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20 * 1048576);
         db.compactRange(0, "", "z");
-        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20*1048576);
+        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20 * 1048576);
         db.compactRange(1, "", "z");
-        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20*1048576);
+        assertTrue(db.getMaxNextLevelOverlappingBytes() <= 20 * 1048576);
     }
 
     @Test
@@ -799,7 +799,7 @@ public class DbImplTest
 
     private void assertBetween(long actual, int smallest, int greatest)
     {
-        if (!between(actual, smallest, greatest))  {
+        if (!between(actual, smallest, greatest)) {
             fail(String.format("Expected: %s to be between %s and %s", actual, smallest, greatest));
         }
     }
@@ -821,9 +821,9 @@ public class DbImplTest
         }
     }
 
-    static Slice toSlice(String value)
+    static byte[] toByteArray(String value)
     {
-        return Slices.wrappedBuffer(value.getBytes(UTF_8));
+        return value.getBytes(UTF_8);
     }
 
 
@@ -879,35 +879,35 @@ public class DbImplTest
 
         public String get(String key)
         {
-            Slice slice = db.get(toSlice(key));
+            byte[] slice = db.get(toByteArray(key));
             if (slice == null) {
                 return null;
             }
-            return slice.toString(Charsets.UTF_8);
+            return new String(slice, UTF_8);
         }
 
         public String get(String key, Snapshot snapshot)
         {
-            Slice slice = db.get(new ReadOptions().snapshot(snapshot), toSlice(key));
+            byte[] slice = db.get(toByteArray(key), new ReadOptions().snapshot(snapshot));
             if (slice == null) {
                 return null;
             }
-            return slice.toString(Charsets.UTF_8);
+            return new String(slice, Charsets.UTF_8);
         }
 
         public void put(String key, String value)
         {
-            db.put(toSlice(key), toSlice(value));
+            db.put(toByteArray(key), toByteArray(value));
         }
 
         public void delete(String key)
         {
-            db.delete(toSlice(key));
+            db.delete(toByteArray(key));
         }
 
         public SeekingIterator<String, String> iterator()
         {
-            return transformValues(transformKeys(db.iterator(), new SliceToString(), new StringToSlice()), new SliceToString());
+            return new StringDbIterator(db.iterator());
         }
 
         public Snapshot getSnapshot()
@@ -927,7 +927,7 @@ public class DbImplTest
 
         public void compactRange(int level, String start, String limit)
         {
-            db.compactRange(level, toSlice(start), toSlice(limit));
+            db.compactRange(level, Slices.copiedBuffer(start, UTF_8), Slices.copiedBuffer(limit, UTF_8));
         }
 
         public void compact(String start, String limit)
@@ -940,7 +940,7 @@ public class DbImplTest
                 }
             }
             for (int level = 0; level < maxLevelWithFiles; level++) {
-                db.compactRange(level, toSlice(""), toSlice("~"));
+                db.compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
             }
 
         }
@@ -961,7 +961,7 @@ public class DbImplTest
 
         public long size(String start, String limit)
         {
-            return db.getApproximateSizes(toSlice(start), toSlice(limit));
+            return db.getApproximateSizes(new Range(toByteArray(start), toByteArray(limit)));
         }
 
         public long getMaxNextLevelOverlappingBytes()
@@ -982,24 +982,6 @@ public class DbImplTest
             db = new DbImpl(options.verifyChecksums(true).createIfMissing(false).errorIfExists(false), databaseDir);
         }
 
-        private static class SliceToString implements Function<Slice, String>
-        {
-            @Override
-            public String apply(Slice input)
-            {
-                return input.toString(Charsets.UTF_8);
-            }
-        }
-
-        private static class StringToSlice implements Function<String, Slice>
-        {
-            @Override
-            public Slice apply(String input)
-            {
-                return toSlice(input);
-            }
-        }
-
         private List<String> allEntriesFor(String userKey)
         {
             ImmutableList.Builder<String> result = ImmutableList.builder();
@@ -1017,5 +999,56 @@ public class DbImplTest
             return result.build();
         }
 
+    }
+
+    private static class StringDbIterator implements SeekingIterator<String, String>
+    {
+        private DBIterator iterator;
+
+        private StringDbIterator(DBIterator iterator)
+        {
+            this.iterator = iterator;
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            return iterator.hasNext();
+        }
+
+        @Override
+        public void seekToFirst()
+        {
+            iterator.seekToFirst();
+        }
+
+        @Override
+        public void seek(String targetKey)
+        {
+            iterator.seek(targetKey.getBytes(UTF_8));
+        }
+
+        @Override
+        public Entry<String, String> peek()
+        {
+            return adapt(iterator.peekNext());
+        }
+
+        @Override
+        public Entry<String, String> next()
+        {
+            return adapt(iterator.next());
+        }
+
+        @Override
+        public void remove()
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        private Entry<String, String> adapt(Entry<byte[], byte[]> next)
+        {
+            return Maps.immutableEntry(new String(next.getKey(), UTF_8), new String(next.getValue(), UTF_8));
+        }
     }
 }
