@@ -25,7 +25,7 @@ public class Options {
 
     private int maxOpenFiles = 1000;
 
-    private int blockRestartInterval = 1;
+    private int blockRestartInterval = 16;
     private int blockSize = 4 * 1024;
     private CompressionType compressionType = CompressionType.SNAPPY;
     private boolean verifyChecksums = true;
