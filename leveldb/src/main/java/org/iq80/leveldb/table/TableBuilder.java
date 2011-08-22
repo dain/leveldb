@@ -172,7 +172,7 @@ public class TableBuilder
         Slice blockContents = raw;
         CompressionType blockCompressionType = CompressionType.NONE;
         if (compressionType == CompressionType.SNAPPY) {
-            ensureCompressedOutputCapacity(Snappy.maxCompressedLength(raw.length()));
+            ensureCompressedOutputCapacity(maxCompressedLength(raw.length()));
             try {
                 int compressedSize = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
 
@@ -201,6 +201,31 @@ public class TableBuilder
         blockBuilder.reset();
 
         return blockHandle;
+    }
+
+    private int maxCompressedLength(int length)
+    {
+        // Compressed data can be defined as:
+        //    compressed := item* literal*
+        //    item       := literal* copy
+        //
+        // The trailing literal sequence has a space blowup of at most 62/60
+        // since a literal of length 60 needs one tag byte + one extra byte
+        // for length information.
+        //
+        // Item blowup is trickier to measure.  Suppose the "copy" op copies
+        // 4 bytes of data.  Because of a special check in the encoding code,
+        // we produce a 4-byte copy only if the offset is < 65536.  Therefore
+        // the copy op takes 3 bytes to encode, and this type of item leads
+        // to at most the 62/60 blowup for representing literals.
+        //
+        // Suppose the "copy" op copies 5 bytes of data.  If the offset is big
+        // enough, it will take 5 bytes to encode the copy op.  Therefore the
+        // worst case here is a one-byte literal followed by a five-byte copy.
+        // I.e., 6 bytes of input turn into 7 bytes of "compressed" data.
+        //
+        // This last factor dominates the blowup, so the final estimate is:
+        return 32 + length + (length / 6);
     }
 
     public void finish()
