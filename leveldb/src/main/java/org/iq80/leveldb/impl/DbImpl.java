@@ -562,9 +562,16 @@ public class DbImpl implements DB
         LookupResult lookupResult = versions.get(lookupKey);
 
         // schedule compaction if necessary
-        if (versions.needsCompaction()) {
-            maybeScheduleCompaction();
+        mutex.lock();
+        try {
+            if (versions.needsCompaction()) {
+                maybeScheduleCompaction();
+            }
         }
+        finally {
+            mutex.unlock();
+        }
+
 
         if (lookupResult != null) {
             return lookupResult.getValue().getBytes();

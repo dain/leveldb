@@ -34,13 +34,16 @@ import org.xerial.snappy.Snappy;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Charsets.UTF_8;
 import static org.iq80.leveldb.DbBenchmark.DBState.EXISTING;
 import static org.iq80.leveldb.DbBenchmark.DBState.FRESH;
 import static org.iq80.leveldb.DbBenchmark.Order.RANDOM;
@@ -90,7 +93,7 @@ public class DbBenchmark
         // cache
         benchmarks = (List<String>) flags.get(Flag.benchmarks);
         num_ = (Integer) flags.get(Flag.num);
-        reads_ = (Integer) flags.get(Flag.reads);
+        reads_ = (Integer) (flags.get(Flag.reads) == null ? flags.get(Flag.num) : flags.get(Flag.reads));
         valueSize = (Integer) flags.get(Flag.value_size);
         writeBufferSize = (Integer) flags.get(Flag.write_buffer_size);
         compressionRatio = (Double) flags.get(Flag.compression_ratio);
@@ -250,7 +253,7 @@ public class DbBenchmark
             int numberOfCpus = 0;
             String cpuType = null;
             String cacheSize = null;
-            for (String line : CharStreams.readLines(Files.newReader(cpuInfo, Charsets.UTF_8))) {
+            for (String line : CharStreams.readLines(Files.newReader(cpuInfo, UTF_8))) {
                 ImmutableList<String> parts = ImmutableList.copyOf(Splitter.on(':').omitEmptyStrings().trimResults().limit(2).split(line));
                 if (parts.size() != 2) {
                     continue;
@@ -313,6 +316,8 @@ public class DbBenchmark
             else {
                 message_ = rate;
             }
+        } else if (message_ == null) {
+            message_ = "";
         }
 
         System.out.printf("%-12s : %11.3f micros/op;%s%s\n",
@@ -402,7 +407,15 @@ public class DbBenchmark
 
     private void readSequential()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        int i = 0;
+        for (Entry<byte[], byte[]> entry : db_) {
+            if (i >= reads_) {
+                break;
+            }
+            bytes_ += entry.getKey().length + entry.getValue().length;
+            finishedSingleOp();
+            i++;
+        }
     }
 
     private void readReverse()
@@ -412,12 +425,24 @@ public class DbBenchmark
 
     private void readRandom()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        for (int i = 0; i < reads_; i++) {
+            byte[] key = formatNumber(rand_.nextInt(num_)).getRawArray();
+            byte[] value = db_.get(key);
+            Preconditions.checkNotNull(value, "db.get(%s) is null", new String(key, UTF_8));
+            bytes_ += key.length + value.length;
+            finishedSingleOp();
+        }
     }
 
     private void readHot()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        int range = (num_ + 99) / 100;
+        for (int i = 0; i < reads_; i++) {
+            byte[] key = formatNumber(rand_.nextInt(range)).getRawArray();
+            byte[] value = db_.get(key);
+            bytes_ += key.length + value.length;
+            finishedSingleOp();
+        }
     }
 
     private void compact()
@@ -524,19 +549,20 @@ public class DbBenchmark
                 "fillsync",
                 "fillrandom",
                 "overwrite",
+                "fillseq",
                 "readrandom",
                 "readrandom",  // Extra run to allow previous compactions to quiesce
                 "readseq",
-                "readreverse",
-                "compact",
+                // "readreverse",
+                // "compact",
                 "readrandom",
-                "readseq",
-                "readreverse",
-                "fill100K",
-                "crc32c",
-                "snappycomp",
-                "snappyuncomp",
-                "acquireload"
+                "readseq"
+                // "readreverse",
+                // "fill100K",
+                // "crc32c",
+                // "snappycomp",
+                // "snappyuncomp",
+                // "acquireload"
         ))
                 {
                     @Override
@@ -590,7 +616,7 @@ public class DbBenchmark
                 },
 
         // Number of read operations to do.  If negative, do FLAGS_num reads.
-        reads(-1)
+        reads(null)
                 {
                     @Override
                     public Object parseValue(String value)
