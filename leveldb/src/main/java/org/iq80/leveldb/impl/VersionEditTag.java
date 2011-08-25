@@ -34,7 +34,7 @@ public enum VersionEditTag
                 @Override
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    byte[] bytes = new byte[VariableLengthQuantity.unpackInt(sliceInput)];
+                    byte[] bytes = new byte[VariableLengthQuantity.readVariableLengthInt(sliceInput)];
                     sliceInput.readBytes(bytes);
                     versionEdit.setComparatorName(new String(bytes, Charsets.UTF_8));
                 }
@@ -44,9 +44,9 @@ public enum VersionEditTag
                 {
                     String comparatorName = versionEdit.getComparatorName();
                     if (comparatorName != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
                         byte[] bytes = comparatorName.getBytes(Charsets.UTF_8);
-                        VariableLengthQuantity.packInt(bytes.length, sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(bytes.length, sliceOutput);
                         sliceOutput.writeBytes(bytes);
                     }
                 }
@@ -56,7 +56,7 @@ public enum VersionEditTag
                 @Override
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    versionEdit.setLogNumber(VariableLengthQuantity.unpackLong(sliceInput));
+                    versionEdit.setLogNumber(VariableLengthQuantity.readVariableLengthLong(sliceInput));
                 }
 
                 @Override
@@ -64,8 +64,8 @@ public enum VersionEditTag
                 {
                     Long logNumber = versionEdit.getLogNumber();
                     if (logNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
-                        VariableLengthQuantity.packLong(logNumber, sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(logNumber, sliceOutput);
                     }
                 }
             },
@@ -75,7 +75,7 @@ public enum VersionEditTag
                 @Override
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    versionEdit.setNextFileNumber(VariableLengthQuantity.unpackLong(sliceInput));
+                    versionEdit.setNextFileNumber(VariableLengthQuantity.readVariableLengthLong(sliceInput));
                 }
 
                 @Override
@@ -83,8 +83,8 @@ public enum VersionEditTag
                 {
                     Long nextFileNumber = versionEdit.getNextFileNumber();
                     if (nextFileNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
-                        VariableLengthQuantity.packLong(nextFileNumber, sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(nextFileNumber, sliceOutput);
                     }
                 }
             },
@@ -94,7 +94,7 @@ public enum VersionEditTag
                 @Override
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    versionEdit.setLastSequenceNumber(VariableLengthQuantity.unpackLong(sliceInput));
+                    versionEdit.setLastSequenceNumber(VariableLengthQuantity.readVariableLengthLong(sliceInput));
                 }
 
                 @Override
@@ -102,8 +102,8 @@ public enum VersionEditTag
                 {
                     Long lastSequenceNumber = versionEdit.getLastSequenceNumber();
                     if (lastSequenceNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
-                        VariableLengthQuantity.packLong(lastSequenceNumber, sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(lastSequenceNumber, sliceOutput);
                     }
                 }
             },
@@ -114,7 +114,7 @@ public enum VersionEditTag
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
                     // level
-                    int level = VariableLengthQuantity.unpackInt(sliceInput);
+                    int level = VariableLengthQuantity.readVariableLengthInt(sliceInput);
 
                     // internal key
                     InternalKey internalKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
@@ -126,10 +126,10 @@ public enum VersionEditTag
                 public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     for (Entry<Integer, InternalKey> entry : versionEdit.getCompactPointers().entrySet()) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
 
                         // level
-                        VariableLengthQuantity.packInt(entry.getKey(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(entry.getKey(), sliceOutput);
 
                         // internal key
                         writeLengthPrefixedBytes(sliceOutput, entry.getValue().encode());
@@ -143,10 +143,10 @@ public enum VersionEditTag
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
                     // level
-                    int level = VariableLengthQuantity.unpackInt(sliceInput);
+                    int level = VariableLengthQuantity.readVariableLengthInt(sliceInput);
 
                     // file number
-                    long fileNumber = VariableLengthQuantity.unpackLong(sliceInput);
+                    long fileNumber = VariableLengthQuantity.readVariableLengthLong(sliceInput);
 
                     versionEdit.deleteFile(level, fileNumber);
                 }
@@ -155,13 +155,13 @@ public enum VersionEditTag
                 public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     for (Entry<Integer, Long> entry : versionEdit.getDeletedFiles().entries()) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
 
                         // level
-                        VariableLengthQuantity.packInt(entry.getKey(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(entry.getKey(), sliceOutput);
 
                         // file number
-                        VariableLengthQuantity.packLong(entry.getValue(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(entry.getValue(), sliceOutput);
                     }
                 }
             },
@@ -172,13 +172,13 @@ public enum VersionEditTag
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
                     // level
-                    int level = VariableLengthQuantity.unpackInt(sliceInput);
+                    int level = VariableLengthQuantity.readVariableLengthInt(sliceInput);
 
                     // file number
-                    long fileNumber = VariableLengthQuantity.unpackLong(sliceInput);
+                    long fileNumber = VariableLengthQuantity.readVariableLengthLong(sliceInput);
 
                     // file size
-                    long fileSize = VariableLengthQuantity.unpackLong(sliceInput);
+                    long fileSize = VariableLengthQuantity.readVariableLengthLong(sliceInput);
 
                     // smallest key
                     InternalKey smallestKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
@@ -193,18 +193,18 @@ public enum VersionEditTag
                 public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
                 {
                     for (Entry<Integer, FileMetaData> entry : versionEdit.getNewFiles().entries()) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
 
                         // level
-                        VariableLengthQuantity.packInt(entry.getKey(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(entry.getKey(), sliceOutput);
 
 
                         // file number
                         FileMetaData fileMetaData = entry.getValue();
-                        VariableLengthQuantity.packLong(fileMetaData.getNumber(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(fileMetaData.getNumber(), sliceOutput);
 
                         // file size
-                        VariableLengthQuantity.packLong(fileMetaData.getFileSize(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(fileMetaData.getFileSize(), sliceOutput);
 
                         // smallest key
                         writeLengthPrefixedBytes(sliceOutput, fileMetaData.getSmallest().encode());
@@ -222,7 +222,7 @@ public enum VersionEditTag
                 @Override
                 public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
                 {
-                    long previousLogNumber = VariableLengthQuantity.unpackLong(sliceInput);
+                    long previousLogNumber = VariableLengthQuantity.readVariableLengthLong(sliceInput);
                     versionEdit.setPreviousLogNumber(previousLogNumber);
                 }
 
@@ -231,8 +231,8 @@ public enum VersionEditTag
                 {
                     Long previousLogNumber = versionEdit.getPreviousLogNumber();
                     if (previousLogNumber != null) {
-                        VariableLengthQuantity.packInt(getPersistentId(), sliceOutput);
-                        VariableLengthQuantity.packLong(previousLogNumber, sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(previousLogNumber, sliceOutput);
                     }
                 }
             },;

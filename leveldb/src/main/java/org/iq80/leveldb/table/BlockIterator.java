@@ -180,9 +180,9 @@ public class BlockIterator implements SeekingIterator<Slice, Slice>
         Preconditions.checkNotNull(data, "data is null");
 
         // read entry header
-        int sharedKeyLength = VariableLengthQuantity.unpackInt(data);
-        int nonSharedKeyLength = VariableLengthQuantity.unpackInt(data);
-        int valueLength = VariableLengthQuantity.unpackInt(data);
+        int sharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
+        int nonSharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
+        int valueLength = VariableLengthQuantity.readVariableLengthInt(data);
 
         // read key
         Slice key = Slices.allocate(sharedKeyLength + nonSharedKeyLength);

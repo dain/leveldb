@@ -93,8 +93,8 @@ public class BlockHandle
 
     public static BlockHandle readBlockHandle(SliceInput sliceInput)
     {
-        long offset = VariableLengthQuantity.unpackLong(sliceInput);
-        long size = VariableLengthQuantity.unpackLong(sliceInput);
+        long offset = VariableLengthQuantity.readVariableLengthLong(sliceInput);
+        long size = VariableLengthQuantity.readVariableLengthLong(sliceInput);
 
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Blocks can not be larger than Integer.MAX_VALUE");
@@ -112,7 +112,7 @@ public class BlockHandle
     }
     public static void writeBlockHandleTo(BlockHandle blockHandle, SliceOutput sliceOutput)
     {
-        VariableLengthQuantity.packLong(blockHandle.offset, sliceOutput);
-        VariableLengthQuantity.packLong(blockHandle.dataSize, sliceOutput);
+        VariableLengthQuantity.writeVariableLengthLong(blockHandle.offset, sliceOutput);
+        VariableLengthQuantity.writeVariableLengthLong(blockHandle.dataSize, sliceOutput);
     }
 }

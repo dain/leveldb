@@ -121,9 +121,9 @@ public class BlockBuilder
         int nonSharedKeyBytes = key.length() - sharedKeyBytes;
 
         // write "<shared><non_shared><value_size>"
-        VariableLengthQuantity.packInt(sharedKeyBytes, block);
-        VariableLengthQuantity.packInt(nonSharedKeyBytes, block);
-        VariableLengthQuantity.packInt(value.length(), block);
+        VariableLengthQuantity.writeVariableLengthInt(sharedKeyBytes, block);
+        VariableLengthQuantity.writeVariableLengthInt(nonSharedKeyBytes, block);
+        VariableLengthQuantity.writeVariableLengthInt(value.length(), block);
 
         // write non-shared key bytes
         block.writeBytes(key, sharedKeyBytes, nonSharedKeyBytes);

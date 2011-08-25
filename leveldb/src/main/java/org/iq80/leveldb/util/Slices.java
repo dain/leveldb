@@ -34,13 +34,13 @@ public final class Slices
 {
     public static Slice readLengthPrefixedBytes(SliceInput sliceInput)
     {
-        int length = VariableLengthQuantity.unpackInt(sliceInput);
+        int length = VariableLengthQuantity.readVariableLengthInt(sliceInput);
         return sliceInput.readBytes(length);
     }
 
     public static void writeLengthPrefixedBytes(SliceOutput sliceOutput, Slice value)
     {
-        VariableLengthQuantity.packInt(value.length(), sliceOutput);
+        VariableLengthQuantity.writeVariableLengthInt(value.length(), sliceOutput);
         sliceOutput.writeBytes(value);
     }
 

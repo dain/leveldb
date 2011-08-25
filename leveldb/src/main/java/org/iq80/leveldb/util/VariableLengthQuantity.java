@@ -19,91 +19,101 @@ package org.iq80.leveldb.util;
 
 public final class VariableLengthQuantity
 {
-    private VariableLengthQuantity() {}
+    private VariableLengthQuantity()
+    {
+    }
 
-    // todo unroll the loops like coding.cc
-
-    public static void packInt(int numberToCompress, SliceOutput sliceOutput) {
-        // if key is 0 length
-        if (numberToCompress == 0) {
-            // write 0 into one byte
-            sliceOutput.writeByte((byte) 0);
-            return;
+    public static int variableLengthSize(int value)
+    {
+        int size = 1;
+        while ((value & (~0x7f)) != 0) {
+            value >>>= 7;
+            size++;
         }
+        return size;
+    }
 
-        while (true) {
-            // shift off 7 bits
-            int remainder = numberToCompress & 0x7f;
-            numberToCompress >>>= 7;
+    public static int variableLengthSize(long value)
+    {
+        int size = 1;
+        while ((value & (~0x7f)) != 0) {
+            value >>>= 7;
+            size++;
+        }
+        return size;
+    }
 
-            // if the there are no more 1s in the number, we are done
-            if (numberToCompress == 0) {
-                // write a positive number to signal we are done
-                sliceOutput.writeByte((byte) remainder);
-                return;
-            }
-
-            // write a negative number to signal there are more bytes to read
-            sliceOutput.writeByte((byte) ~remainder);
+    public static void writeVariableLengthInt(int value, SliceOutput sliceOutput)
+    {
+        int highBitMask = 0x80;
+        if (value < (1 << 7) && value >= 0) {
+            sliceOutput.writeByte(value);
+        }
+        else if (value < (1 << 14) && value > 0) {
+            sliceOutput.writeByte(value | highBitMask);
+            sliceOutput.writeByte(value >>> 7);
+        }
+        else if (value < (1 << 21) && value > 0) {
+            sliceOutput.writeByte(value | highBitMask);
+            sliceOutput.writeByte((value >>> 7) | highBitMask);
+            sliceOutput.writeByte(value >>> 14);
+        }
+        else if (value < (1 << 28) && value > 0) {
+            sliceOutput.writeByte(value | highBitMask);
+            sliceOutput.writeByte((value >>> 7) | highBitMask);
+            sliceOutput.writeByte((value >>> 14) | highBitMask);
+            sliceOutput.writeByte(value >>> 21);
+        }
+        else {
+            sliceOutput.writeByte(value | highBitMask);
+            sliceOutput.writeByte((value >>> 7) | highBitMask);
+            sliceOutput.writeByte((value >>> 14) | highBitMask);
+            sliceOutput.writeByte((value >>> 21) | highBitMask);
+            sliceOutput.writeByte(value >>> 28);
         }
     }
 
-    public static void packLong(long numberToCompress, SliceOutput sliceOutput) {
-        // if key is 0 length
-        if (numberToCompress == 0) {
-            // write 0 into one byte
-            sliceOutput.writeByte((byte) 0);
-            return;
+    public static void writeVariableLengthLong(long value, SliceOutput sliceOutput)
+    {
+        // while value more than the first 7 bits set
+        while ((value & (~0x7f)) != 0) {
+            sliceOutput.writeByte((int) ((value & 0x7f) | 0x80));
+            value >>>= 7;
         }
-
-        while (true) {
-            // shift off 7 bits
-            long remainder = numberToCompress & 0x7f;
-            numberToCompress >>>= 7;
-
-            // if the there are no more 1s in the number, we are done
-            if (numberToCompress == 0) {
-                // write a positive number to signal we are done
-                sliceOutput.writeByte((byte) remainder);
-                return;
-            }
-
-            // write a negative number to signal there are more bytes to read
-            sliceOutput.writeByte((byte) ~remainder);
-        }
+        sliceOutput.writeByte((int) value);
     }
 
-    public static int unpackInt(SliceInput sliceInput) {
-        // number is encoded as blocks of base 128 numbers
+    public static int readVariableLengthInt(SliceInput sliceInput)
+    {
         int result = 0;
-        for (long index = 0; true; index++) {
-            // if the byte is positive, this is the last byte
-            int next = sliceInput.readByte();
-            if (next >= 0) {
-                // shift the bits to the left and add them to the result
-                result ^= next << (7*index);
+        for (int shift = 0; shift <= 28; shift += 7) {
+            int b = sliceInput.readUnsignedByte();
 
+            // add the lower 7 bits to the result
+            result |= ((b & 0x7f) << shift);
+
+            // if high bit is not set, this is the last byte in the number
+            if ((b & 0x80) == 0) {
                 return result;
             }
-            // flip the bits, shift them to the left, and add them to the result
-            result ^= ~next << (7*index);
         }
+        throw new NumberFormatException("last byte of variable length int has high bit set");
     }
 
-    public static long unpackLong(SliceInput sliceInput) {
-        // number is encoded as blocks of base 128 numbers
+    public static long readVariableLengthLong(SliceInput sliceInput)
+    {
         long result = 0;
-        for (long index = 0; true; index++) {
-            // if the byte is positive, this is the last byte
-            long next = sliceInput.readByte();
-            if (next >= 0) {
-                // shift the bits to the left and add them to the result
-                result ^= next << (7*index);
+        for (int shift = 0; shift <= 63; shift += 7) {
+            long b = sliceInput.readUnsignedByte();
 
+            // add the lower 7 bits to the result
+            result |= ((b & 0x7f) << shift);
+
+            // if high bit is not set, this is the last byte in the number
+            if ((b & 0x80) == 0) {
                 return result;
             }
-            // shift the bits to the left and add them to the result
-            result ^= ~next << (7*index);
         }
+        throw new NumberFormatException("last byte of variable length int has high bit set");
     }
 }

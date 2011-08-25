@@ -27,6 +27,7 @@ import org.iq80.leveldb.util.SeekingIterators;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.xerial.snappy.Snappy;
 
 import java.io.EOFException;
