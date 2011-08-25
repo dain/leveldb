@@ -112,9 +112,8 @@ public class Table implements SeekingIterable<Slice, Slice>
         // decompress data
         Slice uncompressedData;
         if (blockTrailer.getCompressionType() == SNAPPY) {
+            uncompressedData = Slices.allocate(uncompressedLength(data));
             // todo when code is change to direct buffers, use the buffer method instead
-            int uncompressedLength = Snappy.uncompressedLength(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize());
-            uncompressedData = Slices.allocate(uncompressedLength);
             Snappy.uncompress(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize(), uncompressedData.getRawArray(), uncompressedData.getRawOffset());
         }
         else {
@@ -122,6 +121,13 @@ public class Table implements SeekingIterable<Slice, Slice>
         }
 
         return new Block(uncompressedData, comparator);
+    }
+
+    private int uncompressedLength(Slice data)
+            throws IOException
+    {
+        int length = VariableLengthQuantity.readVariableLengthInt(data.input());
+        return length;
     }
 
     /**
