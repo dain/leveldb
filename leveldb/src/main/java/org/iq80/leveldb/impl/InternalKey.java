@@ -48,8 +48,9 @@ public class InternalKey
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.userKey = getUserKey(data);
-        this.sequenceNumber = getSequenceNumber(data);
-        this.valueType = getValueType(data);
+        long packedSequenceAndType = data.getLong(data.length() - SIZE_OF_LONG);
+        this.sequenceNumber = SequenceNumber.unpackSequenceNumber(packedSequenceAndType);
+        this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
     }
 
     public InternalKey(byte[] data)

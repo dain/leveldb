@@ -23,12 +23,14 @@ public enum ValueType
     VALUE(0x01);
 
     public static ValueType getValueTypeByPersistentId(int persistentId) {
-        for (ValueType compressionType : ValueType.values()) {
-            if (compressionType.persistentId == persistentId) {
-                return compressionType;
-            }
+        switch (persistentId) {
+            case 0:
+                return DELETION;
+            case 1:
+                return VALUE;
+            default:
+                throw new IllegalArgumentException("Unknown persistentId " + persistentId);
         }
-        throw new IllegalArgumentException("Unknown persistentId " + persistentId);
     }
 
     private final int persistentId;
