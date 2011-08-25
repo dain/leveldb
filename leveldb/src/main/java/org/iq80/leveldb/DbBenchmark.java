@@ -25,6 +25,8 @@ import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 import org.iq80.leveldb.impl.DbConstants;
 import org.iq80.leveldb.impl.DbImpl;
+import org.iq80.leveldb.impl.SeekingIteratorAdapter;
+import org.iq80.leveldb.impl.SeekingIteratorAdapter.DbEntry;
 import org.iq80.leveldb.impl.WriteBatchImpl;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.Slice;
@@ -407,14 +409,13 @@ public class DbBenchmark
 
     private void readSequential()
     {
-        int i = 0;
-        for (Entry<byte[], byte[]> entry : db_) {
-            if (i >= reads_) {
-                break;
+        for (int loops = 0; loops < 10; loops++) {
+            SeekingIteratorAdapter iterator = db_.iterator();
+            for (int i = 0; i < reads_ && iterator.hasNext(); i++) {
+                DbEntry entry = iterator.next();
+                bytes_ += entry.getKeySlice().length() + entry.getValueSlice().length();
+                finishedSingleOp();
             }
-            bytes_ += entry.getKey().length + entry.getValue().length;
-            finishedSingleOp();
-            i++;
         }
     }
 

@@ -662,12 +662,12 @@ public class DbImpl implements DB
     }
 
     @Override
-    public DBIterator iterator()
+    public SeekingIteratorAdapter iterator()
     {
         return iterator(new ReadOptions());
     }
 
-    public DBIterator iterator(ReadOptions options)
+    public SeekingIteratorAdapter iterator(ReadOptions options)
     {
         mutex.lock();
         try {

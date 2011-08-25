@@ -1,6 +1,6 @@
 package org.iq80.leveldb.impl;
 
-import com.google.common.collect.Maps;
+import com.google.common.base.Preconditions;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -35,13 +35,13 @@ public class SeekingIteratorAdapter implements DBIterator
     }
 
     @Override
-    public Entry<byte[], byte[]> next()
+    public DbEntry next()
     {
         return adapt(seekingIterator.next());
     }
 
     @Override
-    public Entry<byte[], byte[]> peekNext()
+    public DbEntry peekNext()
     {
         return adapt(seekingIterator.peek());
     }
@@ -57,9 +57,9 @@ public class SeekingIteratorAdapter implements DBIterator
         throw new UnsupportedOperationException();
     }
 
-    private Entry<byte[], byte[]> adapt(Entry<Slice, Slice> entry)
+    private DbEntry adapt(Entry<Slice, Slice> entry)
     {
-        return Maps.immutableEntry(entry.getKey().getBytes(), entry.getValue().getBytes());
+        return new DbEntry(entry.getKey(), entry.getValue());
     }
 
     //
@@ -80,14 +80,82 @@ public class SeekingIteratorAdapter implements DBIterator
     }
 
     @Override
-    public Entry<byte[], byte[]> prev()
+    public DbEntry prev()
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Entry<byte[], byte[]> peekPrev()
+    public DbEntry peekPrev()
     {
         throw new UnsupportedOperationException();
+    }
+
+    public static class DbEntry implements Entry<byte[], byte[]>
+    {
+        private final Slice key;
+        private final Slice value;
+
+        public DbEntry(Slice key, Slice value)
+        {
+            Preconditions.checkNotNull(key, "key is null");
+            Preconditions.checkNotNull(value, "value is null");
+            this.key = key;
+            this.value = value;
+        }
+
+        @Override
+        public byte[] getKey()
+        {
+            return key.getBytes();
+        }
+
+        public Slice getKeySlice()
+        {
+            return key;
+        }
+
+        @Override
+        public byte[] getValue()
+        {
+            return value.getBytes();
+        }
+
+        public Slice getValueSlice()
+        {
+            return value;
+        }
+
+        @Override
+        public byte[] setValue(byte[] value)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean equals(Object object)
+        {
+            if (object instanceof Entry) {
+                Entry<?, ?> that = (Entry<?, ?>) object;
+                return key.equals(that.getKey()) &&
+                        value.equals(that.getValue());
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return key.hashCode() ^ value.hashCode();
+        }
+
+        /**
+         * Returns a string representation of the form <code>{key}={value}</code>.
+         */
+        @Override
+        public String toString()
+        {
+            return key + "=" + value;
+        }
     }
 }
