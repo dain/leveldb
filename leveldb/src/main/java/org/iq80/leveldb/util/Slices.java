@@ -19,7 +19,9 @@ package org.iq80.leveldb.util;
 
 import com.google.common.base.Preconditions;
 
+import javax.xml.transform.Source;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -94,6 +96,21 @@ public final class Slices
             return EMPTY_SLICE;
         }
         return new Slice(array);
+    }
+
+    public static Slice copiedBuffer(ByteBuffer source, int sourceOffset, int length)
+    {
+        Preconditions.checkNotNull(source, "source is null");
+        int newPosition = source.position() + sourceOffset;
+        return copiedBuffer((ByteBuffer) source.duplicate().order(ByteOrder.LITTLE_ENDIAN).clear().limit(newPosition + length).position(newPosition));
+    }
+
+    public static Slice copiedBuffer(ByteBuffer source)
+    {
+        Preconditions.checkNotNull(source, "source is null");
+        Slice copy = allocate(source.limit() - source.position());
+        copy.setBytes(0, source.duplicate().order(ByteOrder.LITTLE_ENDIAN));
+        return copy;
     }
 
     public static Slice copiedBuffer(String string, Charset charset)

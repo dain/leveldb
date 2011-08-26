@@ -22,17 +22,18 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.impl.SeekingIterable;
 import org.iq80.leveldb.impl.SeekingIterator;
-import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.SeekingIterators;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.xerial.snappy.Snappy;
 
-import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
 
 import static org.iq80.leveldb.CompressionType.SNAPPY;
@@ -47,21 +48,25 @@ public class Table implements SeekingIterable<Slice, Slice>
 
     private final Block indexBlock;
     private final BlockHandle metaindexBlockHandle;
+    private final MappedByteBuffer data;
 
     public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
             throws IOException
     {
         Preconditions.checkNotNull(name, "name is null");
         Preconditions.checkNotNull(fileChannel, "fileChannel is null");
-        Preconditions.checkArgument(fileChannel.size() >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
+        long size = fileChannel.size();
+        Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
+        Preconditions.checkArgument(size <= Integer.MAX_VALUE, "File must be smaller than %s bytes", Integer.MAX_VALUE);
         Preconditions.checkNotNull(comparator, "comparator is null");
 
         this.name = name;
         this.fileChannel = fileChannel;
+        data = fileChannel.map(MapMode.READ_ONLY, 0, size);
         this.verifyChecksums = verifyChecksums;
         this.comparator = comparator;
 
-        Slice footerSlice = read(fileChannel, fileChannel.size() - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
+        Slice footerSlice = Slices.copiedBuffer(data, (int) size - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
         Footer footer = Footer.readFooter(footerSlice);
 
         indexBlock = readBlock(footer.getIndexBlockHandle());
@@ -90,43 +95,53 @@ public class Table implements SeekingIterable<Slice, Slice>
         return SeekingIterators.concat(inputs);
     }
 
+    private static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
+
     private Block readBlock(BlockHandle blockHandle)
             throws IOException
     {
-        // read full block (data + trailer) into memory
-        Slice data = read(fileChannel, blockHandle.getOffset(), blockHandle.getFullBlockSize());
-
         // read block trailer
-        BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(data.slice(blockHandle.getDataSize(), BlockTrailer.ENCODED_LENGTH));
+        BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(Slices.copiedBuffer(this.data,
+                (int) blockHandle.getOffset() + blockHandle.getDataSize(),
+                BlockTrailer.ENCODED_LENGTH));
 
-        // only verify check sums if explicitly asked by the user
-        if (verifyChecksums) {
-            // checksum data and the compression type in the trailer
-            PureJavaCrc32C checksum = new PureJavaCrc32C();
-            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
-            int actualCrc32c = checksum.getMaskedValue();
-
-            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
-        }
+// todo re-enable crc check when ported to support direct buffers
+//        // only verify check sums if explicitly asked by the user
+//        if (verifyChecksums) {
+//            // checksum data and the compression type in the trailer
+//            PureJavaCrc32C checksum = new PureJavaCrc32C();
+//            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
+//            int actualCrc32c = checksum.getMaskedValue();
+//
+//            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
+//        }
 
         // decompress data
         Slice uncompressedData;
+        ByteBuffer uncompressedBuffer = read(this.data, (int) blockHandle.getOffset(), blockHandle.getDataSize());
         if (blockTrailer.getCompressionType() == SNAPPY) {
-            uncompressedData = Slices.allocate(uncompressedLength(data));
-            // todo when code is change to direct buffers, use the buffer method instead
-            Snappy.uncompress(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize(), uncompressedData.getRawArray(), uncompressedData.getRawOffset());
+            synchronized (Table.class) {
+                int uncompressedLength = uncompressedLength(uncompressedBuffer);
+                if (uncompressedScratch.capacity() < uncompressedLength) {
+                    uncompressedScratch = ByteBuffer.allocateDirect(uncompressedLength);
+                }
+                uncompressedScratch.clear();
+
+                Snappy.uncompress(uncompressedBuffer, uncompressedScratch);
+                uncompressedData = Slices.copiedBuffer(uncompressedScratch);
+            }
         }
         else {
-            uncompressedData = data.slice(0, blockHandle.getDataSize());
+            uncompressedData = Slices.copiedBuffer(uncompressedBuffer);
         }
 
         return new Block(uncompressedData, comparator);
     }
 
-    private int uncompressedLength(Slice data)
+    private int uncompressedLength(ByteBuffer data)
             throws IOException
     {
-        int length = VariableLengthQuantity.readVariableLengthInt(data.input());
+        int length = VariableLengthQuantity.readVariableLengthInt(data.duplicate());
         return length;
     }
 
@@ -154,21 +169,12 @@ public class Table implements SeekingIterable<Slice, Slice>
     }
 
 
-    public static Slice read(FileChannel channel, long position, int length)
+    public static ByteBuffer read(MappedByteBuffer data, int offset, int length)
             throws IOException
     {
-        SliceOutput buffer = Slices.allocate(length).output();
-
-        while (buffer.writableBytes() > 0) {
-            int bytesRead = buffer.writeBytes(channel, (int) position, buffer.writableBytes());
-            if (bytesRead < 0) {
-                // error tried to read off the end of the file
-                throw new EOFException();
-            }
-
-        }
-
-        return buffer.slice();
+        int newPosition = data.position() + offset;
+        ByteBuffer block = (ByteBuffer) data.duplicate().order(ByteOrder.LITTLE_ENDIAN).clear().limit(newPosition + length).position(newPosition);
+        return block;
     }
 
     @Override
