@@ -23,11 +23,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
+import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.SeekingIterator;
 
 import java.util.Comparator;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
+import java.util.PriorityQueue;
 
 public class SeekingIterators
 {
@@ -45,6 +47,7 @@ public class SeekingIterators
     {
         private final SeekingIterator<K, ? extends SeekingIterator<K, ? extends V>> inputs;
         private SeekingIterator<K, ? extends V> current;
+        private Entry<K,V> nextElement;
 
         public ConcatenatingIterator(SeekingIterator<K, ? extends SeekingIterator<K, ? extends V>> inputs)
         {
@@ -53,21 +56,12 @@ public class SeekingIterators
         }
 
         @Override
-        public Entry<K, V> peek()
-        {
-            if (!hasNext()) {
-                throw new NoSuchElementException();
-            }
-            // this woks because Entry is unmodifiable
-            return (Entry<K, V>) current.peek();
-        }
-
-        @Override
         public void seekToFirst()
         {
             // reset index to before first and clear the data iterator
             inputs.seekToFirst();
             current = emptyIterator();
+            nextElement = null;
         }
 
         @Override
@@ -78,9 +72,10 @@ public class SeekingIterators
 
             // if indexIterator does not have a next, it mean the key does not exist in this iterator
             if (inputs.hasNext()) {
-                // load and see the data iterator to the key
+                // seek the current iterator to the key
                 current = inputs.next().getValue();
                 current.seek(targetKey);
+                nextElement = null;
             }
             else {
                 current = emptyIterator();
@@ -90,34 +85,58 @@ public class SeekingIterators
         @Override
         public boolean hasNext()
         {
-            // http://code.google.com/p/google-collections/issues/detail?id=151
-            // current.hasNext() might be relatively expensive, worth minimizing.
-            boolean currentHasNext;
-
-            // note: it must be here & not where 'current' is assigned,
-            // because otherwise we'll have called inputs.next() before throwing
-            // the first NPE, and the next time around we'll call inputs.next()
-            // again, incorrectly moving beyond the error.
-            while (!(currentHasNext = current.hasNext()) && inputs.hasNext()) {
-                current = inputs.next().getValue();
-            }
-            return currentHasNext;
+            advanceToNext();
+            return nextElement != null;
         }
 
         @Override
         public Entry<K, V> next()
         {
-            if (!hasNext()) {
+            advanceToNext();
+            if (nextElement == null) {
                 throw new NoSuchElementException();
             }
-            // this woks because Entry is unmodifiable
-            return (Entry<K, V>) current.next();
+
+            Entry<K, V> result = nextElement;
+            nextElement = null;
+            return result;
+        }
+
+        @Override
+        public Entry<K, V> peek()
+        {
+            advanceToNext();
+            if (nextElement == null) {
+                throw new NoSuchElementException();
+            }
+
+            return nextElement;
         }
 
         @Override
         public void remove()
         {
             throw new UnsupportedOperationException();
+        }
+
+        private void advanceToNext()
+        {
+            if (nextElement == null) {
+                // note: it must be here & not where 'current' is assigned,
+                // because otherwise we'll have called inputs.next() before throwing
+                // the first NPE, and the next time around we'll call inputs.next()
+                // again, incorrectly moving beyond the error.
+                boolean currentHasNext;
+                while (!(currentHasNext = current.hasNext()) && inputs.hasNext()) {
+                    current = inputs.next().getValue();
+                }
+                if (currentHasNext) {
+                    nextElement = (Entry<K, V>) current.next();
+                } else {
+                    // set current to empty iterator to avoid extra calls to user iterators
+                    current = emptyIterator();
+                }
+            }
         }
 
         @Override
@@ -163,23 +182,29 @@ public class SeekingIterators
     private static final class MergingIterator<K, V> implements SeekingIterator<K, V>
     {
         private final Iterable<? extends SeekingIterator<K, ? extends V>> inputs;
+        private final PriorityQueue<ComparableIterator<K, V>> priorityQueue;
         private final Comparator<K> comparator;
-        private SeekingIterator<K, ? extends V> current;
+        private Entry<K,V> nextElement;
 
         public MergingIterator(Iterable<? extends SeekingIterator<K, ? extends V>> inputs, Comparator<K> comparator)
         {
             this.inputs = inputs;
             this.comparator = comparator;
+
+            this.priorityQueue = new PriorityQueue<ComparableIterator<K, V>>(Iterables.size(inputs));
+            resetPriorityQueue(inputs, comparator);
+
             findSmallestChild();
         }
 
-        @Override
-        public Entry<K, V> peek()
+        private void resetPriorityQueue(Iterable<? extends SeekingIterator<K, ? extends V>> inputs, Comparator<K> comparator)
         {
-            if (!hasNext()) {
-                throw new NoSuchElementException();
+            int i = 0;
+            for (SeekingIterator<K, ? extends V> input : inputs) {
+                if (input.hasNext()) {
+                    priorityQueue.add(new ComparableIterator<K, V>(input, comparator, i++, (Entry<K, V>) input.next()));
+                }
             }
-            return (Entry<K, V>) current.peek();
         }
 
         @Override
@@ -188,6 +213,7 @@ public class SeekingIterators
             for (SeekingIterator<K, ? extends V> input : inputs) {
                 input.seekToFirst();
             }
+            resetPriorityQueue(inputs, comparator);
             findSmallestChild();
         }
 
@@ -197,13 +223,14 @@ public class SeekingIterators
             for (SeekingIterator<K, ? extends V> input : inputs) {
                 input.seek(targetKey);
             }
+            resetPriorityQueue(inputs, comparator);
             findSmallestChild();
         }
 
         @Override
         public boolean hasNext()
         {
-            return current != null;
+            return nextElement != null;
         }
 
         @Override
@@ -212,9 +239,18 @@ public class SeekingIterators
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
-            Entry<K, V> result = (Entry<K, V>) current.next();
+            Entry<K, V> result = nextElement;
             findSmallestChild();
             return result;
+        }
+
+        @Override
+        public Entry<K, V> peek()
+        {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            return nextElement;
         }
 
         @Override
@@ -229,22 +265,16 @@ public class SeekingIterators
          */
         private void findSmallestChild()
         {
-            K smallestKey = null;
-            SeekingIterator<K, ? extends V> smallest = null;
-            for (SeekingIterator<K, ? extends V> input : inputs) {
-                if (input.hasNext()) {
-                    K nextKey = input.peek().getKey();
-                    if (smallestKey == null) {
-                        smallestKey = nextKey;
-                        smallest = input;
-                    }
-                    else if (comparator.compare(nextKey, smallestKey) < 0) {
-                        smallestKey = nextKey;
-                        smallest = input;
-                    }
+            nextElement = null;
+
+            ComparableIterator<K, V> nextIterator = priorityQueue.poll();
+            if (nextIterator != null) {
+                nextElement = nextIterator.getNextElement();
+                nextIterator.advanceToNextElement();
+                if (nextIterator.getNextElement() != null) {
+                    priorityQueue.add(nextIterator);
                 }
             }
-            current = smallest;
         }
 
         @Override
@@ -254,9 +284,79 @@ public class SeekingIterators
             sb.append("MergingIterator");
             sb.append("{inputs=").append(Iterables.toString(inputs));
             sb.append(", comparator=").append(comparator);
-            sb.append(", current=").append(current);
+            sb.append(", nextElement=").append(nextElement);
             sb.append('}');
             return sb.toString();
+        }
+
+        private static class ComparableIterator<K, V> implements Comparable<ComparableIterator<K, V>> {
+            private final SeekingIterator<K, ? extends V> iterator;
+            private final Comparator<K> comparator;
+            private final int ordinal;
+            private Entry<K,V> nextElement;
+
+            private ComparableIterator(SeekingIterator<K, ? extends V> iterator, Comparator<K> comparator, int ordinal, Entry<K, V> nextElement)
+            {
+                this.iterator = iterator;
+                this.comparator = comparator;
+                this.ordinal = ordinal;
+                this.nextElement = nextElement;
+            }
+
+            public Entry<K, V> getNextElement()
+            {
+                return nextElement;
+            }
+
+            public void advanceToNextElement()
+            {
+                if (iterator.hasNext()) {
+                    nextElement = (Entry<K, V>) iterator.next();
+                } else {
+                    nextElement = null;
+                }
+
+            }
+
+            @Override
+            public boolean equals(Object o)
+            {
+                if (this == o) {
+                    return true;
+                }
+                if (o == null || getClass() != o.getClass()) {
+                    return false;
+                }
+
+                ComparableIterator<?, ?> comparableIterator = (ComparableIterator<?, ?>) o;
+
+                if (ordinal != comparableIterator.ordinal) {
+                    return false;
+                }
+                if (nextElement != null ? !nextElement.equals(comparableIterator.nextElement) : comparableIterator.nextElement != null) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            @Override
+            public int hashCode()
+            {
+                int result = ordinal;
+                result = 31 * result + (nextElement != null ? nextElement.hashCode() : 0);
+                return result;
+            }
+
+            @Override
+            public int compareTo(ComparableIterator<K, V> that)
+            {
+                int result = comparator.compare(this.nextElement.getKey(), that.nextElement.getKey());
+                if (result == 0) {
+                    result = Ints.compare(this.ordinal, that.ordinal);
+                }
+                return result;
+            }
         }
     }
 
@@ -331,6 +431,7 @@ public class SeekingIterators
         private final SeekingIterator<K1, V1> fromIterator;
         private final Function<Entry<K1, V1>, Entry<K2, V2>> entryFunction;
         private final Function<? super K2, ? extends K1> reverseKeyFunction;
+        private Entry<K2,V2> nextElement;
 
         public TransformingSeekingIterator(SeekingIterator<K1, V1> fromIterator,
                 Function<Entry<K1, V1>, Entry<K2, V2>> entryFunction,
@@ -345,38 +446,58 @@ public class SeekingIterators
         public void seekToFirst()
         {
             fromIterator.seekToFirst();
+            nextElement = null;
         }
 
         @Override
         public void seek(K2 targetKey)
         {
             fromIterator.seek(reverseKeyFunction.apply(targetKey));
+            nextElement = null;
         }
 
         @Override
         public boolean hasNext()
         {
-            return fromIterator.hasNext();
-        }
-
-        @Override
-        public Entry<K2, V2> peek()
-        {
-            Entry<K1, V1> from = fromIterator.peek();
-            return entryFunction.apply(from);
+            advanceToNext();
+            return nextElement != null;
         }
 
         @Override
         public Entry<K2, V2> next()
         {
-            Entry<K1, V1> from = fromIterator.next();
-            return entryFunction.apply(from);
+            advanceToNext();
+            if (nextElement == null) {
+                throw new NoSuchElementException();
+            }
+
+            Entry<K2, V2> result = nextElement;
+            nextElement = null;
+            return result;
+        }
+
+        @Override
+        public Entry<K2, V2> peek()
+        {
+            advanceToNext();
+            if (nextElement == null) {
+                throw new NoSuchElementException();
+            }
+            return nextElement;
         }
 
         @Override
         public void remove()
         {
             throw new UnsupportedOperationException();
+        }
+
+        private void advanceToNext()
+        {
+            if (nextElement == null && fromIterator.hasNext()) {
+                Entry<K1, V1> from = fromIterator.next();
+                nextElement = entryFunction.apply(from);
+            }
         }
 
         @Override
@@ -387,6 +508,7 @@ public class SeekingIterators
             sb.append("{fromIterator=").append(fromIterator);
             sb.append(", entryFunction=").append(entryFunction);
             sb.append(", reverseKeyFunction=").append(reverseKeyFunction);
+            sb.append(", nextElement=").append(nextElement);
             sb.append('}');
             return sb.toString();
         }
