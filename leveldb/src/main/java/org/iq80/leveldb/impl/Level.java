@@ -144,23 +144,20 @@ public class Level implements SeekingIterable<InternalKey, Slice>
             // seek to the key
             iterator.seek(key.getInternalKey());
 
-            // if this key is not in the file, try the next one
-            if (!iterator.hasNext()) {
-                continue;
-            }
+            if (iterator.hasNext()) {
+                // parse the key in the block
+                Entry<InternalKey, Slice> entry = iterator.next();
+                InternalKey internalKey = entry.getKey();
+                Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey().toString(UTF_8));
 
-            // parse the key in the block
-            Entry<InternalKey, Slice> entry = iterator.next();
-            InternalKey internalKey = entry.getKey();
-            Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey().toString(UTF_8));
-
-            // if this is a value key (not a delete) and the keys match, return the value
-            if (key.getUserKey().equals(internalKey.getUserKey())) {
-                if (internalKey.getValueType() == ValueType.DELETION) {
-                    return LookupResult.deleted(key);
-                }
-                else if (internalKey.getValueType() == VALUE) {
-                    return LookupResult.ok(key, entry.getValue());
+                // if this is a value key (not a delete) and the keys match, return the value
+                if (key.getUserKey().equals(internalKey.getUserKey())) {
+                    if (internalKey.getValueType() == ValueType.DELETION) {
+                        return LookupResult.deleted(key);
+                    }
+                    else if (internalKey.getValueType() == VALUE) {
+                        return LookupResult.ok(key, entry.getValue());
+                    }
                 }
             }
 

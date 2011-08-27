@@ -131,14 +131,15 @@ public class Version implements SeekingIterable<InternalKey, Slice>
         // levels.  Therefore we are guaranteed that if we find data
         // in an smaller level, later levels are irrelevant.
         ReadStats readStats = new ReadStats();
+        LookupResult lookupResult = null;
         for (Level level : levels) {
-            LookupResult lookupResult = level.get(key, readStats);
+            lookupResult = level.get(key, readStats);
             if (lookupResult != null) {
-                return lookupResult;
+                break;
             }
         }
         updateStats(readStats.getSeekFileLevel(), readStats.getSeekFile());
-        return null;
+        return lookupResult;
     }
 
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
