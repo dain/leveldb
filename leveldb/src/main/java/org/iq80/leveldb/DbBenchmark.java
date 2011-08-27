@@ -409,7 +409,7 @@ public class DbBenchmark
 
     private void readSequential()
     {
-        for (int loops = 0; loops < 10; loops++) {
+        for (int loops = 0; loops < 5; loops++) {
             SeekingIteratorAdapter iterator = db_.iterator();
             for (int i = 0; i < reads_ && iterator.hasNext(); i++) {
                 DbEntry entry = iterator.next();

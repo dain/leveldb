@@ -27,8 +27,8 @@ import com.google.common.io.Closeables;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Finalizer;
+import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SeekingIterators;
 
 import java.io.Closeable;
 import java.io.File;
@@ -37,9 +37,6 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-
-import static org.iq80.leveldb.impl.InternalKey.SLICE_TO_INTERNAL_KEY;
-import static org.iq80.leveldb.impl.InternalKey.INTERNAL_KEY_TO_SLICE;
 
 public class TableCache
 {
@@ -70,15 +67,14 @@ public class TableCache
                 });
     }
 
-    public SeekingIterator<InternalKey, Slice> newIterator(FileMetaData file)
+    public InternalTableIterator newIterator(FileMetaData file)
     {
         return newIterator(file.getNumber());
     }
 
-    public SeekingIterator<InternalKey, Slice> newIterator(long number)
+    public InternalTableIterator newIterator(long number)
     {
-        Table table = getTable(number);
-        return SeekingIterators.transformKeys(table.iterator(), SLICE_TO_INTERNAL_KEY, INTERNAL_KEY_TO_SLICE);
+        return new InternalTableIterator(getTable(number).iterator());
     }
 
     public long getApproximateOffsetOf(FileMetaData file, Slice key) {

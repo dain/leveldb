@@ -27,8 +27,10 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Level0Iterator;
+import org.iq80.leveldb.util.LevelIterator;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SeekingIterators;
+import org.iq80.leveldb.util.VersionIterator;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -130,29 +132,23 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
     }
 
     @Override
-    public SeekingIterator<InternalKey, Slice> iterator()
+    public VersionIterator iterator()
     {
         return current.iterator();
     }
 
-    public List<SeekingIterator<InternalKey, Slice>> getIterators()
-    {
-        return current.getIterators();
-    }
-
-    public SeekingIterator<InternalKey, Slice> makeInputIterator(Compaction c)
+    public VersionIterator makeInputIterator(Compaction c)
     {
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
         int space = (c.getLevel() == 0 ? c.getLevelInputs().size() + 1 : 2);
-        List<SeekingIterator<InternalKey, Slice>> list = newArrayList();
+        List<LevelIterator> list = newArrayList();
         int num = 0;
 
+        Level0Iterator level0Iterator = null;
         if (c.getLevel() == 0) {
-            for (FileMetaData fileMetaData : c.getLevelInputs()) {
-                list.add(tableCache.newIterator(fileMetaData.getNumber()));
-            }
+            level0Iterator = new Level0Iterator(tableCache, c.getLevelInputs(), internalKeyComparator);
         }
         else {
             // concat iterator over files in this level
@@ -162,8 +158,9 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
         list.add(Level.createLevelConcatIterator(tableCache, c.getLevelUpInputs(), internalKeyComparator));
 
         assert (num <= space);
-        SeekingIterator<InternalKey, Slice> iterator = SeekingIterators.merge(list, internalKeyComparator);
-        return iterator;
+//        SeekingIterator<InternalKey, Slice> iterator = SeekingIterators.merge(list, internalKeyComparator);
+//        return iterator;
+        return new VersionIterator(level0Iterator, list, internalKeyComparator);
     }
 
     public LookupResult get(LookupKey key)

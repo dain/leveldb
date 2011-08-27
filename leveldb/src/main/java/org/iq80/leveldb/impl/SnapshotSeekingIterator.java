@@ -17,18 +17,21 @@
  */
 package org.iq80.leveldb.impl;
 
+import com.google.common.collect.Maps;
+import org.iq80.leveldb.util.AbstractSeekingIterator;
+import org.iq80.leveldb.util.DbIterator;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.Comparator;
 import java.util.Map.Entry;
 
-public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, Slice>
+public final class SnapshotSeekingIterator extends AbstractSeekingIterator<Slice, Slice>
 {
-    private final Comparator<Slice> userComparator;
-    private final SeekingIterator<InternalKey, Slice> iterator;
+    private final DbIterator iterator;
     private final long snapshot;
+    private final Comparator<Slice> userComparator;
 
-    public SnapshotSeekingIterator(SeekingIterator<InternalKey, Slice> iterator, long snapshot, Comparator<Slice> userComparator)
+    public SnapshotSeekingIterator(DbIterator iterator, long snapshot, Comparator<Slice> userComparator)
     {
         this.iterator = iterator;
         this.snapshot = snapshot;
@@ -36,46 +39,32 @@ public class SnapshotSeekingIterator implements SeekingIterator<InternalKey, Sli
     }
 
     @Override
-    public void seekToFirst()
+    protected void seekToFirstInternal()
     {
         iterator.seekToFirst();
         findNextUserEntry(null);
     }
 
     @Override
-    public void seek(InternalKey targetKey)
+    protected void seekInternal(Slice targetKey)
     {
-        iterator.seek(targetKey);
+        iterator.seek(new InternalKey(targetKey, snapshot, ValueType.VALUE));
         findNextUserEntry(null);
     }
 
     @Override
-    public boolean hasNext()
+    protected Entry<Slice, Slice> getNextElement()
     {
-        return iterator.hasNext();
-    }
+        if (!iterator.hasNext()) {
+            return null;
+        }
 
-    @Override
-    public Entry<InternalKey, Slice> peek()
-    {
-        return iterator.peek();
-    }
-
-    @Override
-    public Entry<InternalKey, Slice> next()
-    {
         Entry<InternalKey, Slice> next = iterator.next();
 
         // find the next user entry after the key we are about to return
         findNextUserEntry(next.getKey().getUserKey());
 
-        return next;
-    }
-
-    @Override
-    public void remove()
-    {
-        throw new UnsupportedOperationException();
+        return Maps.immutableEntry(next.getKey().getUserKey(), next.getValue());
     }
 
     private void findNextUserEntry(Slice deletedKey)

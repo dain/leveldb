@@ -17,14 +17,12 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.impl.SeekingIterable;
-import org.iq80.leveldb.impl.SeekingIterator;
-import org.iq80.leveldb.util.SeekingIterators;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.TableIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.xerial.snappy.Snappy;
 
@@ -74,25 +72,22 @@ public class Table implements SeekingIterable<Slice, Slice>
     }
 
     @Override
-    public SeekingIterator<Slice, Slice> iterator()
+    public TableIterator iterator()
     {
-        SeekingIterator<Slice, BlockIterator> inputs = SeekingIterators.transformValues(indexBlock.iterator(), new Function<Slice, BlockIterator>()
-        {
-            @Override
-            public BlockIterator apply(Slice blockEntry)
-            {
-                BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry.input());
-                try {
-                    Block dataBlock = readBlock(blockHandle);
-                    return dataBlock.iterator();
-                }
-                catch (IOException e) {
-                    throw Throwables.propagate(e);
-                }
-            }
-        });
+        return new TableIterator(this, indexBlock.iterator());
+    }
 
-        return SeekingIterators.concat(inputs);
+    public Block openBlock(Slice blockEntry)
+    {
+        BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry.input());
+        Block dataBlock;
+        try {
+            dataBlock = readBlock(blockHandle);
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+        return dataBlock;
     }
 
     private static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);

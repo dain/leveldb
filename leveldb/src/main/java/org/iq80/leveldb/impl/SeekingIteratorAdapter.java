@@ -9,9 +9,9 @@ import java.util.Map.Entry;
 
 public class SeekingIteratorAdapter implements DBIterator
 {
-    private final SeekingIterator<Slice, Slice> seekingIterator;
+    private final SnapshotSeekingIterator seekingIterator;
 
-    public SeekingIteratorAdapter(SeekingIterator<Slice, Slice> seekingIterator)
+    public SeekingIteratorAdapter(SnapshotSeekingIterator seekingIterator)
     {
         this.seekingIterator = seekingIterator;
     }

@@ -19,12 +19,10 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBException;
-import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.Range;
 import org.iq80.leveldb.ReadOptions;
@@ -33,14 +31,16 @@ import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.impl.Filename.FileInfo;
 import org.iq80.leveldb.impl.Filename.FileType;
+import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BasicUserComparator;
 import org.iq80.leveldb.table.TableBuilder;
-import org.iq80.leveldb.util.SeekingIterators;
+import org.iq80.leveldb.util.DbIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.VersionIterator;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -67,8 +67,6 @@ import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.InternalKey.INTERNAL_KEY_TO_USER_KEY;
-import static org.iq80.leveldb.impl.InternalKey.createUserKeyToInternalKeyFunction;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
@@ -671,18 +669,13 @@ public class DbImpl implements DB
     {
         mutex.lock();
         try {
-            SeekingIterator<InternalKey, Slice> rawIterator = internalIterator();
+            DbIterator rawIterator = internalIterator();
 
 
             // filter any entries not visible in our snapshot
             long snapshot = getSnapshotNumber(options);
-            SeekingIterator<InternalKey, Slice> snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
-
-            // transform the keys user space
-            SeekingIterator<Slice, Slice> userIterator = SeekingIterators.transformKeys(snapshotIterator,
-                    INTERNAL_KEY_TO_USER_KEY,
-                    createUserKeyToInternalKeyFunction(snapshot));
-            return new SeekingIteratorAdapter(userIterator);
+            SnapshotSeekingIterator snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
+            return new SeekingIteratorAdapter(snapshotIterator);
         }
         finally {
             mutex.unlock();
@@ -694,28 +687,24 @@ public class DbImpl implements DB
         return new SeekingIterable<InternalKey, Slice>()
         {
             @Override
-            public SeekingIterator<InternalKey, Slice> iterator()
+            public DbIterator iterator()
             {
                 return internalIterator();
             }
         };
     }
 
-    SeekingIterator<InternalKey, Slice> internalIterator()
+    DbIterator internalIterator()
     {
         mutex.lock();
         try {
             // merge together the memTable, immutableMemTable, and tables in version set
-            ImmutableList.Builder<SeekingIterator<InternalKey, Slice>> iterators = ImmutableList.builder();
-            if (memTable != null && !memTable.isEmpty()) {
-                iterators.add(memTable.iterator());
+            MemTableIterator iterator = null;
+            if (immutableMemTable != null) {
+                iterator = immutableMemTable.iterator();
             }
-            if (immutableMemTable != null && !immutableMemTable.isEmpty()) {
-                iterators.add(immutableMemTable.iterator());
-            }
-            // todo only add if versions is not empty... makes debugging the iterators easier
-            iterators.add(versions.iterator());
-            return SeekingIterators.merge(iterators.build(), internalKeyComparator);
+            Version current = versions.getCurrent();
+            return new DbIterator(memTable.iterator(), iterator, current.getLevel0Files(), current.getLevelIterators(), internalKeyComparator);
         }
         finally {
             mutex.unlock();
@@ -955,7 +944,7 @@ public class DbImpl implements DB
         // Release mutex while we're actually doing the compaction work
         mutex.unlock();
         try {
-            SeekingIterator<InternalKey, Slice> iterator = versions.makeInputIterator(compactionState.compaction);
+            VersionIterator iterator = versions.makeInputIterator(compactionState.compaction);
 
             Slice currentUserKey = null;
             boolean hasCurrentUserKey = false;

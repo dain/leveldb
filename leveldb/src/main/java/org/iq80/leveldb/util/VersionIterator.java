@@ -1,63 +1,76 @@
 package org.iq80.leveldb.util;
 
-import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
+import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.SeekingIterator;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 
-public final class MergingIterator<K, V> extends AbstractSeekingIterator<K, V>
+public final class VersionIterator extends AbstractSeekingIterator<InternalKey, Slice>
 {
-    private final Iterable<? extends SeekingIterator<K, ? extends V>> inputs;
-    private final PriorityQueue<ComparableIterator<K, V>> priorityQueue;
-    private final Comparator<K> comparator;
+    private final Level0Iterator level0;
+    private final List<LevelIterator> levels;
+    private final PriorityQueue<ComparableIterator> priorityQueue;
+    private final Comparator<InternalKey> comparator;
 
-    public MergingIterator(Iterable<? extends SeekingIterator<K, ? extends V>> inputs, Comparator<K> comparator)
+    public VersionIterator(Level0Iterator level0, List<LevelIterator> levels, Comparator<InternalKey> comparator)
     {
-        this.inputs = inputs;
+        this.level0 = level0;
+        this.levels = levels;
         this.comparator = comparator;
 
-        this.priorityQueue = new PriorityQueue<ComparableIterator<K, V>>(Iterables.size(inputs));
-        resetPriorityQueue(inputs, comparator);
+        this.priorityQueue = new PriorityQueue<ComparableIterator>(levels.size() + 1);
+        resetPriorityQueue(comparator);
     }
 
     @Override
     protected void seekToFirstInternal()
     {
-        for (SeekingIterator<K, ? extends V> input : inputs) {
-            input.seekToFirst();
+        if (level0 != null) {
+            level0.seekToFirst();
         }
-        resetPriorityQueue(inputs, comparator);
+        for (LevelIterator level : levels) {
+            level.seekToFirst();
+        }
+        resetPriorityQueue(comparator);
     }
 
     @Override
-    protected void seekInternal(K targetKey)
+    protected void seekInternal(InternalKey targetKey)
     {
-        for (SeekingIterator<K, ? extends V> input : inputs) {
-            input.seek(targetKey);
+        if (level0 != null) {
+            level0.seekInternal(targetKey);
         }
-        resetPriorityQueue(inputs, comparator);
+        for (LevelIterator level : levels) {
+            level.seek(targetKey);
+        }
+        resetPriorityQueue(comparator);
     }
 
-    private void resetPriorityQueue(Iterable<? extends SeekingIterator<K, ? extends V>> inputs, Comparator<K> comparator)
+    private void resetPriorityQueue(Comparator<InternalKey> comparator)
     {
-        int i = 0;
-        for (SeekingIterator<K, ? extends V> input : inputs) {
-            if (input.hasNext()) {
-                priorityQueue.add(new ComparableIterator<K, V>(input, comparator, i++, (Entry<K, V>) input.next()));
+        if (level0 != null && level0.hasNext()) {
+            priorityQueue.add(new ComparableIterator(level0, comparator, 0, level0.next()));
+        }
+
+        int i = 1;
+        for (LevelIterator level : levels) {
+            if (level.hasNext()) {
+                priorityQueue.add(new ComparableIterator(level, comparator, i++, level.next()));
             }
         }
     }
 
     @Override
-    protected Entry<K, V> getNextElement()
+    protected Entry<InternalKey, Slice> getNextElement()
     {
-        Entry<K, V> result = null;
-        ComparableIterator<K, V> nextIterator = priorityQueue.poll();
+        Entry<InternalKey, Slice> result = null;
+        ComparableIterator nextIterator = priorityQueue.poll();
         if (nextIterator != null) {
             result = nextIterator.next();
             if (nextIterator.hasNext()) {
@@ -71,20 +84,22 @@ public final class MergingIterator<K, V> extends AbstractSeekingIterator<K, V>
     public String toString()
     {
         final StringBuilder sb = new StringBuilder();
-        sb.append("MergingIterator");
-        sb.append("{inputs=").append(Iterables.toString(inputs));
+        sb.append("VersionIterator");
+        sb.append("{level0=").append(level0);
+        sb.append(", levels=").append(levels);
         sb.append(", comparator=").append(comparator);
         sb.append('}');
         return sb.toString();
     }
 
-    private static class ComparableIterator<K, V> implements Iterator<Entry<K, V>>, Comparable<ComparableIterator<K, V>> {
-        private final SeekingIterator<K, ? extends V> iterator;
-        private final Comparator<K> comparator;
+    private static class ComparableIterator implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
+    {
+        private final SeekingIterator<InternalKey, Slice> iterator;
+        private final Comparator<InternalKey> comparator;
         private final int ordinal;
-        private Entry<K,V> nextElement;
+        private Entry<InternalKey, Slice> nextElement;
 
-        private ComparableIterator(SeekingIterator<K, ? extends V> iterator, Comparator<K> comparator, int ordinal, Entry<K, V> nextElement)
+        private ComparableIterator(SeekingIterator<InternalKey, Slice> iterator, Comparator<InternalKey> comparator, int ordinal, Entry<InternalKey, Slice> nextElement)
         {
             this.iterator = iterator;
             this.comparator = comparator;
@@ -98,16 +113,17 @@ public final class MergingIterator<K, V> extends AbstractSeekingIterator<K, V>
             return nextElement != null;
         }
 
-        public Entry<K, V> next()
+        public Entry<InternalKey, Slice> next()
         {
             if (nextElement == null) {
                 throw new NoSuchElementException();
             }
 
-            Entry<K, V> result = nextElement;
+            Entry<InternalKey, Slice> result = nextElement;
             if (iterator.hasNext()) {
-                nextElement = (Entry<K, V>) iterator.next();
-            } else {
+                nextElement = iterator.next();
+            }
+            else {
                 nextElement = null;
             }
             return result;
@@ -129,7 +145,7 @@ public final class MergingIterator<K, V> extends AbstractSeekingIterator<K, V>
                 return false;
             }
 
-            ComparableIterator<?, ?> comparableIterator = (ComparableIterator<?, ?>) o;
+            ComparableIterator comparableIterator = (ComparableIterator) o;
 
             if (ordinal != comparableIterator.ordinal) {
                 return false;
@@ -150,7 +166,7 @@ public final class MergingIterator<K, V> extends AbstractSeekingIterator<K, V>
         }
 
         @Override
-        public int compareTo(ComparableIterator<K, V> that)
+        public int compareTo(ComparableIterator that)
         {
             int result = comparator.compare(this.nextElement.getKey(), that.nextElement.getKey());
             if (result == 0) {
