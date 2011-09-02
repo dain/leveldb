@@ -1,5 +1,6 @@
 package org.iq80.leveldb.util;
 
+import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
@@ -10,7 +11,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
-import java.util.PriorityQueue;
 
 public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice>
 {
@@ -19,8 +19,10 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
     private final List<InternalTableIterator> level0Files;
     private final List<LevelIterator> levels;
 
-    private final PriorityQueue<ComparableIterator> priorityQueue;
     private final Comparator<InternalKey> comparator;
+
+    private final ComparableIterator[] heap;
+    private int heapSize = 0;
 
     public DbIterator(MemTableIterator memTableIterator,
             MemTableIterator immutableMemTableIterator,
@@ -34,8 +36,8 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
         this.levels = levels;
         this.comparator = comparator;
 
-        this.priorityQueue = new PriorityQueue<ComparableIterator>(3);
-        resetPriorityQueue(comparator);
+        this.heap = new ComparableIterator[3 + level0Files.size() + levels.size()];
+        resetPriorityQueue();
     }
 
     @Override
@@ -53,7 +55,7 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
         for (LevelIterator level : levels) {
             level.seekToFirst();
         }
-        resetPriorityQueue(comparator);
+        resetPriorityQueue();
     }
 
     @Override
@@ -71,42 +73,101 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
         for (LevelIterator level : levels) {
             level.seek(targetKey);
         }
-        resetPriorityQueue(comparator);
-    }
-
-    private void resetPriorityQueue(Comparator<InternalKey> comparator)
-    {
-        int i = 0;
-        if (memTableIterator != null && memTableIterator.hasNext()) {
-            priorityQueue.add(new ComparableIterator(memTableIterator, comparator, i++, memTableIterator.next()));
-        }
-        if (immutableMemTableIterator != null && immutableMemTableIterator.hasNext()) {
-            priorityQueue.add(new ComparableIterator(immutableMemTableIterator, comparator, i++, immutableMemTableIterator.next()));
-        }
-        for (InternalTableIterator level0File : level0Files) {
-            if (level0File.hasNext()) {
-                priorityQueue.add(new ComparableIterator(level0File, comparator, i++, level0File.next()));
-            }
-        }
-        for (LevelIterator level : levels) {
-            if (level.hasNext()) {
-                priorityQueue.add(new ComparableIterator(level, comparator, i++, level.next()));
-            }
-        }
+        resetPriorityQueue();
     }
 
     @Override
     protected Entry<InternalKey, Slice> getNextElement()
     {
-        Entry<InternalKey, Slice> result = null;
-        ComparableIterator nextIterator = priorityQueue.poll();
-        if (nextIterator != null) {
-            result = nextIterator.next();
-            if (nextIterator.hasNext()) {
-                priorityQueue.add(nextIterator);
+        if (heapSize == 0) {
+            return null;
+        }
+
+        ComparableIterator smallest = heap[0];
+        Entry<InternalKey, Slice> result = smallest.next();
+
+        // if the smallest iterator has more elements, put it back in the heap,
+        // otherwise use the last element in the queue
+        ComparableIterator replacementElement;
+        if (smallest.hasNext()) {
+            replacementElement = smallest;
+        }
+        else {
+            heapSize--;
+            replacementElement = heap[heapSize];
+            heap[heapSize] = null;
+        }
+
+        if (replacementElement != null) {
+            heap[0] = replacementElement;
+            heapSiftDown(0);
+        }
+
+        return result;
+    }
+
+    private void resetPriorityQueue()
+    {
+        int i = 0;
+        if (memTableIterator != null && memTableIterator.hasNext()) {
+            heapAdd(new ComparableIterator(memTableIterator, comparator, i++, memTableIterator.next()));
+        }
+        if (immutableMemTableIterator != null && immutableMemTableIterator.hasNext()) {
+            heapAdd(new ComparableIterator(immutableMemTableIterator, comparator, i++, immutableMemTableIterator.next()));
+        }
+        for (InternalTableIterator level0File : level0Files) {
+            if (level0File.hasNext()) {
+                heapAdd(new ComparableIterator(level0File, comparator, i++, level0File.next()));
             }
         }
-        return result;
+        for (LevelIterator level : levels) {
+            if (level.hasNext()) {
+                heapAdd(new ComparableIterator(level, comparator, i++, level.next()));
+            }
+        }
+    }
+
+    private boolean heapAdd(ComparableIterator newElement)
+    {
+        Preconditions.checkNotNull(newElement, "newElement is null");
+
+        heap[heapSize] = newElement;
+        heapSiftUp(heapSize++);
+        return true;
+    }
+
+    private void heapSiftUp(int childIndex)
+    {
+        ComparableIterator target = heap[childIndex];
+        int parentIndex;
+        while (childIndex > 0) {
+            parentIndex = (childIndex - 1) / 2;
+            ComparableIterator parent = heap[parentIndex];
+            if (parent.compareTo(target) <= 0) {
+                break;
+            }
+            heap[childIndex] = parent;
+            childIndex = parentIndex;
+        }
+        heap[childIndex] = target;
+    }
+
+    private void heapSiftDown(int rootIndex)
+    {
+        ComparableIterator target = heap[rootIndex];
+        int childIndex;
+        while ((childIndex = rootIndex * 2 + 1) < heapSize) {
+            if (childIndex + 1 < heapSize
+                    && heap[childIndex + 1].compareTo(heap[childIndex]) < 0) {
+                childIndex++;
+            }
+            if (target.compareTo(heap[childIndex]) <= 0) {
+                break;
+            }
+            heap[rootIndex] = heap[childIndex];
+            rootIndex = childIndex;
+        }
+        heap[rootIndex] = target;
     }
 
     @Override
