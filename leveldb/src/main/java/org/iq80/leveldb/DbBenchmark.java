@@ -17,9 +17,9 @@
  */
 package org.iq80.leveldb;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
@@ -30,22 +30,22 @@ import org.iq80.leveldb.impl.SeekingIteratorAdapter.DbEntry;
 import org.iq80.leveldb.impl.WriteBatchImpl;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 import org.xerial.snappy.Snappy;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Charsets.UTF_8;
+import static org.iq80.leveldb.CompressionType.SNAPPY;
 import static org.iq80.leveldb.DbBenchmark.DBState.EXISTING;
 import static org.iq80.leveldb.DbBenchmark.DBState.FRESH;
 import static org.iq80.leveldb.DbBenchmark.Order.RANDOM;
@@ -181,7 +181,13 @@ public class DbBenchmark
                 snappyCompress();
             }
             else if (benchmark.equals("snappyuncomp")) {
-                snappyUncompress();
+                snappyUncompressDirectBuffer();
+            }
+            else if (benchmark.equals("unsnap-array")) {
+                snappyUncompressArray();
+            }
+            else if (benchmark.equals("unsnap-direct")) {
+                snappyUncompressDirectBuffer();
             }
             else if (benchmark.equals("heapprofile")) {
                 heapProfile();
@@ -318,7 +324,8 @@ public class DbBenchmark
             else {
                 message_ = rate;
             }
-        } else if (message_ == null) {
+        }
+        else if (message_ == null) {
             message_ = "";
         }
 
@@ -395,13 +402,27 @@ public class DbBenchmark
 //        }
         done_++;
         if (done_ >= next_report_) {
-            if      (next_report_ < 1000)   next_report_ += 100;
-            else if (next_report_ < 5000)   next_report_ += 500;
-            else if (next_report_ < 10000)  next_report_ += 1000;
-            else if (next_report_ < 50000)  next_report_ += 5000;
-            else if (next_report_ < 100000) next_report_ += 10000;
-            else if (next_report_ < 500000) next_report_ += 50000;
-            else                            next_report_ += 100000;
+            if (next_report_ < 1000) {
+                next_report_ += 100;
+            }
+            else if (next_report_ < 5000) {
+                next_report_ += 500;
+            }
+            else if (next_report_ < 10000) {
+                next_report_ += 1000;
+            }
+            else if (next_report_ < 50000) {
+                next_report_ += 5000;
+            }
+            else if (next_report_ < 100000) {
+                next_report_ += 10000;
+            }
+            else if (next_report_ < 500000) {
+                next_report_ += 50000;
+            }
+            else {
+                next_report_ += 100000;
+            }
             System.out.printf("... finished %d ops%30s\r", done_, "");
 
         }
@@ -463,12 +484,87 @@ public class DbBenchmark
 
     private void snappyCompress()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        Slice raw = gen_.generate(new Options().blockSize());
+        Slice compressedOutput = Slices.allocate(Snappy.maxCompressedLength(raw.length()));
+
+        long produced = 0;
+
+        // attempt to compress the block
+        while (bytes_ < 1024 * 1048576) {  // Compress 1G
+            try {
+                int compressedSize = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
+                bytes_ += raw.length();
+                produced += compressedSize;
+            }
+            catch (IOException ignored) {
+                throw Throwables.propagate(ignored);
+            }
+
+            finishedSingleOp();
+        }
+
+        message_ = String.format("(output: %.1f%%)", (produced * 100.0) / bytes_);
     }
 
-    private void snappyUncompress()
+    private void snappyUncompressArray()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        int inputSize = new Options().blockSize();
+        Slice raw = gen_.generate(inputSize);
+        Slice compressedOutput = Slices.allocate(Snappy.maxCompressedLength(inputSize));
+        int compressedLength;
+        try {
+            compressedLength = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+
+        // attempt to compress the block
+        while (bytes_ < 5L * 1024 * 1048576) {  // Compress 1G
+            try {
+                Snappy.uncompress(compressedOutput.getRawArray(), compressedOutput.getRawOffset(), compressedLength, raw.getRawArray(), 0);
+                bytes_ += inputSize;
+            }
+            catch (IOException ignored) {
+                throw Throwables.propagate(ignored);
+            }
+
+            finishedSingleOp();
+        }
+    }
+
+    private void snappyUncompressDirectBuffer()
+    {
+        int inputSize = new Options().blockSize();
+        Slice compressedOutput = Slices.allocate(Snappy.maxCompressedLength(inputSize));
+        int compressedLength;
+        try {
+            Slice raw = gen_.generate(inputSize);
+            compressedLength = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+
+        ByteBuffer uncompressedBuffer = ByteBuffer.allocateDirect(inputSize);
+        ByteBuffer compressedBuffer = ByteBuffer.allocateDirect(compressedLength);
+        compressedBuffer.put(compressedOutput.getRawArray(), 0, compressedLength);
+
+        // attempt to compress the block
+        while (bytes_ < 5L * 1024 * 1048576) {  // Compress 1G
+            try {
+                uncompressedBuffer.clear();
+                compressedBuffer.position(0);
+                compressedBuffer.limit(compressedLength);
+                Snappy.uncompress(compressedBuffer, uncompressedBuffer);
+                bytes_ += inputSize;
+            }
+            catch (IOException ignored) {
+                throw Throwables.propagate(ignored);
+            }
+
+            finishedSingleOp();
+        }
     }
 
     private void heapProfile()
@@ -557,12 +653,13 @@ public class DbBenchmark
                 // "readreverse",
                 // "compact",
                 "readrandom",
-                "readseq"
+                "readseq",
                 // "readreverse",
-                // "fill100K",
+                "fill100K",
                 // "crc32c",
-                // "snappycomp",
-                // "snappyuncomp",
+                "snappycomp",
+                "unsnap-array",
+                "unsnap-direct"
                 // "acquireload"
         ))
                 {
@@ -693,7 +790,8 @@ public class DbBenchmark
         }
     }
 
-    private static class RandomGenerator {
+    private static class RandomGenerator
+    {
         private final Slice data;
         private int position;
 
