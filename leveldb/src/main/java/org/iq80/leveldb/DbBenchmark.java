@@ -29,6 +29,7 @@ import org.iq80.leveldb.impl.SeekingIteratorAdapter;
 import org.iq80.leveldb.impl.SeekingIteratorAdapter.DbEntry;
 import org.iq80.leveldb.impl.WriteBatchImpl;
 import org.iq80.leveldb.util.FileUtils;
+import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
@@ -478,7 +479,27 @@ public class DbBenchmark
 
     private void crc32c(int blockSize, String message)
     {
-        //To change body of created methods use File | Settings | File Templates.
+        // Checksum about 500MB of data total
+        byte[] data = new byte[blockSize];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = 'x';
+
+        }
+
+        long bytes = 0;
+        int crc = 0;
+        while (bytes < 1000 * 1048576) {
+            PureJavaCrc32C checksum = new PureJavaCrc32C();
+            checksum.update(data, 0, blockSize);
+            crc = checksum.getMaskedValue();
+            finishedSingleOp();
+            bytes += blockSize;
+        }
+        System.out.printf("... crc=0x%x\r", crc);
+
+        bytes_ = bytes;
+        // Print so result is not dead
+        message_ = message;
     }
 
     private void acquireLoad()
