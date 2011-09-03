@@ -27,6 +27,8 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
+import static java.lang.String.format;
+
 public class DbLock
 {
     private final File lockFile;
@@ -47,6 +49,10 @@ public class DbLock
         catch (IOException e) {
             Closeables.closeQuietly(channel);
             throw e;
+        }
+
+        if (lock == null) {
+            throw new IOException(format("Unable to acquire lock on '%s'", lockFile.getAbsolutePath()));
         }
     }
 
