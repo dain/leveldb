@@ -170,6 +170,10 @@ public class Compaction
     // before processing "internal_key".
     public boolean shouldStopBefore(InternalKey internalKey)
     {
+        if (grandparents == null) {
+            return false;
+        }
+
         // Scan to find earliest grandparent file that contains key.
         InternalKeyComparator internalKeyComparator = inputVersion.getInternalKeyComparator();
         while (grandparentIndex < grandparents.size() &&

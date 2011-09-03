@@ -318,7 +318,7 @@ public class DbImpl implements DB
     public void compactRange(int level, Slice start, Slice end)
     {
         Preconditions.checkArgument(level >= 0, "level is negative");
-        Preconditions.checkArgument(level + 1 < NUM_LEVELS, "level is greater than %s", NUM_LEVELS);
+        Preconditions.checkArgument(level + 1 < NUM_LEVELS, "level is greater than or equal to %s", NUM_LEVELS);
         Preconditions.checkNotNull(start, "start is null");
         Preconditions.checkNotNull(end, "end is null");
 
@@ -416,7 +416,7 @@ public class DbImpl implements DB
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
-        compactMemTable();
+        compactMemTableInternal();
 
         Compaction compaction;
         if (manualCompaction != null) {
@@ -817,7 +817,19 @@ public class DbImpl implements DB
         }
     }
 
-    private void compactMemTable()
+    public void compactMemTable()
+            throws IOException
+    {
+        mutex.lock();
+        try {
+            compactMemTableInternal();
+        }
+        finally {
+            mutex.unlock();
+        }
+    }
+
+    private void compactMemTableInternal()
             throws IOException
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
@@ -954,7 +966,7 @@ public class DbImpl implements DB
                 // always give priority to compacting the current mem table
                 mutex.lock();
                 try {
-                    compactMemTable();
+                    compactMemTableInternal();
                 }
                 finally {
                     mutex.unlock();

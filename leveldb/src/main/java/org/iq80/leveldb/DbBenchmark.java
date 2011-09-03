@@ -45,11 +45,11 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Charsets.UTF_8;
-import static org.iq80.leveldb.CompressionType.SNAPPY;
 import static org.iq80.leveldb.DbBenchmark.DBState.EXISTING;
 import static org.iq80.leveldb.DbBenchmark.DBState.FRESH;
 import static org.iq80.leveldb.DbBenchmark.Order.RANDOM;
 import static org.iq80.leveldb.DbBenchmark.Order.SEQUENTIAL;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
 public class DbBenchmark
 {
@@ -468,8 +468,12 @@ public class DbBenchmark
     }
 
     private void compact()
+            throws IOException
     {
-        //To change body of created methods use File | Settings | File Templates.
+        db_.compactMemTable();
+        for (int level = 0; level < NUM_LEVELS - 1; level++) {
+            db_.compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
+        }
     }
 
     private void crc32c(int blockSize, String message)
@@ -651,7 +655,7 @@ public class DbBenchmark
                 "readrandom",  // Extra run to allow previous compactions to quiesce
                 "readseq",
                 // "readreverse",
-                // "compact",
+                "compact",
                 "readrandom",
                 "readseq",
                 // "readreverse",
