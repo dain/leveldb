@@ -70,6 +70,29 @@
             <version>6.0.1</version>
             <scope>test</scope>
         </dependency>
-    </dependencies>
 
+        <!-- to verify file format compatibility with the native leveldb impl -->
+        <dependency>
+          <groupId>org.fusesource.leveldbjni</groupId>
+          <artifactId>leveldbjni-all</artifactId>
+          <version>1.1-SNAPSHOT</version>
+          <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <excludes>
+              <exclude>**/NativeInteropTest.*</exclude>
+            </excludes>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
 </project>
