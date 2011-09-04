@@ -33,7 +33,7 @@ import org.iq80.leveldb.impl.Filename.FileInfo;
 import org.iq80.leveldb.impl.Filename.FileType;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
-import org.iq80.leveldb.table.BasicUserComparator;
+import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.util.DbIterator;
 import org.iq80.leveldb.util.Slice;
@@ -110,7 +110,7 @@ public class DbImpl implements DB
         this.options = options;
         this.databaseDir = databaseDir;
 
-        internalKeyComparator = new InternalKeyComparator(new BasicUserComparator());
+        internalKeyComparator = new InternalKeyComparator(new BytewiseComparator());
         memTable = new MemTable(internalKeyComparator);
         immutableMemTable = null;
 

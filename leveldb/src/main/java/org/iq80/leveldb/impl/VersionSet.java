@@ -262,8 +262,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
     {
         // Save metadata
         VersionEdit edit = new VersionEdit();
-        // todo implement user provided comparators
-        edit.setComparatorName(internalKeyComparator.getClass().getName());
+        edit.setComparatorName(internalKeyComparator.name());
 
         // Save compaction pointers
         edit.setCompactPointers(compactPointers);
@@ -310,7 +309,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
             // verify comparator
             // todo implement user comparator
             String editComparator = edit.getComparatorName();
-            String userComparator = internalKeyComparator.getClass().getName();
+            String userComparator = internalKeyComparator.name();
             Preconditions.checkArgument(editComparator == null || editComparator.equals(userComparator),
                     "Expected user comparator %s to match existing database comparator ", userComparator, editComparator);
 

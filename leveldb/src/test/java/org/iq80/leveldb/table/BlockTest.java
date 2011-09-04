@@ -34,7 +34,7 @@ public class BlockTest
     public void testEmptyBuffer()
             throws Exception
     {
-        new Block(Slices.EMPTY_SLICE, new BasicUserComparator());
+        new Block(Slices.EMPTY_SLICE, new BytewiseComparator());
     }
 
     @Test
@@ -111,7 +111,7 @@ public class BlockTest
 
     private void blockTest(int blockRestartInterval, List<BlockEntry> entries)
     {
-        BlockBuilder builder = new BlockBuilder(256, blockRestartInterval, new BasicUserComparator());
+        BlockBuilder builder = new BlockBuilder(256, blockRestartInterval, new BytewiseComparator());
 
         for (BlockEntry entry : entries) {
             builder.add(entry);
@@ -121,7 +121,7 @@ public class BlockTest
         Slice blockSlice = builder.finish();
         assertEquals(builder.currentSizeEstimate(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
-        Block block = new Block(blockSlice, new BasicUserComparator());
+        Block block = new Block(blockSlice, new BytewiseComparator());
         assertEquals(block.size(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
         BlockIterator blockIterator = block.iterator();

@@ -240,7 +240,7 @@ public class TableBuilder
         closed = true;
 
         // write (empty) meta index block
-        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(256, blockRestartInterval, new BasicUserComparator());
+        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(256, blockRestartInterval, new BytewiseComparator());
         // TODO(postrelease): Add stats and other meta blocks
         BlockHandle metaindexBlockHandle = writeBlock(metaIndexBlockBuilder);
 

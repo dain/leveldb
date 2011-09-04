@@ -39,6 +39,11 @@ public class InternalUserComparator implements UserComparator
     }
 
     @Override
+    public String name() {
+        return internalKeyComparator.name();
+    }
+
+    @Override
     public Slice findShortestSeparator(
             Slice start,
             Slice limit)

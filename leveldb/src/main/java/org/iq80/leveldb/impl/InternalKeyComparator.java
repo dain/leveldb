@@ -39,6 +39,10 @@ public class InternalKeyComparator implements Comparator<InternalKey>
         return userComparator;
     }
 
+    public String name() {
+        return this.userComparator.name();
+    }
+
     @Override
     public int compare(InternalKey left, InternalKey right)
     {

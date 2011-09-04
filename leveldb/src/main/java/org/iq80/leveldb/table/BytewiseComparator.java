@@ -19,8 +19,14 @@ package org.iq80.leveldb.table;
 
 import org.iq80.leveldb.util.Slice;
 
-public class BasicUserComparator implements UserComparator
+public class BytewiseComparator implements UserComparator
 {
+
+    @Override
+    public String name() {
+        return "leveldb.BytewiseComparator";
+    }
+
     @Override
     public int compare(Slice sliceA, Slice sliceB)
     {

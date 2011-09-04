@@ -48,7 +48,7 @@ public class TableTest
     public void testEmptyFile()
             throws Exception
     {
-        new Table(file.getAbsolutePath(), fileChannel, new BasicUserComparator(), true);
+        new Table(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
     }
 
     @Test
@@ -114,14 +114,14 @@ public class TableTest
     {
         reopenFile();
         Options options = new Options().blockSize(blockSize).blockRestartInterval(blockRestartInterval);
-        TableBuilder builder = new TableBuilder(options, fileChannel, new BasicUserComparator());
+        TableBuilder builder = new TableBuilder(options, fileChannel, new BytewiseComparator());
 
         for (BlockEntry entry : entries) {
             builder.add(entry);
         }
         builder.finish();
 
-        Table table = new Table(file.getAbsolutePath(), fileChannel, new BasicUserComparator(), true);
+        Table table = new Table(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
 
         SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);
