@@ -31,7 +31,7 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 public class MemTable implements SeekingIterable<InternalKey, Slice>
 {
     private final ConcurrentSkipListMap<InternalKey, Slice> table;
-    private AtomicLong approximateMemoryUsage = new AtomicLong();
+    private final AtomicLong approximateMemoryUsage = new AtomicLong();
 
     public MemTable(InternalKeyComparator internalKeyComparator)
     {
