@@ -53,7 +53,7 @@ public class FileMetaData
      * Seeks allowed until compaction
      */
     // todo this mutable state should be moved elsewhere
-    private AtomicInteger allowedSeeks = new AtomicInteger(1 << 30);
+    private final AtomicInteger allowedSeeks = new AtomicInteger(1 << 30);
 
     public FileMetaData(long number, long fileSize, InternalKey smallest, InternalKey largest)
     {
