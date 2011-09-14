@@ -70,6 +70,26 @@ public enum VersionEditTag
                 }
             },
 
+    PREVIOUS_LOG_NUMBER(9)
+            {
+                @Override
+                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
+                {
+                    long previousLogNumber = VariableLengthQuantity.readVariableLengthLong(sliceInput);
+                    versionEdit.setPreviousLogNumber(previousLogNumber);
+                }
+
+                @Override
+                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
+                {
+                    Long previousLogNumber = versionEdit.getPreviousLogNumber();
+                    if (previousLogNumber != null) {
+                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
+                        VariableLengthQuantity.writeVariableLengthLong(previousLogNumber, sliceOutput);
+                    }
+                }
+            },
+
     NEXT_FILE_NUMBER(3)
             {
                 @Override
@@ -213,29 +233,9 @@ public enum VersionEditTag
                         writeLengthPrefixedBytes(sliceOutput, fileMetaData.getLargest().encode());
                     }
                 }
-            },
-
+            }
     // 8 was used for large value refs
-
-    PREVIOUS_LOG_NUMBER(9)
-            {
-                @Override
-                public void readValue(SliceInput sliceInput, VersionEdit versionEdit)
-                {
-                    long previousLogNumber = VariableLengthQuantity.readVariableLengthLong(sliceInput);
-                    versionEdit.setPreviousLogNumber(previousLogNumber);
-                }
-
-                @Override
-                public void writeValue(SliceOutput sliceOutput, VersionEdit versionEdit)
-                {
-                    Long previousLogNumber = versionEdit.getPreviousLogNumber();
-                    if (previousLogNumber != null) {
-                        VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
-                        VariableLengthQuantity.writeVariableLengthLong(previousLogNumber, sliceOutput);
-                    }
-                }
-            },;
+            ;
 
     public static VersionEditTag getValueTypeByPersistentId(int persistentId)
     {

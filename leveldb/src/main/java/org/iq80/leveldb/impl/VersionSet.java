@@ -66,7 +66,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
 
 
     private AtomicLong nextFileNumber = new AtomicLong(2);
-    private long manifestFileNumber;
+    private long manifestFileNumber = 1;
     private Version current;
     private long lastSequence;
     private long logNumber;
@@ -81,11 +81,35 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
     private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
 
     public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+            throws IOException
     {
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
         appendVersion(new Version(NUM_LEVELS, tableCache, internalKeyComparator));
+
+        initializeIfNeeded();
+    }
+
+    private void initializeIfNeeded()
+            throws IOException
+    {
+        File currentFile = new File(databaseDir, Filename.currentFileName());
+
+        if (!currentFile.exists()) {
+            VersionEdit edit = new VersionEdit();
+            edit.setComparatorName(internalKeyComparator.name());
+            edit.setLogNumber(prevLogNumber);
+            edit.setNextFileNumber(nextFileNumber.get());
+            edit.setLastSequenceNumber(lastSequence);
+
+            LogWriter log = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
+            writeSnapshot(log);
+            log.addRecord(edit.encode(), false);
+            log.close();
+
+            Filename.setCurrentFile(databaseDir, log.getFileNumber());
+        }
     }
 
     public void destroy()
@@ -280,10 +304,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
 
         // Read "CURRENT" file, which contains a pointer to the current manifest file
         File currentFile = new File(databaseDir, Filename.currentFileName());
-        if (!currentFile.exists()) {
-            // empty database
-            return;
-        }
+        Preconditions.checkState(currentFile.exists(), "CURRENT file does not exist");
 
         String currentName = Files.toString(currentFile, Charsets.UTF_8);
         if (currentName.isEmpty() || currentName.charAt(currentName.length() - 1) != '\n') {
