@@ -134,7 +134,6 @@ public class DbImpl implements DB
         tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyComparator), options.verifyChecksums());
 
         // create the version set
-        versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
 
         // create the database dir if it does not already exist
         databaseDir.mkdirs();
@@ -154,6 +153,8 @@ public class DbImpl implements DB
             else {
                 Preconditions.checkArgument(!options.errorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
+
+            versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
 
             // load  (and recover) current version
             versions.recover();
