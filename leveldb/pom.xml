@@ -96,7 +96,6 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
             <excludes>
-              <exclude>**/NativeInteropTest.*</exclude>
             </excludes>
           </configuration>
         </plugin>
