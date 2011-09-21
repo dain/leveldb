@@ -572,11 +572,12 @@ public class DbImpl implements DB
             mutex.unlock();
         }
 
-
         if (lookupResult != null) {
-            return lookupResult.getValue().getBytes();
+            Slice value = lookupResult.getValue();
+            if (value != null) {
+                return value.getBytes();
+            }
         }
-
         return null;
     }
 
