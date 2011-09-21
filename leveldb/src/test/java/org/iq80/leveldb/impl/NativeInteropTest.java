@@ -54,7 +54,7 @@ public class NativeInteropTest extends TestCase {
     }
 
     public void assertEquals(byte[] arg1, byte[] arg2) {
-        assertTrue(Arrays.equals(arg1, arg2));
+        assertTrue(asString(arg1)+" != "+asString(arg2), Arrays.equals(arg1, arg2));
     }
 
     DBFactory iq80factory = Iq80DBFactory.factory;
@@ -67,11 +67,19 @@ public class NativeInteropTest extends TestCase {
         return rc;
     }
 
-    public void testCRUDCreatedByIQ80() throws IOException, DBException {
+    public void testCRUDviaIQ80() throws IOException, DBException {
+        crud(iq80factory, iq80factory);
+    }
+
+    public void testCRUDviaJNI() throws IOException, DBException {
+        crud(jnifactory, jnifactory);
+    }
+
+    public void testCRUDviaIQ80thenJNI() throws IOException, DBException {
         crud(iq80factory, jnifactory);
     }
 
-    public void testCRUDCreatedByJni() throws IOException, DBException {
+    public void testCRUDviaJNIthenIQ80() throws IOException, DBException {
         crud(jnifactory, iq80factory);
     }
 
@@ -94,36 +102,21 @@ public class NativeInteropTest extends TestCase {
         assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
         assertEquals(db.get(bytes("London"), ro), bytes("red"));
         assertEquals(db.get(bytes("New York"), ro), bytes("blue"));
+
         db.delete(bytes("New York"), wo);
+
+        assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
+        assertEquals(db.get(bytes("London"), ro), bytes("red"));
+        assertNull(db.get(bytes("New York"), ro));
 
         db.close();
         db = firstFactory.open(path, options);
 
+        assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
+        assertEquals(db.get(bytes("London"), ro), bytes("red"));
         assertNull(db.get(bytes("New York"), ro));
+
         db.close();
     }
-
-//    @Test
-//    public void testFileCompare() throws IOException, DBException {
-//
-//        File path1 = getTestDirectory(getName()+"-iq80");
-//        createDB(path1, iq80factory);
-//
-//        File path2 = getTestDirectory(getName()+"-jni");
-//        createDB(path2, jnifactory);
-//
-//        System.out.println(path1 +" and "+path2);
-//    }
-//
-//    private void createDB(File path, DBFactory factory) throws IOException, DBException {
-//        Options options = new Options().createIfMissing(true);
-//        DB db = factory.open(path, options);
-//        WriteOptions wo = new WriteOptions().sync(false);
-//        ReadOptions ro = new ReadOptions().fillCache(true).verifyChecksums(true);
-//        db.put(bytes("Tampa"), bytes("green"));
-//        db.put(bytes("London"), bytes("red"));
-//        db.put(bytes("New York"), bytes("blue"));
-//        db.close();
-//    }
 
 }
