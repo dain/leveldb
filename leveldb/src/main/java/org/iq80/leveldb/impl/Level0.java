@@ -24,6 +24,8 @@ import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Level0Iterator;
 import org.iq80.leveldb.util.Slice;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -38,6 +40,13 @@ public class Level0 implements SeekingIterable<InternalKey, Slice>
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
     private final List<FileMetaData> files;
+
+    public static final Comparator<FileMetaData> NEWEST_FIRST = new Comparator<FileMetaData>() {
+        @Override
+        public int compare(FileMetaData fileMetaData, FileMetaData fileMetaData1) {
+            return (int) (fileMetaData1.getNumber() - fileMetaData.getNumber());
+        }
+    };
 
     public Level0(List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
@@ -79,6 +88,8 @@ public class Level0 implements SeekingIterable<InternalKey, Slice>
                 fileMetaDataList.add(fileMetaData);
             }
         }
+
+        Collections.sort(fileMetaDataList, NEWEST_FIRST);
 
         readStats.clear();
         for (FileMetaData fileMetaData : fileMetaDataList) {
