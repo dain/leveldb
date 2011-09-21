@@ -70,12 +70,13 @@ public class MemTable implements SeekingIterable<InternalKey, Slice>
             return null;
         }
 
-        if (entry.getKey().getValueType() == ValueType.DELETION) {
-            return LookupResult.deleted(key);
-        }
-
-        if (entry.getKey().getUserKey().equals(key.getUserKey())) {
-            return LookupResult.ok(key, entry.getValue());
+        InternalKey entryKey = entry.getKey();
+        if (entryKey.getUserKey().equals(key.getUserKey())) {
+            if (entryKey.getValueType() == ValueType.DELETION) {
+                return LookupResult.deleted(key);
+            } else {
+                return LookupResult.ok(key, entry.getValue());
+            }
         }
         return null;
     }
