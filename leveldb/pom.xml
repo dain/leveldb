@@ -18,6 +18,14 @@
     <name>${project.artifactId}</name>
     <description>Port of LevelDB to Java</description>
 
+    <repositories>
+        <repository>
+            <id>fusesource.nexus.snapshot</id>
+            <name>FuseSource Community Snapshot Repository</name>
+            <url>http://repo.fusesource.com/nexus/content/groups/public-snapshots</url>
+        </repository>
+    </repositories>
+
     <dependencies>
 
         <dependency>
@@ -88,7 +96,6 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
             <excludes>
-              <exclude>**/NativeInteropTest.*</exclude>
             </excludes>
           </configuration>
         </plugin>

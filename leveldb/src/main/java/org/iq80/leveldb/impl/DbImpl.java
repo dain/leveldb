@@ -134,10 +134,10 @@ public class DbImpl implements DB
         tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyComparator), options.verifyChecksums());
 
         // create the version set
-        versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
 
         // create the database dir if it does not already exist
         databaseDir.mkdirs();
+        Preconditions.checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created");
         Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory");
 
         mutex.lock();
@@ -153,6 +153,8 @@ public class DbImpl implements DB
             else {
                 Preconditions.checkArgument(!options.errorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
+
+            versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
 
             // load  (and recover) current version
             versions.recover();
@@ -570,11 +572,12 @@ public class DbImpl implements DB
             mutex.unlock();
         }
 
-
         if (lookupResult != null) {
-            return lookupResult.getValue().getBytes();
+            Slice value = lookupResult.getValue();
+            if (value != null) {
+                return value.getBytes();
+            }
         }
-
         return null;
     }
 

@@ -41,7 +41,7 @@ public class PureJavaCrc32C implements Checksum
     public static int mask(int crc)
     {
         // Rotate right by 15 bits and add a constant.
-        return ((crc >> 15) | (crc << 17)) + MASK_DELTA;
+        return ((crc >>> 15) | (crc << 17)) + MASK_DELTA;
     }
 
     /**
@@ -50,7 +50,7 @@ public class PureJavaCrc32C implements Checksum
     public static int unmask(int maskedCrc)
     {
         int rot = maskedCrc - MASK_DELTA;
-        return ((rot >> 17) | (rot << 15));
+        return ((rot >>> 17) | (rot << 15));
     }
 
     /**
