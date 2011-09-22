@@ -41,7 +41,7 @@
             <name>Hiram Chirino</name>
             <email>hiram@hiramchirino.com</email>
             <url>http://hiramchirino.com</url>
-            <timezone>GMT-5</timezone>
+            <timezone>-5</timezone>
         </developer>
     </developers>
 
