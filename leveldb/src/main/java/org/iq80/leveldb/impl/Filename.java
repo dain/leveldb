@@ -163,10 +163,11 @@ public class Filename
 
         File tempFile = new File(databaseDir, temp);
         Files.write(manifest + "\n", tempFile, Charsets.UTF_8);
-        boolean ok = tempFile.renameTo(new File(databaseDir, currentFileName()));
+        File to = new File(databaseDir, currentFileName());
+        boolean ok = tempFile.renameTo(to);
         if (!ok) {
             tempFile.delete();
-            throw new IOException(String.format("Failed to rename temp file '%s' to descriptor file '%s'", temp, manifest));
+            Files.write(manifest + "\n", to, Charsets.UTF_8);
         }
         return ok;
     }
