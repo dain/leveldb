@@ -109,6 +109,7 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
     private void resetPriorityQueue()
     {
         int i = 0;
+        heapSize = 0;
         if (memTableIterator != null && memTableIterator.hasNext()) {
             heapAdd(new ComparableIterator(memTableIterator, comparator, i++, memTableIterator.next()));
         }
