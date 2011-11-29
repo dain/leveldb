@@ -18,7 +18,6 @@
 package org.iq80.leveldb.impl;
 
 import junit.framework.TestCase;
-import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.*;
 
 import java.io.File;
