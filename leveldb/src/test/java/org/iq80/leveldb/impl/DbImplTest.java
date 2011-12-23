@@ -34,12 +34,8 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
-import java.util.Random;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
@@ -367,20 +363,23 @@ public class DbImplTest
 
         // Write 8MB (80 values, each 100K)
         assertEquals(db.numberOfFilesInLevel(0), 0);
+        assertEquals(db.numberOfFilesInLevel(1), 0);
         Random random = new Random(301);
         List<String> values = newArrayList();
         for (int i = 0; i < 80; i++) {
-            String value = randomString(random, 100000);
+            String value = randomString(random, 100*1024);
             db.put(key(i), value);
             values.add(value);
         }
 
         // Reopening moves updates to level-0
         db.reopen();
+        assertTrue(db.numberOfFilesInLevel(0) > 0);
+        assertEquals(db.numberOfFilesInLevel(1), 0);
         db.compactRange(0, "", key(100000));
 
         assertEquals(db.numberOfFilesInLevel(0), 0);
-        assertTrue(db.numberOfFilesInLevel(1) > 1);
+        assertTrue(db.numberOfFilesInLevel(1) > 0);
         for (int i = 0; i < 80; i++) {
             assertEquals(db.get(key(i)), values.get(i));
         }
@@ -793,7 +792,10 @@ public class DbImplTest
     public void tearDown()
             throws Exception
     {
-
+        for (DbStringWrapper db : opened) {
+            db.close();
+        }
+        opened.clear();
         FileUtils.deleteRecursively(databaseDir);
     }
 
@@ -863,7 +865,9 @@ public class DbImplTest
         }
     }
 
-    private static class DbStringWrapper
+    ArrayList<DbStringWrapper> opened = new ArrayList<DbStringWrapper>();
+    
+    private class DbStringWrapper
     {
         private final Options options;
         private final File databaseDir;
@@ -875,6 +879,7 @@ public class DbImplTest
             this.options = options.verifyChecksums(true).createIfMissing(true).errorIfExists(true);
             this.databaseDir = databaseDir;
             this.db = new DbImpl(options, databaseDir);
+            opened.add(this);
         }
 
         public String get(String key)

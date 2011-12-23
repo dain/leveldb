@@ -2,25 +2,18 @@ package org.iq80.leveldb.util;
 
 import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.InternalKey;
-import org.iq80.leveldb.impl.SeekingIterator;
 
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
-import java.util.PriorityQueue;
 
-public final class VersionIterator extends AbstractSeekingIterator<InternalKey, Slice>
+public final class MergingIterator extends AbstractSeekingIterator<InternalKey, Slice>
 {
-    private final Level0Iterator level0;
-    private final List<LevelIterator> levels;
+    private final List<? extends InternalIterator> levels;
     private final PriorityQueue<ComparableIterator> priorityQueue;
     private final Comparator<InternalKey> comparator;
 
-    public VersionIterator(Level0Iterator level0, List<LevelIterator> levels, Comparator<InternalKey> comparator)
+    public MergingIterator(List<? extends InternalIterator> levels, Comparator<InternalKey> comparator)
     {
-        this.level0 = level0;
         this.levels = levels;
         this.comparator = comparator;
 
@@ -31,10 +24,7 @@ public final class VersionIterator extends AbstractSeekingIterator<InternalKey, 
     @Override
     protected void seekToFirstInternal()
     {
-        if (level0 != null) {
-            level0.seekToFirst();
-        }
-        for (LevelIterator level : levels) {
+        for (InternalIterator level : levels) {
             level.seekToFirst();
         }
         resetPriorityQueue(comparator);
@@ -43,10 +33,7 @@ public final class VersionIterator extends AbstractSeekingIterator<InternalKey, 
     @Override
     protected void seekInternal(InternalKey targetKey)
     {
-        if (level0 != null) {
-            level0.seekInternal(targetKey);
-        }
-        for (LevelIterator level : levels) {
+        for (InternalIterator level : levels) {
             level.seek(targetKey);
         }
         resetPriorityQueue(comparator);
@@ -54,12 +41,8 @@ public final class VersionIterator extends AbstractSeekingIterator<InternalKey, 
 
     private void resetPriorityQueue(Comparator<InternalKey> comparator)
     {
-        if (level0 != null && level0.hasNext()) {
-            priorityQueue.add(new ComparableIterator(level0, comparator, 0, level0.next()));
-        }
-
         int i = 1;
-        for (LevelIterator level : levels) {
+        for (InternalIterator level : levels) {
             if (level.hasNext()) {
                 priorityQueue.add(new ComparableIterator(level, comparator, i++, level.next()));
             }
@@ -84,9 +67,8 @@ public final class VersionIterator extends AbstractSeekingIterator<InternalKey, 
     public String toString()
     {
         final StringBuilder sb = new StringBuilder();
-        sb.append("VersionIterator");
-        sb.append("{level0=").append(level0);
-        sb.append(", levels=").append(levels);
+        sb.append("MergingIterator");
+        sb.append("{levels=").append(levels);
         sb.append(", comparator=").append(comparator);
         sb.append('}');
         return sb.toString();
@@ -94,12 +76,12 @@ public final class VersionIterator extends AbstractSeekingIterator<InternalKey, 
 
     private static class ComparableIterator implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
     {
-        private final SeekingIterator<InternalKey, Slice> iterator;
+        private final InternalIterator iterator;
         private final Comparator<InternalKey> comparator;
         private final int ordinal;
         private Entry<InternalKey, Slice> nextElement;
 
-        private ComparableIterator(SeekingIterator<InternalKey, Slice> iterator, Comparator<InternalKey> comparator, int ordinal, Entry<InternalKey, Slice> nextElement)
+        private ComparableIterator(InternalIterator iterator, Comparator<InternalKey> comparator, int ordinal, Entry<InternalKey, Slice> nextElement)
         {
             this.iterator = iterator;
             this.comparator = comparator;

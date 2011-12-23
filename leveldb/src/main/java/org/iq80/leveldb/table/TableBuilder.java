@@ -24,7 +24,7 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
-import org.xerial.snappy.Snappy;
+import org.iq80.leveldb.util.Snappy;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

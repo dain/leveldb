@@ -21,26 +21,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.DBException;
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.Range;
-import org.iq80.leveldb.ReadOptions;
-import org.iq80.leveldb.Snapshot;
-import org.iq80.leveldb.WriteBatch;
-import org.iq80.leveldb.WriteOptions;
+import org.iq80.leveldb.*;
 import org.iq80.leveldb.impl.Filename.FileInfo;
 import org.iq80.leveldb.impl.Filename.FileType;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.TableBuilder;
-import org.iq80.leveldb.util.DbIterator;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.VersionIterator;
+import org.iq80.leveldb.util.*;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -65,7 +53,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
-import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
@@ -108,11 +95,19 @@ public class DbImpl implements DB
         Preconditions.checkNotNull(options, "options is null");
         Preconditions.checkNotNull(databaseDir, "databaseDir is null");
         this.options = options;
+
+        if( this.options.compressionType() == CompressionType.SNAPPY && !Snappy.available() ) {
+            // Disable snappy if it's not available.
+            this.options.compressionType(CompressionType.NONE);
+        }
+
         this.databaseDir = databaseDir;
 
         internalKeyComparator = new InternalKeyComparator(new BytewiseComparator());
         memTable = new MemTable(internalKeyComparator);
         immutableMemTable = null;
+
+
 
         ThreadFactory compactionThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("leveldb-compaction-%s")
@@ -864,47 +859,40 @@ public class DbImpl implements DB
         }
     }
 
-    private void writeLevel0Table(MemTable memTable, VersionEdit edit, Version base)
+    private void writeLevel0Table(MemTable mem, VersionEdit edit, Version base)
             throws IOException
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
-        if (memTable.isEmpty()) {
-            return;
-        }
-
         // write the memtable to a new sstable
-        FileMetaData fileMetaData;
-        mutex.unlock();
-        try {
-            // todo must add file to pending files so it is not deleted out from under us by a compaction
-            fileMetaData = buildTable(memTable);
-        }
-        finally {
-            mutex.lock();
-        }
-
-        Slice minUserKey = fileMetaData.getSmallest().getUserKey();
-        Slice maxUserKey = fileMetaData.getLargest().getUserKey();
-
-        int level = 0;
-        if (base != null && !base.overlapInLevel(0, minUserKey, maxUserKey)) {
-            // Push the new sstable to a higher level if possible to reduce
-            // expensive manifest file ops.
-            while (level < MAX_MEM_COMPACT_LEVEL && !base.overlapInLevel(level + 1, minUserKey, maxUserKey)) {
-                level++;
-            }
-        }
-        edit.addFile(level, fileMetaData);
-    }
-
-    private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data)
-            throws IOException
-    {
         long fileNumber = versions.getNextFileNumber();
         pendingOutputs.add(fileNumber);
-        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
+        mutex.unlock();
+        FileMetaData meta;
+        try {
+            meta = buildTable(mem, fileNumber);
+        } finally {
+            mutex.lock();
+        }
+        pendingOutputs.remove(fileNumber);
 
+        // Note that if file_size is zero, the file has been deleted and
+        // should not be added to the manifest.
+        int level = 0;
+        if (meta.getFileSize() > 0) {
+            Slice minUserKey = meta.getSmallest().getUserKey();
+            Slice maxUserKey = meta.getLargest().getUserKey();
+            if (base != null) {
+                level = base.pickLevelForMemTableOutput(minUserKey, maxUserKey);
+            }
+            edit.addFile(level, meta);
+        }
+    }
+
+    private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data, long fileNumber)
+            throws IOException
+    {
+        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
         try {
             FileChannel channel = new FileOutputStream(file).getChannel();
             TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
@@ -959,7 +947,7 @@ public class DbImpl implements DB
         // Release mutex while we're actually doing the compaction work
         mutex.unlock();
         try {
-            VersionIterator iterator = versions.makeInputIterator(compactionState.compaction);
+            MergingIterator iterator = versions.makeInputIterator(compactionState.compaction);
 
             Slice currentUserKey = null;
             boolean hasCurrentUserKey = false;

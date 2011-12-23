@@ -22,13 +22,29 @@ import org.iq80.leveldb.DBFactory;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.FileUtils;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.net.URL;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
 public class Iq80DBFactory implements DBFactory {
+
+    public static final String VERSION;
+    static {
+        String v="unknown";
+        InputStream is = Iq80DBFactory.class.getResourceAsStream("version.txt");
+        try {
+            v = new BufferedReader(new InputStreamReader(is, "UTF-8")).readLine();
+        } catch (Throwable e) {
+        } finally {
+            try {
+                is.close();
+            } catch (Throwable e) {
+            }
+        }
+        VERSION = v;
+    }
 
     public static final Iq80DBFactory factory = new Iq80DBFactory();
 
@@ -46,5 +62,10 @@ public class Iq80DBFactory implements DBFactory {
     @Override
     public void repair(File path, Options options) throws IOException {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("iq80 leveldb version %s", VERSION);
     }
 }

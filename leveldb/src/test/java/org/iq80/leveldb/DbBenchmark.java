@@ -23,17 +23,8 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
-import org.iq80.leveldb.impl.DbConstants;
 import org.iq80.leveldb.impl.DbImpl;
-import org.iq80.leveldb.impl.SeekingIteratorAdapter;
-import org.iq80.leveldb.impl.SeekingIteratorAdapter.DbEntry;
-import org.iq80.leveldb.impl.WriteBatchImpl;
-import org.iq80.leveldb.util.FileUtils;
-import org.iq80.leveldb.util.PureJavaCrc32C;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
-import org.xerial.snappy.Snappy;
+import org.iq80.leveldb.util.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,7 +65,7 @@ public class DbBenchmark
 
     //    Cache cache_;
     private List<String> benchmarks;
-    private DbImpl db_;
+    private DB db_;
     private final int num_;
     private int reads_;
     private final int valueSize;
@@ -91,9 +82,12 @@ public class DbBenchmark
     int done_;
     int next_report_;     // When to report next
 
-    public DbBenchmark(Map<Flag, Object> flags)
+    final DBFactory factory;
+
+    public DbBenchmark(Map<Flag, Object> flags) throws Exception
     {
-        // cache
+        ClassLoader cl = DbBenchmark.class.getClassLoader();
+        factory = (DBFactory) cl.loadClass(System.getProperty("leveldb.factory", "org.iq80.leveldb.impl.Iq80DBFactory")).newInstance();
         benchmarks = (List<String>) flags.get(Flag.benchmarks);
         num_ = (Integer) flags.get(Flag.num);
         reads_ = (Integer) (flags.get(Flag.reads) == null ? flags.get(Flag.num) : flags.get(Flag.reads));
@@ -230,7 +224,7 @@ public class DbBenchmark
     {
         boolean assertsEnabled = false;
         assert assertsEnabled = true; // Intentional side effect!!!
-        if (!assertsEnabled) {
+        if (assertsEnabled) {
             System.out.printf("WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
         }
 
@@ -253,7 +247,7 @@ public class DbBenchmark
     void printEnvironment()
             throws IOException
     {
-        System.out.printf("LevelDB:    version %d.%d\n", DbConstants.MAJOR_VERSION, DbConstants.MINOR_VERSION);
+        System.out.printf("LevelDB:    %s\n", factory);
 
         System.out.printf("Date:       %tc\n", new Date());
 
@@ -292,7 +286,7 @@ public class DbBenchmark
         if (writeBufferSize != null) {
             options.writeBufferSize(writeBufferSize);
         }
-        db_ = new DbImpl(options, databaseDir);
+        db_ = factory.open(databaseDir, options);
     }
 
     private void start()
@@ -366,33 +360,33 @@ public class DbBenchmark
         }
 
         for (int i = 0; i < numEntries; i += entries_per_batch) {
-            WriteBatchImpl batch = new WriteBatchImpl();
+            WriteBatch batch = db_.createWriteBatch();
             for (int j = 0; j < entries_per_batch; j++) {
                 int k = (order == SEQUENTIAL) ? i + j : rand_.nextInt(num_);
-                Slice key = formatNumber(k);
+                byte[] key = formatNumber(k);
                 batch.put(key, gen_.generate(valueSize));
-                bytes_ += valueSize + key.length();
+                bytes_ += valueSize + key.length;
                 finishedSingleOp();
             }
             db_.write(batch, writeOptions);
+            batch.close();
         }
     }
 
-    public static Slice formatNumber(long n)
+    public static byte[] formatNumber(long n)
     {
         Preconditions.checkArgument(n >= 0, "number must be positive");
 
-        Slice slice = Slices.allocate(16);
+        byte []slice = new byte[16];
 
         int i = 15;
         while (n > 0) {
-            slice.setByte(i--, (int) ('0' + (n % 10)));
+            slice[i--] = (byte) ('0' + (n % 10));
             n /= 10;
         }
         while (i >= 0) {
-            slice.setByte(i--, '0');
+            slice[i--] = '0';
         }
-
         return slice;
     }
 
@@ -432,12 +426,13 @@ public class DbBenchmark
     private void readSequential()
     {
         for (int loops = 0; loops < 5; loops++) {
-            SeekingIteratorAdapter iterator = db_.iterator();
+            DBIterator iterator = db_.iterator();
             for (int i = 0; i < reads_ && iterator.hasNext(); i++) {
-                DbEntry entry = iterator.next();
-                bytes_ += entry.getKeySlice().length() + entry.getValueSlice().length();
+                Map.Entry<byte[], byte[]> entry = iterator.next();
+                bytes_ += entry.getKey().length + entry.getValue().length;
                 finishedSingleOp();
             }
+            iterator.close();
         }
     }
 
@@ -449,7 +444,7 @@ public class DbBenchmark
     private void readRandom()
     {
         for (int i = 0; i < reads_; i++) {
-            byte[] key = formatNumber(rand_.nextInt(num_)).getRawArray();
+            byte[] key = formatNumber(rand_.nextInt(num_));
             byte[] value = db_.get(key);
             Preconditions.checkNotNull(value, "db.get(%s) is null", new String(key, UTF_8));
             bytes_ += key.length + value.length;
@@ -461,7 +456,7 @@ public class DbBenchmark
     {
         int range = (num_ + 99) / 100;
         for (int i = 0; i < reads_; i++) {
-            byte[] key = formatNumber(rand_.nextInt(range)).getRawArray();
+            byte[] key = formatNumber(rand_.nextInt(range));
             byte[] value = db_.get(key);
             bytes_ += key.length + value.length;
             finishedSingleOp();
@@ -471,9 +466,11 @@ public class DbBenchmark
     private void compact()
             throws IOException
     {
-        db_.compactMemTable();
-        for (int level = 0; level < NUM_LEVELS - 1; level++) {
-            db_.compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
+        if(db_ instanceof DbImpl) {
+            ((DbImpl)db_).compactMemTable();
+            for (int level = 0; level < NUM_LEVELS - 1; level++) {
+                ((DbImpl)db_).compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
+            }
         }
     }
 
@@ -509,16 +506,16 @@ public class DbBenchmark
 
     private void snappyCompress()
     {
-        Slice raw = gen_.generate(new Options().blockSize());
-        Slice compressedOutput = Slices.allocate(Snappy.maxCompressedLength(raw.length()));
+        byte[] raw = gen_.generate(new Options().blockSize());
+        byte[] compressedOutput = new byte[Snappy.maxCompressedLength(raw.length)];
 
         long produced = 0;
 
         // attempt to compress the block
         while (bytes_ < 1024 * 1048576) {  // Compress 1G
             try {
-                int compressedSize = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
-                bytes_ += raw.length();
+                int compressedSize = Snappy.compress(raw, 0, raw.length, compressedOutput, 0);
+                bytes_ += raw.length;
                 produced += compressedSize;
             }
             catch (IOException ignored) {
@@ -534,20 +531,19 @@ public class DbBenchmark
     private void snappyUncompressArray()
     {
         int inputSize = new Options().blockSize();
-        Slice raw = gen_.generate(inputSize);
-        Slice compressedOutput = Slices.allocate(Snappy.maxCompressedLength(inputSize));
+        byte[] compressedOutput = new byte[Snappy.maxCompressedLength(inputSize)];
+        byte raw[] = gen_.generate(inputSize);
         int compressedLength;
         try {
-            compressedLength = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
+            compressedLength = Snappy.compress(raw, 0, raw.length, compressedOutput, 0);
         }
         catch (IOException e) {
             throw Throwables.propagate(e);
         }
-
-        // attempt to compress the block
+        // attempt to uncompress the block
         while (bytes_ < 5L * 1024 * 1048576) {  // Compress 1G
             try {
-                Snappy.uncompress(compressedOutput.getRawArray(), compressedOutput.getRawOffset(), compressedLength, raw.getRawArray(), 0);
+                Snappy.uncompress(compressedOutput, 0, compressedLength, raw, 0);
                 bytes_ += inputSize;
             }
             catch (IOException ignored) {
@@ -561,11 +557,11 @@ public class DbBenchmark
     private void snappyUncompressDirectBuffer()
     {
         int inputSize = new Options().blockSize();
-        Slice compressedOutput = Slices.allocate(Snappy.maxCompressedLength(inputSize));
+        byte[] compressedOutput = new byte[Snappy.maxCompressedLength(inputSize)];
+        byte raw[] = gen_.generate(inputSize);
         int compressedLength;
         try {
-            Slice raw = gen_.generate(inputSize);
-            compressedLength = Snappy.compress(raw.getRawArray(), raw.getRawOffset(), raw.length(), compressedOutput.getRawArray(), 0);
+            compressedLength = Snappy.compress(raw, 0, raw.length, compressedOutput, 0);
         }
         catch (IOException e) {
             throw Throwables.propagate(e);
@@ -573,9 +569,9 @@ public class DbBenchmark
 
         ByteBuffer uncompressedBuffer = ByteBuffer.allocateDirect(inputSize);
         ByteBuffer compressedBuffer = ByteBuffer.allocateDirect(compressedLength);
-        compressedBuffer.put(compressedOutput.getRawArray(), 0, compressedLength);
+        compressedBuffer.put(compressedOutput, 0, compressedLength);
 
-        // attempt to compress the block
+        // attempt to uncompress the block
         while (bytes_ < 5L * 1024 * 1048576) {  // Compress 1G
             try {
                 uncompressedBuffer.clear();
@@ -612,7 +608,7 @@ public class DbBenchmark
     }
 
     public static void main(String[] args)
-            throws IOException
+            throws Exception
     {
         Map<Flag, Object> flags = new EnumMap<Flag, Object>(Flag.class);
         for (Flag flag : Flag.values()) {
@@ -835,7 +831,7 @@ public class DbBenchmark
             }
         }
 
-        private Slice generate(int length)
+        private byte[] generate(int length)
         {
             if (position + length > data.length()) {
                 position = 0;
@@ -843,7 +839,7 @@ public class DbBenchmark
             }
             Slice slice = data.slice(position, length);
             position += length;
-            return slice;
+            return slice.getBytes();
         }
     }
 

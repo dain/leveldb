@@ -5,7 +5,7 @@ import org.iq80.leveldb.impl.InternalKey;
 
 import java.util.Map.Entry;
 
-public class InternalTableIterator extends AbstractSeekingIterator<InternalKey, Slice>
+public class InternalTableIterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
 {
     private final TableIterator tableIterator;
 

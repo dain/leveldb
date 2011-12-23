@@ -20,11 +20,7 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.impl.SeekingIterable;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.TableIterator;
-import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.xerial.snappy.Snappy;
+import org.iq80.leveldb.util.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
