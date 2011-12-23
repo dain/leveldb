@@ -160,8 +160,8 @@ public class Compaction
                     }
                     break;
                 }
+                levelPointers[level]++;
             }
-            levelPointers[level]++;
         }
         return true;
     }
