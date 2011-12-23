@@ -225,7 +225,7 @@ public class DbBenchmark
     {
         boolean assertsEnabled = false;
         assert assertsEnabled = true; // Intentional side effect!!!
-        if (!assertsEnabled) {
+        if (assertsEnabled) {
             System.out.printf("WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
         }
 
