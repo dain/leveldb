@@ -28,12 +28,7 @@ import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.impl.SeekingIteratorAdapter;
 import org.iq80.leveldb.impl.SeekingIteratorAdapter.DbEntry;
 import org.iq80.leveldb.impl.WriteBatchImpl;
-import org.iq80.leveldb.util.FileUtils;
-import org.iq80.leveldb.util.PureJavaCrc32C;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
-import org.xerial.snappy.Snappy;
+import org.iq80.leveldb.util.*;
 
 import java.io.File;
 import java.io.IOException;

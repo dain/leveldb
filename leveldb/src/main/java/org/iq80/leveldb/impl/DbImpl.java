@@ -28,13 +28,7 @@ import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.TableBuilder;
-import org.iq80.leveldb.util.DbIterator;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.MergingIterator;
-import org.xerial.snappy.Snappy;
+import org.iq80.leveldb.util.*;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -59,7 +53,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
-import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
@@ -103,13 +96,9 @@ public class DbImpl implements DB
         Preconditions.checkNotNull(databaseDir, "databaseDir is null");
         this.options = options;
 
-        if( this.options.compressionType() == CompressionType.SNAPPY ) {
+        if( this.options.compressionType() == CompressionType.SNAPPY && !Snappy.available() ) {
             // Disable snappy if it's not available.
-            try {
-                Snappy.compress("test");
-            } catch (Throwable e) {
-                this.options.compressionType(CompressionType.NONE);
-            }
+            this.options.compressionType(CompressionType.NONE);
         }
 
         this.databaseDir = databaseDir;
