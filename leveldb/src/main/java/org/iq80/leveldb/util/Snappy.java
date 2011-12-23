@@ -92,9 +92,11 @@ public class Snappy {
                 output = uncompressed.array();
                 outputOffset = uncompressed.arrayOffset() + uncompressed.position();
             } else {
-                output = new byte[uncompressed.capacity()-uncompressed.position()];
+                int t = org.iq80.snappy.Snappy.getUncompressedLength(input, inputOffset);
+                output = new byte[t];
                 outputOffset = 0;
             }
+
             int count = org.iq80.snappy.Snappy.uncompress(input, inputOffset, length, output, outputOffset);
             if( uncompressed.hasArray() ) {
                 uncompressed.limit(uncompressed.position()+count);
