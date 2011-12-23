@@ -21,14 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.DBException;
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.Range;
-import org.iq80.leveldb.ReadOptions;
-import org.iq80.leveldb.Snapshot;
-import org.iq80.leveldb.WriteBatch;
-import org.iq80.leveldb.WriteOptions;
+import org.iq80.leveldb.*;
 import org.iq80.leveldb.impl.Filename.FileInfo;
 import org.iq80.leveldb.impl.Filename.FileType;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
@@ -41,6 +34,7 @@ import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.VersionIterator;
+import org.xerial.snappy.Snappy;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -108,6 +102,16 @@ public class DbImpl implements DB
         Preconditions.checkNotNull(options, "options is null");
         Preconditions.checkNotNull(databaseDir, "databaseDir is null");
         this.options = options;
+
+        if( this.options.compressionType() == CompressionType.SNAPPY ) {
+            // Disable snappy if it's not available.
+            try {
+                Snappy.compress("test");
+            } catch (Throwable e) {
+                this.options.compressionType(CompressionType.NONE);
+            }
+        }
+
         this.databaseDir = databaseDir;
 
         internalKeyComparator = new InternalKeyComparator(new BytewiseComparator());
