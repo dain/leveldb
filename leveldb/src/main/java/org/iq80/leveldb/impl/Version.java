@@ -25,10 +25,7 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Ordering;
-import org.iq80.leveldb.util.InternalTableIterator;
-import org.iq80.leveldb.util.LevelIterator;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.VersionIterator;
+import org.iq80.leveldb.util.*;
 
 import java.util.List;
 
@@ -119,9 +116,11 @@ public class Version implements SeekingIterable<InternalKey, Slice>
     }
 
     @Override
-    public VersionIterator iterator()
-    {
-        return new VersionIterator(level0.iterator(), getLevelIterators(), internalKeyComparator);
+    public MergingIterator iterator() {
+        Builder<InternalIterator> builder = ImmutableList.builder();
+        builder.add(level0.iterator());
+        builder.addAll(getLevelIterators());
+        return new MergingIterator(builder.build(), internalKeyComparator);
     }
 
     List<InternalTableIterator> getLevel0Files()

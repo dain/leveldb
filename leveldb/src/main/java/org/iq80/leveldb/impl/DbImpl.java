@@ -33,7 +33,7 @@ import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.VersionIterator;
+import org.iq80.leveldb.util.MergingIterator;
 import org.xerial.snappy.Snappy;
 
 import java.io.File;
@@ -117,6 +117,8 @@ public class DbImpl implements DB
         internalKeyComparator = new InternalKeyComparator(new BytewiseComparator());
         memTable = new MemTable(internalKeyComparator);
         immutableMemTable = null;
+
+
 
         ThreadFactory compactionThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("leveldb-compaction-%s")
@@ -963,7 +965,7 @@ public class DbImpl implements DB
         // Release mutex while we're actually doing the compaction work
         mutex.unlock();
         try {
-            VersionIterator iterator = versions.makeInputIterator(compactionState.compaction);
+            MergingIterator iterator = versions.makeInputIterator(compactionState.compaction);
 
             Slice currentUserKey = null;
             boolean hasCurrentUserKey = false;

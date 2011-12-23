@@ -36,6 +36,7 @@ public class Compaction
     private final List<FileMetaData> levelInputs;
     private final List<FileMetaData> levelUpInputs;
     private final List<FileMetaData> grandparents;
+    private final List<FileMetaData>[] inputs;
 
     private final long maxOutputFileSize;
     private final VersionEdit edit = new VersionEdit();
@@ -68,6 +69,7 @@ public class Compaction
         this.levelUpInputs = levelUpInputs;
         this.grandparents = grandparents;
         this.maxOutputFileSize = VersionSet.maxFileSizeForLevel(level);
+        this.inputs = new List[]{levelInputs, levelUpInputs};
     }
 
     public int getLevel()
@@ -194,5 +196,9 @@ public class Compaction
         else {
             return false;
         }
+    }
+
+    public List<FileMetaData>[] getInputs() {
+        return inputs;
     }
 }

@@ -27,10 +27,10 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.InternalIterator;
 import org.iq80.leveldb.util.Level0Iterator;
-import org.iq80.leveldb.util.LevelIterator;
+import org.iq80.leveldb.util.MergingIterator;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.VersionIterator;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -156,35 +156,30 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
     }
 
     @Override
-    public VersionIterator iterator()
+    public MergingIterator iterator()
     {
         return current.iterator();
     }
 
-    public VersionIterator makeInputIterator(Compaction c)
+    public MergingIterator makeInputIterator(Compaction c)
     {
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
         int space = (c.getLevel() == 0 ? c.getLevelInputs().size() + 1 : 2);
-        List<LevelIterator> list = newArrayList();
-        int num = 0;
-
-        Level0Iterator level0Iterator = null;
-        if (c.getLevel() == 0) {
-            level0Iterator = new Level0Iterator(tableCache, c.getLevelInputs(), internalKeyComparator);
+        List<InternalIterator> list = newArrayList();
+        for (int which = 0; which < 2; which++) {
+          if (!c.getInputs()[which].isEmpty()) {
+            if (c.getLevel() + which == 0) {
+                List<FileMetaData> files = c.getInputs()[which];
+                list.add(new Level0Iterator(tableCache, files, internalKeyComparator));
+            } else {
+              // Create concatenating iterator for the files from this level
+              list.add(Level.createLevelConcatIterator(tableCache, c.getInputs()[which], internalKeyComparator));
+            }
+          }
         }
-        else {
-            // concat iterator over files in this level
-            list.add(Level.createLevelConcatIterator(tableCache, c.getLevelInputs(), internalKeyComparator));
-        }
-
-        list.add(Level.createLevelConcatIterator(tableCache, c.getLevelUpInputs(), internalKeyComparator));
-
-        assert (num <= space);
-//        SeekingIterator<InternalKey, Slice> iterator = SeekingIterators.merge(list, internalKeyComparator);
-//        return iterator;
-        return new VersionIterator(level0Iterator, list, internalKeyComparator);
+        return new MergingIterator(list, internalKeyComparator);
     }
 
     public LookupResult get(LookupKey key)

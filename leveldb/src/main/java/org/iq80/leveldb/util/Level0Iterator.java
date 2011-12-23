@@ -16,7 +16,7 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 
-public final class Level0Iterator extends AbstractSeekingIterator<InternalKey, Slice>
+public final class Level0Iterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
 {
     private final List<InternalTableIterator> inputs;
     private final PriorityQueue<ComparableIterator> priorityQueue;

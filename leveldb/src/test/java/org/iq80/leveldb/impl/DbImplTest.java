@@ -363,20 +363,23 @@ public class DbImplTest
 
         // Write 8MB (80 values, each 100K)
         assertEquals(db.numberOfFilesInLevel(0), 0);
+        assertEquals(db.numberOfFilesInLevel(1), 0);
         Random random = new Random(301);
         List<String> values = newArrayList();
         for (int i = 0; i < 80; i++) {
-            String value = randomString(random, 100000);
+            String value = randomString(random, 100*1024);
             db.put(key(i), value);
             values.add(value);
         }
 
         // Reopening moves updates to level-0
         db.reopen();
+        assertTrue(db.numberOfFilesInLevel(0) > 0);
+        assertEquals(db.numberOfFilesInLevel(1), 0);
         db.compactRange(0, "", key(100000));
 
         assertEquals(db.numberOfFilesInLevel(0), 0);
-        assertTrue(db.numberOfFilesInLevel(1) > 1);
+        assertTrue(db.numberOfFilesInLevel(1) > 0);
         for (int i = 0; i < 80; i++) {
             assertEquals(db.get(key(i)), values.get(i));
         }

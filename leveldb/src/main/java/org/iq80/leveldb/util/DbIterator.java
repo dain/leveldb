@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
-public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice>
+public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
 {
     private final MemTableIterator memTableIterator;
     private final MemTableIterator immutableMemTableIterator;
