@@ -86,7 +86,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
-        appendVersion(new Version(NUM_LEVELS, tableCache, internalKeyComparator));
+        appendVersion(new Version(this));
 
         initializeIfNeeded();
     }
@@ -128,6 +128,14 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
 
         current = version;
         activeVersions.put(version, new Object());
+    }
+
+    public InternalKeyComparator getInternalKeyComparator() {
+        return internalKeyComparator;
+    }
+
+    public TableCache getTableCache() {
+        return tableCache;
     }
 
     public Version getCurrent()
@@ -231,7 +239,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
         edit.setNextFileNumber(nextFileNumber.get());
         edit.setLastSequenceNumber(lastSequence);
 
-        Version version = new Version(NUM_LEVELS, tableCache, internalKeyComparator);
+        Version version = new Version(this);
         Builder builder = new Builder(this, current);
         builder.apply(edit);
         builder.saveTo(version);
@@ -357,7 +365,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
             prevLogNumber = 0L;
         }
 
-        Version newVersion = new Version(NUM_LEVELS, tableCache, internalKeyComparator);
+        Version newVersion = new Version(this);
         builder.saveTo(newVersion);
 
         // Install recovered version
@@ -587,7 +595,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
         return compaction;
     }
 
-    private List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
+    List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
     {
         ImmutableList.Builder<FileMetaData> files = ImmutableList.builder();
         Slice userBegin = begin.getUserKey();

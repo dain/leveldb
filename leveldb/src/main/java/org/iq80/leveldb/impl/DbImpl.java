@@ -870,47 +870,40 @@ public class DbImpl implements DB
         }
     }
 
-    private void writeLevel0Table(MemTable memTable, VersionEdit edit, Version base)
+    private void writeLevel0Table(MemTable mem, VersionEdit edit, Version base)
             throws IOException
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
-        if (memTable.isEmpty()) {
-            return;
-        }
-
         // write the memtable to a new sstable
-        FileMetaData fileMetaData;
-        mutex.unlock();
-        try {
-            // todo must add file to pending files so it is not deleted out from under us by a compaction
-            fileMetaData = buildTable(memTable);
-        }
-        finally {
-            mutex.lock();
-        }
-
-        Slice minUserKey = fileMetaData.getSmallest().getUserKey();
-        Slice maxUserKey = fileMetaData.getLargest().getUserKey();
-
-        int level = 0;
-        if (base != null && !base.overlapInLevel(0, minUserKey, maxUserKey)) {
-            // Push the new sstable to a higher level if possible to reduce
-            // expensive manifest file ops.
-            while (level < MAX_MEM_COMPACT_LEVEL && !base.overlapInLevel(level + 1, minUserKey, maxUserKey)) {
-                level++;
-            }
-        }
-        edit.addFile(level, fileMetaData);
-    }
-
-    private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data)
-            throws IOException
-    {
         long fileNumber = versions.getNextFileNumber();
         pendingOutputs.add(fileNumber);
-        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
+        mutex.unlock();
+        FileMetaData meta;
+        try {
+            meta = buildTable(mem, fileNumber);
+        } finally {
+            mutex.lock();
+        }
+        pendingOutputs.remove(fileNumber);
 
+        // Note that if file_size is zero, the file has been deleted and
+        // should not be added to the manifest.
+        int level = 0;
+        if (meta.getFileSize() > 0) {
+            Slice minUserKey = meta.getSmallest().getUserKey();
+            Slice maxUserKey = meta.getLargest().getUserKey();
+            if (base != null) {
+                level = base.pickLevelForMemTableOutput(minUserKey, maxUserKey);
+            }
+            edit.addFile(level, meta);
+        }
+    }
+
+    private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data, long fileNumber)
+            throws IOException
+    {
+        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
         try {
             FileChannel channel = new FileOutputStream(file).getChannel();
             TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));

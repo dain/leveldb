@@ -123,7 +123,7 @@ public class Compaction
 
     }
 
-    private static long totalFileSize(List<FileMetaData> files)
+    public static long totalFileSize(List<FileMetaData> files)
     {
         long sum = 0;
         for (FileMetaData file : files) {
