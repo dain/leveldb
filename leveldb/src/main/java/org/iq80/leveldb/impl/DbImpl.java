@@ -248,6 +248,8 @@ public class DbImpl implements DB
 
     private void deleteObsoleteFiles()
     {
+        Preconditions.checkState(mutex.isHeldByCurrentThread());
+
         // Make a set of all of the live files
         List<Long> live = newArrayList(this.pendingOutputs);
         for (FileMetaData fileMetaData : versions.getLiveFiles()) {
@@ -530,8 +532,8 @@ public class DbImpl implements DB
         LookupKey lookupKey;
         mutex.lock();
         try {
-            long snapshot = getSnapshotNumber(options);
-            lookupKey = new LookupKey(Slices.wrappedBuffer(key), snapshot);
+            SnapshotImpl snapshot = getSnapshot(options);
+            lookupKey = new LookupKey(Slices.wrappedBuffer(key), snapshot.getLastSequence());
 
             // First look in the memtable, then in the immutable memtable (if any).
             LookupResult lookupResult = memTable.get(lookupKey);
@@ -644,7 +646,7 @@ public class DbImpl implements DB
             // Update memtable
             updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
 
-            return new SnapshotImpl(sequenceEnd);
+            return new SnapshotImpl(versions.getCurrent(), sequenceEnd);
         }
         finally {
             mutex.unlock();
@@ -671,7 +673,7 @@ public class DbImpl implements DB
 
 
             // filter any entries not visible in our snapshot
-            long snapshot = getSnapshotNumber(options);
+            SnapshotImpl snapshot = getSnapshot(options);
             SnapshotSeekingIterator snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
             return new SeekingIteratorAdapter(snapshotIterator);
         }
@@ -713,21 +715,22 @@ public class DbImpl implements DB
     {
         mutex.lock();
         try {
-            return new SnapshotImpl(versions.getLastSequence());
+            return new SnapshotImpl(versions.getCurrent(), versions.getLastSequence());
         }
         finally {
             mutex.unlock();
         }
     }
 
-    private long getSnapshotNumber(ReadOptions options)
+    private SnapshotImpl getSnapshot(ReadOptions options)
     {
-        long snapshot;
+        SnapshotImpl snapshot;
         if (options.snapshot() != null) {
-            snapshot = ((SnapshotImpl) options.snapshot()).snapshot;
+            snapshot = (SnapshotImpl) options.snapshot();
         }
         else {
-            snapshot = versions.getLastSequence();
+            snapshot = new SnapshotImpl(versions.getCurrent(), versions.getLastSequence());
+            snapshot.close(); // To avoid holding the snapshot active..
         }
         return snapshot;
     }

@@ -36,17 +36,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.collect.Lists.newArrayList;
@@ -124,10 +115,20 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
     private void appendVersion(Version version)
     {
         Preconditions.checkNotNull(version, "version is null");
-        Preconditions.checkArgument(version != current, "version is null");
-
+        Preconditions.checkArgument(version != current, "version is the current version");
+        Version previous = current;
         current = version;
         activeVersions.put(version, new Object());
+        if(previous!=null) {
+            previous.release();
+        }
+    }
+
+    public void removeVersion(Version version) {
+        Preconditions.checkNotNull(version, "version is null");
+        Preconditions.checkArgument(version != current, "version is the current version");
+        boolean removed = activeVersions.remove(version)!=null;
+        assert removed : "Expected the version to still be in the active set";
     }
 
     public InternalKeyComparator getInternalKeyComparator() {
@@ -174,7 +175,6 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
-        int space = (c.getLevel() == 0 ? c.getLevelInputs().size() + 1 : 2);
         List<InternalIterator> list = newArrayList();
         for (int which = 0; which < 2; which++) {
           if (!c.getInputs()[which].isEmpty()) {

@@ -28,14 +28,19 @@ import java.util.Map.Entry;
 public final class SnapshotSeekingIterator extends AbstractSeekingIterator<Slice, Slice>
 {
     private final DbIterator iterator;
-    private final long snapshot;
+    private final SnapshotImpl snapshot;
     private final Comparator<Slice> userComparator;
 
-    public SnapshotSeekingIterator(DbIterator iterator, long snapshot, Comparator<Slice> userComparator)
+    public SnapshotSeekingIterator(DbIterator iterator, SnapshotImpl snapshot, Comparator<Slice> userComparator)
     {
         this.iterator = iterator;
         this.snapshot = snapshot;
         this.userComparator = userComparator;
+        this.snapshot.getVersion().retain();
+    }
+
+    public void close() {
+        this.snapshot.getVersion().release();
     }
 
     @Override
@@ -48,7 +53,7 @@ public final class SnapshotSeekingIterator extends AbstractSeekingIterator<Slice
     @Override
     protected void seekInternal(Slice targetKey)
     {
-        iterator.seek(new InternalKey(targetKey, snapshot, ValueType.VALUE));
+        iterator.seek(new InternalKey(targetKey, snapshot.getLastSequence(), ValueType.VALUE));
         findNextUserEntry(null);
     }
 
@@ -79,7 +84,7 @@ public final class SnapshotSeekingIterator extends AbstractSeekingIterator<Slice
             InternalKey internalKey = iterator.peek().getKey();
 
             // skip entries created after our snapshot
-            if (internalKey.getSequenceNumber() > snapshot) {
+            if (internalKey.getSequenceNumber() > snapshot.getLastSequence()) {
                 iterator.next();
                 continue;
             }
@@ -108,4 +113,5 @@ public final class SnapshotSeekingIterator extends AbstractSeekingIterator<Slice
         sb.append('}');
         return sb.toString();
     }
+
 }

@@ -21,25 +21,25 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Ordering;
-import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.*;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Ordering.natural;
-import static org.iq80.leveldb.impl.DbConstants.*;
+import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
 // todo this class should be immutable
 public class Version implements SeekingIterable<InternalKey, Slice>
 {
+    private final AtomicInteger retained = new AtomicInteger(1);
+    private final VersionSet versionSet;
     private final Level0 level0;
     private final List<Level> levels;
 
@@ -48,8 +48,6 @@ public class Version implements SeekingIterable<InternalKey, Slice>
     private double compactionScore;
     private FileMetaData fileToCompact;
     private int fileToCompactLevel;
-
-    private final VersionSet versionSet;
 
     public Version(VersionSet versionSet)
     {
@@ -274,5 +272,24 @@ public class Version implements SeekingIterable<InternalKey, Slice>
         }
         return result;
     }
+
+    public void retain() {
+        int was = retained.getAndIncrement();
+        assert was>0 : "Version was retain after it was disposed.";
+    }
+
+    public void release() {
+        int now = retained.decrementAndGet();
+        assert now >= 0 : "Version was released after it was disposed.";
+        if( now == 0 ) {
+            // The version is now disposed.
+            versionSet.removeVersion(this);
+        }
+    }
+    
+    public boolean isDisposed() {
+        return retained.get() <= 0;
+    }
+    
 
 }

@@ -6,10 +6,12 @@ import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SeekingIteratorAdapter implements DBIterator
 {
     private final SnapshotSeekingIterator seekingIterator;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public SeekingIteratorAdapter(SnapshotSeekingIterator seekingIterator)
     {
@@ -49,6 +51,11 @@ public class SeekingIteratorAdapter implements DBIterator
     @Override
     public void close()
     {
+        // This is an end user API.. he might screw up and close multiple times.
+        // but we don't want the close multiple times as reference counts go bad.
+        if(closed.compareAndSet(false, true)) {
+            seekingIterator.close();
+        }
     }
 
     @Override
