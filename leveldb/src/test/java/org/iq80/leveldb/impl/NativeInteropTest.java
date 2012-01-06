@@ -19,6 +19,7 @@ package org.iq80.leveldb.impl;
 
 import junit.framework.TestCase;
 import org.iq80.leveldb.*;
+import org.iq80.leveldb.util.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +31,8 @@ import java.util.Arrays;
  */
 public class NativeInteropTest extends TestCase {
 
+    File databaseDir = FileUtils.createTempDir("leveldb");
+    
     public static byte[] bytes(String value) {
         if( value == null) {
             return null;
@@ -70,7 +73,7 @@ public class NativeInteropTest extends TestCase {
     }
 
     File getTestDirectory(String name) throws IOException {
-        File rc = new File(new File("test-data"), name);
+        File rc = new File(databaseDir, name);
         iq80factory.destroy(rc, new Options().createIfMissing(true));
         rc.mkdirs();
         return rc;
