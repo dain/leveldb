@@ -14,6 +14,24 @@ import java.util.NoSuchElementException;
 
 public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
 {
+
+    /*
+     * NOTE: This code has been specifically tuned for performance of the DB
+     * iterator methods.  Before committing changes to this code, make sure
+     * that the performance of the DB benchmark with the following parameters
+     * has not regressed:
+     *
+     *    --num=10000000 --benchmarks=fillseq,readrandom,readseq,readseq,readseq
+     *
+     * The code in this class purposely does not use the SeekingIterator
+     * interface, but instead used the concrete implementations.  This is
+     * because we want the hot spot compiler to inline the code from the
+     * concrete iterators, and this can not happen with truly polymorphic
+     * call-sites.  If a future version of hot spot supports inlining of truly
+     * polymorphic call-sites, this code can be made much simpler.
+     */
+
+
     private final MemTableIterator memTableIterator;
     private final MemTableIterator immutableMemTableIterator;
     private final List<InternalTableIterator> level0Files;
