@@ -20,11 +20,7 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import org.iq80.leveldb.DBIterator;
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.Range;
-import org.iq80.leveldb.ReadOptions;
-import org.iq80.leveldb.Snapshot;
+import org.iq80.leveldb.*;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -54,7 +50,29 @@ import static org.testng.Assert.fail;
 
 public class DbImplTest
 {
+    // You can set the STRESS_FACTOR system property to make the tests run more iterations.
+    public static final double STRESS_FACTOR = Double.parseDouble(System.getProperty("STRESS_FACTOR", "1"));
+
     private File databaseDir;
+
+    @Test
+    public void testGitHubIssue5()
+            throws Exception
+    {
+        Options options = new Options();
+        options.maxOpenFiles(100);
+        options.createIfMissing(true);
+        DbImpl db = new DbImpl(options, this.databaseDir);
+        Random random = new Random(301);
+        for(int i=0; i < 200000*STRESS_FACTOR; i++)
+        {
+            db.put(randomString(random, 64).getBytes(), new byte[]{0x01}, new WriteOptions().sync(false));
+            db.get(randomString(random, 64).getBytes());
+            if ((i%50000)==0 && i!=0 ) {
+                System.out.println(i+" rows written");
+            }
+        }
+    }
 
     @Test
     public void testEmpty()

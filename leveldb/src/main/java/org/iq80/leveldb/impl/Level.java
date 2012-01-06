@@ -112,8 +112,20 @@ public class Level implements SeekingIterable<InternalKey, Slice>
             fileMetaDataList.add(fileMetaData);
         }
 
+        FileMetaData lastFileRead = null;
+        int lastFileReadLevel = -1;
         readStats.clear();
         for (FileMetaData fileMetaData : fileMetaDataList) {
+
+            if (lastFileRead!=null && readStats.getSeekFile() == null) {
+                // We have had more than one seek for this read.  Charge the first file.
+                readStats.setSeekFile(lastFileRead);
+                readStats.setSeekFileLevel(lastFileReadLevel);
+            }
+
+            lastFileRead = fileMetaData;
+            lastFileReadLevel = levelNumber;
+
             // open the iterator
             InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
 
@@ -137,11 +149,6 @@ public class Level implements SeekingIterable<InternalKey, Slice>
                 }
             }
 
-            if (readStats.getSeekFile() == null) {
-                // We have had more than one seek for this read.  Charge the first file.
-                readStats.setSeekFile(fileMetaData);
-                readStats.setSeekFileLevel(levelNumber);
-            }
         }
 
         return null;
