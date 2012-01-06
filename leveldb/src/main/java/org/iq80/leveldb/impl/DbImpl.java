@@ -84,6 +84,7 @@ public class DbImpl implements DB
 
     private final InternalKeyComparator internalKeyComparator;
 
+    private volatile Throwable backgroundException;
     private ExecutorService compactionExecutor;
     private Future<?> backgroundCompaction;
 
@@ -243,6 +244,7 @@ public class DbImpl implements DB
     @Override
     public String getProperty(String name)
     {
+        checkBackgroundException();
         return null;
     }
 
@@ -367,14 +369,19 @@ public class DbImpl implements DB
                         backgroundCall();
                     }
                     catch (DatabaseShutdownException ignored) {
-                    }
-                    catch (Throwable e) {
-                        // todo add logging system
-                        e.printStackTrace();
+                    } catch (Throwable e) {
+                        backgroundException = e;
                     }
                     return null;
                 }
             });
+        }
+    }
+    
+    public void checkBackgroundException() {
+        Throwable e = backgroundException;
+        if(e!=null) {
+            throw new BackgroundProcessingException(e);
         }
     }
 
@@ -529,6 +536,7 @@ public class DbImpl implements DB
     public byte[] get(byte[] key, ReadOptions options)
             throws DBException
     {
+        checkBackgroundException();
         LookupKey lookupKey;
         mutex.lock();
         try {
@@ -623,6 +631,7 @@ public class DbImpl implements DB
     public Snapshot writeInternal(WriteBatchImpl updates, WriteOptions options)
             throws DBException
     {
+        checkBackgroundException();
         mutex.lock();
         try {
             makeRoomForWrite(false);
@@ -656,6 +665,7 @@ public class DbImpl implements DB
     @Override
     public WriteBatch createWriteBatch()
     {
+        checkBackgroundException();
         return new WriteBatchImpl();
     }
 
@@ -667,6 +677,7 @@ public class DbImpl implements DB
 
     public SeekingIteratorAdapter iterator(ReadOptions options)
     {
+        checkBackgroundException();
         mutex.lock();
         try {
             DbIterator rawIterator = internalIterator();
@@ -713,6 +724,7 @@ public class DbImpl implements DB
 
     public Snapshot getSnapshot()
     {
+        checkBackgroundException();
         mutex.lock();
         try {
             return new SnapshotImpl(versions.getCurrent(), versions.getLastSequence());
@@ -1286,7 +1298,7 @@ public class DbImpl implements DB
         }
     }
 
-    public static class DatabaseShutdownException extends RuntimeException {
+    public static class DatabaseShutdownException extends DBException {
         public DatabaseShutdownException()
         {
         }
@@ -1294,6 +1306,13 @@ public class DbImpl implements DB
         public DatabaseShutdownException(String message)
         {
             super(message);
+        }
+    }
+    
+    public static class BackgroundProcessingException extends DBException {
+        public BackgroundProcessingException(Throwable cause)
+        {
+            super(cause);
         }
     }
 }
