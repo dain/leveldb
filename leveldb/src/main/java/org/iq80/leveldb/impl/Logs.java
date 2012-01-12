@@ -32,7 +32,11 @@ public final class Logs
     public static LogWriter createLogWriter(File file, long fileNumber)
             throws IOException
     {
-        return new MMapLogWriter(file, fileNumber);
+        if( Iq80DBFactory.USE_MMAP ) {
+            return new MMapLogWriter(file, fileNumber);
+        } else {
+            return new FileChannelLogWriter(file, fileNumber);
+        }
     }
 
     public static int getChunkChecksum(int chunkTypeId, Slice slice)

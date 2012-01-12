@@ -25,6 +25,8 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.io.Closeables;
 import org.iq80.leveldb.table.Table;
+import org.iq80.leveldb.table.FileChannelTable;
+import org.iq80.leveldb.table.MMapTable;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Finalizer;
 import org.iq80.leveldb.util.InternalTableIterator;
@@ -113,9 +115,12 @@ public class TableCache
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
             fileChannel = new FileInputStream(tableFile).getChannel();
-
             try {
-                table = new Table(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                if( Iq80DBFactory.USE_MMAP ) {
+                    table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                } else {
+                    table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                }
             }
             catch (IOException e) {
                 Closeables.closeQuietly(fileChannel);

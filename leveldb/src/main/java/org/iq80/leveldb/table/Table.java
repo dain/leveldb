@@ -27,22 +27,16 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
 
-import static org.iq80.leveldb.CompressionType.SNAPPY;
-
-public class Table implements SeekingIterable<Slice, Slice>
+abstract public class Table implements SeekingIterable<Slice, Slice>
 {
-    private final String name;
-    private final FileChannel fileChannel;
-    private final Comparator<Slice> comparator;
-
-    private final boolean verifyChecksums;
-
-    private final Block indexBlock;
-    private final BlockHandle metaindexBlockHandle;
-    private final MappedByteBuffer data;
+    protected final String name;
+    protected final FileChannel fileChannel;
+    protected final Comparator<Slice> comparator;
+    protected final boolean verifyChecksums;
+    protected final Block indexBlock;
+    protected final BlockHandle metaindexBlockHandle;
 
     public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
             throws IOException
@@ -56,16 +50,15 @@ public class Table implements SeekingIterable<Slice, Slice>
 
         this.name = name;
         this.fileChannel = fileChannel;
-        data = fileChannel.map(MapMode.READ_ONLY, 0, size);
         this.verifyChecksums = verifyChecksums;
         this.comparator = comparator;
 
-        Slice footerSlice = Slices.copiedBuffer(data, (int) size - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
-        Footer footer = Footer.readFooter(footerSlice);
-
+        Footer footer = init();
         indexBlock = readBlock(footer.getIndexBlockHandle());
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
     }
+
+    abstract protected Footer init() throws IOException;
 
     @Override
     public TableIterator iterator()
@@ -86,50 +79,12 @@ public class Table implements SeekingIterable<Slice, Slice>
         return dataBlock;
     }
 
-    private static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
+    protected static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
 
-    private Block readBlock(BlockHandle blockHandle)
-            throws IOException
-    {
-        // read block trailer
-        BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(Slices.copiedBuffer(this.data,
-                (int) blockHandle.getOffset() + blockHandle.getDataSize(),
-                BlockTrailer.ENCODED_LENGTH));
+    abstract protected Block readBlock(BlockHandle blockHandle)
+            throws IOException;
 
-// todo re-enable crc check when ported to support direct buffers
-//        // only verify check sums if explicitly asked by the user
-//        if (verifyChecksums) {
-//            // checksum data and the compression type in the trailer
-//            PureJavaCrc32C checksum = new PureJavaCrc32C();
-//            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
-//            int actualCrc32c = checksum.getMaskedValue();
-//
-//            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
-//        }
-
-        // decompress data
-        Slice uncompressedData;
-        ByteBuffer uncompressedBuffer = read(this.data, (int) blockHandle.getOffset(), blockHandle.getDataSize());
-        if (blockTrailer.getCompressionType() == SNAPPY) {
-            synchronized (Table.class) {
-                int uncompressedLength = uncompressedLength(uncompressedBuffer);
-                if (uncompressedScratch.capacity() < uncompressedLength) {
-                    uncompressedScratch = ByteBuffer.allocateDirect(uncompressedLength);
-                }
-                uncompressedScratch.clear();
-
-                Snappy.uncompress(uncompressedBuffer, uncompressedScratch);
-                uncompressedData = Slices.copiedBuffer(uncompressedScratch);
-            }
-        }
-        else {
-            uncompressedData = Slices.copiedBuffer(uncompressedBuffer);
-        }
-
-        return new Block(uncompressedData, comparator);
-    }
-
-    private int uncompressedLength(ByteBuffer data)
+    protected int uncompressedLength(ByteBuffer data)
             throws IOException
     {
         int length = VariableLengthQuantity.readVariableLengthInt(data.duplicate());
@@ -159,14 +114,6 @@ public class Table implements SeekingIterable<Slice, Slice>
         return metaindexBlockHandle.getOffset();
     }
 
-
-    public static ByteBuffer read(MappedByteBuffer data, int offset, int length)
-            throws IOException
-    {
-        int newPosition = data.position() + offset;
-        ByteBuffer block = (ByteBuffer) data.duplicate().order(ByteOrder.LITTLE_ENDIAN).clear().limit(newPosition + length).position(newPosition);
-        return block;
-    }
 
     @Override
     public String toString()

@@ -33,22 +33,25 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertTrue;
 
-public class TableTest
+abstract public class TableTest
 {
     private File file;
     private RandomAccessFile randomAccessFile;
     private FileChannel fileChannel;
 
+    abstract protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums) throws IOException;
+    
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testEmptyFile()
             throws Exception
     {
-        new Table(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
+        createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
     }
 
     @Test
@@ -121,7 +124,7 @@ public class TableTest
         }
         builder.finish();
 
-        Table table = new Table(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
+        Table table = createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
 
         SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);

@@ -188,8 +188,8 @@ public class FileChannelLogWriter implements LogWriter
         Slice header = newLogRecordHeader(type, slice, slice.length());
 
         // write the header and the payload
-        header.setBytes(0, fileChannel, header.length());
-        slice.setBytes(0, fileChannel, slice.length());
+        header.getBytes(0, fileChannel, header.length());
+        slice.getBytes(0, fileChannel, slice.length());
 
         blockOffset += HEADER_SIZE + slice.length();
     }
