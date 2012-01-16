@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.impl.LogMonitors.logMonitor;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
 public class VersionSet implements SeekingIterable<InternalKey, Slice>
@@ -95,9 +96,12 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
             edit.setLastSequenceNumber(lastSequence);
 
             LogWriter log = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
-            writeSnapshot(log);
-            log.addRecord(edit.encode(), false);
-            log.close();
+            try {
+                writeSnapshot(log);
+                log.addRecord(edit.encode(), false);
+            } finally {
+                log.close();
+            }
 
             Filename.setCurrentFile(databaseDir, log.getFileNumber());
         }
@@ -110,6 +114,16 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
             descriptorLog.close();
             descriptorLog = null;
         }
+        
+        Version t = current;
+        if( t!=null ) {
+            current = null;
+            t.release();
+        }
+
+        Set<Version> versions = activeVersions.keySet();
+        // TODO:
+        // log("DB closed with "+versions.size()+" open snapshots. This could mean your application has a resource leak.");
     }
 
     private void appendVersion(Version version)

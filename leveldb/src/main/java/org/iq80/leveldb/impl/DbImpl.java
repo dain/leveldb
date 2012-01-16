@@ -237,7 +237,7 @@ public class DbImpl implements DB
         }
         catch (IOException ignored) {
         }
-
+        tableCache.close();
         dbLock.release();
     }
 
@@ -654,8 +654,11 @@ public class DbImpl implements DB
 
             // Update memtable
             updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
-
-            return new SnapshotImpl(versions.getCurrent(), sequenceEnd);
+            if(options.snapshot()) {
+                return new SnapshotImpl(versions.getCurrent(), sequenceEnd);
+            } else {
+                return null;
+            }
         }
         finally {
             mutex.unlock();

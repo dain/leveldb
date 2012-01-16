@@ -18,26 +18,20 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
+import com.google.common.cache.*;
 import com.google.common.io.Closeables;
-import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.FileChannelTable;
 import org.iq80.leveldb.table.MMapTable;
+import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Finalizer;
 import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Slice;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
 public class TableCache
@@ -51,19 +45,15 @@ public class TableCache
 
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
-                .removalListener(new RemovalListener<Long, TableAndFile>()
-                {
-                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
-                    {
-                        TableAndFile tableAndFile = notification.getValue();
-                        finalizer.addCleanup(tableAndFile.getTable(), new CloseQuietly(tableAndFile.fileChannel));
+                .removalListener(new RemovalListener<Long, TableAndFile>() {
+                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification) {
+                        Table table = notification.getValue().getTable();
+                        finalizer.addCleanup(table, table.closer());
                     }
                 })
-                .build(new CacheLoader<Long, TableAndFile>()
-                {
+                .build(new CacheLoader<Long, TableAndFile>() {
                     public TableAndFile load(Long fileNumber)
-                            throws IOException
-                    {
+                            throws IOException {
                         return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
                     }
                 });
@@ -97,6 +87,11 @@ public class TableCache
             throw new RuntimeException("Could not open table " + number, cause);
         }
         return table;
+    }
+
+    public void close() {
+        cache.invalidateAll();
+        finalizer.destroy();
     }
 
     public void evict(long number)
@@ -134,19 +129,4 @@ public class TableCache
         }
     }
 
-    private static class CloseQuietly implements Callable<Void>
-    {
-        private final Closeable closeable;
-
-        public CloseQuietly(Closeable closeable)
-        {
-            this.closeable = closeable;
-        }
-
-        public Void call()
-        {
-            Closeables.closeQuietly(closeable);
-            return null;
-        }
-    }
 }

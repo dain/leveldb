@@ -19,15 +19,18 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.google.common.io.Closeables;
 import org.iq80.leveldb.impl.SeekingIterable;
 import org.iq80.leveldb.util.*;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
+import java.util.concurrent.Callable;
 
 abstract public class Table implements SeekingIterable<Slice, Slice>
 {
@@ -126,4 +129,25 @@ abstract public class Table implements SeekingIterable<Slice, Slice>
         sb.append('}');
         return sb.toString();
     }
+
+    public Callable<?> closer() {
+        return new Closer(fileChannel);
+    }
+
+    private static class Closer implements Callable<Void>
+    {
+        private final Closeable closeable;
+
+        public Closer(Closeable closeable)
+        {
+            this.closeable = closeable;
+        }
+
+        public Void call()
+        {
+            Closeables.closeQuietly(closeable);
+            return null;
+        }
+    }
+
 }

@@ -22,12 +22,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Finalizer<T>
 {
@@ -41,7 +37,7 @@ public class Finalizer<T>
     private final int threads;
     private final FinalizerMonitor monitor;
 
-    private final Set<FinalizerPhantomReference<T>> references = new HashSet<FinalizerPhantomReference<T>>();
+    private final ConcurrentHashMap<FinalizerPhantomReference<T>, Object> references = new ConcurrentHashMap<FinalizerPhantomReference<T>, Object>();
     private final ReferenceQueue<T> referenceQueue = new ReferenceQueue<T>();
     private boolean destroyed;
     private ExecutorService executor;
@@ -88,13 +84,21 @@ public class Finalizer<T>
 
         // we must keep a strong reference to the reference object so we are notified when the item
         // is no longer reachable (if the reference object is garbage collected we are never notified)
-        references.add(reference);
+        references.put(reference, Boolean.TRUE);
     }
-
+    
     public synchronized void destroy()
     {
         destroyed = true;
-        executor.shutdownNow();
+        if( executor!=null ) {
+            executor.shutdownNow();
+        }
+        for(FinalizerPhantomReference<T> r: references.keySet() ) {
+            try {
+                r.cleanup();
+            } catch (Exception e) {
+            }
+        }
     }
 
     public interface FinalizerMonitor
@@ -104,12 +108,19 @@ public class Finalizer<T>
 
     private static class FinalizerPhantomReference<T> extends PhantomReference<T>
     {
+        private final AtomicBoolean cleaned = new AtomicBoolean(false);
         private final Callable<?> cleanup;
 
         private FinalizerPhantomReference(T referent, ReferenceQueue<? super T> queue, Callable<?> cleanup)
         {
             super(referent, queue);
             this.cleanup = cleanup;
+        }
+
+        private void cleanup() throws Exception {
+            if(cleaned.compareAndSet(false, true)) {
+                cleanup.call();
+            }
         }
     }
 
@@ -134,7 +145,7 @@ public class Finalizer<T>
 
                 boolean rescheduleAndReturn = false;
                 try {
-                    reference.cleanup.call();
+                    reference.cleanup();
                     rescheduleAndReturn = Thread.currentThread().isInterrupted();
                 }
                 catch (Throwable userException) {

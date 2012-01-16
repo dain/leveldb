@@ -17,8 +17,10 @@
  */
 package org.iq80.leveldb.table;
 
+import com.google.common.io.Closeables;
 import org.iq80.leveldb.util.*;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -26,11 +28,14 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 public class MMapTable extends Table
 {
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private MappedByteBuffer data;
 
     public MMapTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
@@ -46,6 +51,33 @@ public class MMapTable extends Table
         Slice footerSlice = Slices.copiedBuffer(data, (int) size - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
         return Footer.readFooter(footerSlice);
     }
+
+    @Override
+    public Callable<?> closer() {
+        return new Closer(name, fileChannel, data);
+    }
+
+    private static class Closer implements Callable<Void>
+    {
+        private final String name;
+        private final Closeable closeable;
+        private final MappedByteBuffer data;
+
+        public Closer(String name, Closeable closeable, MappedByteBuffer data)
+        {
+            this.name = name;
+            this.closeable = closeable;
+            this.data = data;
+        }
+
+        public Void call()
+        {
+            ByteBufferSupport.unmap(data);
+            Closeables.closeQuietly(closeable);
+            return null;
+        }
+    }
+
 
     @Override
     protected Block readBlock(BlockHandle blockHandle)

@@ -20,10 +20,7 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.io.Closeables;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.*;
 import sun.nio.ch.FileChannelImpl;
 
 import java.io.File;
@@ -41,21 +38,7 @@ import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
 
 public class MMapLogWriter implements LogWriter
 {
-    private static final Method unmap;
     private static final int PAGE_SIZE  = 1024 * 1024;
-
-    static {
-        Method x;
-        try {
-            x = FileChannelImpl.class.getDeclaredMethod("unmap", MappedByteBuffer.class);
-        }
-        catch (NoSuchMethodException e) {
-            throw new AssertionError(e);
-        }
-        x.setAccessible(true);
-        unmap = x;
-
-    }
 
     private final File file;
     private final long fileNumber;
@@ -73,7 +56,6 @@ public class MMapLogWriter implements LogWriter
     {
         Preconditions.checkNotNull(file, "file is null");
         Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
-
         this.file = file;
         this.fileNumber = fileNumber;
         this.fileChannel = new RandomAccessFile(file, "rw").getChannel();
@@ -233,12 +215,7 @@ public class MMapLogWriter implements LogWriter
 
     private void unmap()
     {
-        try {
-            unmap.invoke(null, mappedByteBuffer);
-        }
-        catch (Exception ignored) {
-            throw Throwables.propagate(ignored);
-        }
+        ByteBufferSupport.unmap(mappedByteBuffer);
     }
 
     private Slice newLogRecordHeader(LogChunkType type, Slice slice)
