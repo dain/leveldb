@@ -87,16 +87,83 @@
                         <goals>
                             <goal>shade</goal>
                         </goals>
-                        <configuration>
-                            <relocations>
-                                <relocation>
-                                    <pattern>com.google.common</pattern>
-                                    <shadedPattern>org.iq80.leveldb.shaded.guava</shadedPattern>
-                                </relocation>
-                            </relocations>
-                        </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                    <shadedClassifierName>uber</shadedClassifierName>
+                    <relocations>
+                        <relocation>
+                            <pattern>com.google.common</pattern>
+                            <shadedPattern>org.iq80.leveldb.shaded.guava</shadedPattern>
+                        </relocation>
+                    </relocations>
+                </configuration>
+            </plugin>
+            <plugin>
+              <groupId>com.pyx4me</groupId>
+              <artifactId>proguard-maven-plugin</artifactId>
+              <version>2.0.4</version>
+              <executions>
+                <execution>
+                  <phase>package</phase>
+                  <goals>
+                    <goal>proguard</goal>
+                  </goals>
+                </execution>
+              </executions>
+              <configuration>
+                <injar>${project.build.finalName}.jar</injar>
+                <outjar>${project.build.finalName}-slim.jar</outjar>          
+                <attach>true</attach>
+                <attachArtifactClassifier>min</attachArtifactClassifier>
+                <libs>
+                  <lib>${rt.jar.path}</lib>
+                  <lib>${jsse.jar.path}</lib>
+                </libs>
+                <assembly>
+                  <inclusions>
+                    <inclusion>
+                      <groupId>org.iq80.leveldb</groupId>
+                      <artifactId>leveldb-api</artifactId>
+                    </inclusion>
+                    <inclusion>
+                      <groupId>org.iq80.snappy</groupId>
+                      <artifactId>snappy</artifactId>
+                    </inclusion> 
+                    <inclusion>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                    </inclusion> 
+                  </inclusions>
+                </assembly>
+                 
+                <obfuscate>false</obfuscate>
+                <options>
+                  <option>-keep class org.iq80.leveldb.*{*;}</option>
+                  <option>-keep class org.iq80.leveldb.impl.*{*;}</option>
+                  <option>-keep class org.iq80.leveldb.util.*{*;}</option>
+
+                  <option>-keep class com.google.common.collect.ImmutableList{*;}</option>
+                  <option>-keep class com.google.common.base.Preconditions{*;}</option>
+
+                  <option>-keep class org.iq80.snappy.*{*;}</option>
+                  <!-- <option>-keep class org.xerial.snappy.Snappy{*;}</option> -->
+                  <option>-dontwarn com.google.common.collect.MinMaxPriorityQueue</option>
+                  <option>-dontwarn org.xerial.snappy.SnappyLoader</option>
+                  <option>-dontwarn org.xerial.snappy.SnappyBundleActivator</option>
+                  <option>-dontwarn org.iq80.snappy.HadoopSnappyCodec**</option>
+                  <option>-dontoptimize</option>
+                </options>
+              </configuration>
+              <dependencies>
+                <dependency>
+                  <groupId>net.sf.proguard</groupId>
+                  <artifactId>proguard</artifactId>
+                  <version>4.4</version>
+                  <scope>runtime</scope>
+                </dependency>
+              </dependencies>        
             </plugin>
         </plugins>
 
@@ -122,4 +189,32 @@
             </plugins>
         </pluginManagement>
     </build>
+    
+    <profiles>
+      <profile>
+        <id>unix</id>
+        <activation><os><family>unix</family></os></activation>
+        <properties>
+          <rt.jar.path>${java.home}/lib/rt.jar</rt.jar.path>
+          <jsse.jar.path>${java.home}/lib/jsse.jar</jsse.jar.path>
+        </properties>
+      </profile>
+      <profile>
+        <id>mac</id>
+        <activation><os><family>mac</family></os></activation>
+        <properties>
+          <rt.jar.path>${java.home}/../Classes/classes.jar</rt.jar.path>
+          <jsse.jar.path>${java.home}/../Classes/jsse.jar</jsse.jar.path>
+        </properties>
+      </profile>
+      <profile>
+        <id>windows</id>
+        <activation><os><family>windows</family></os></activation>
+        <properties>
+          <rt.jar.path>${java.home}/jre/lib/rt.jar</rt.jar.path>
+          <jsse.jar.path>${java.home}/jre/lib/jsse.jar</jsse.jar.path>
+        </properties>
+      </profile>
+    </profiles>
+      
 </project>
