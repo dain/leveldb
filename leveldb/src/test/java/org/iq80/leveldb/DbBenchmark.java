@@ -173,16 +173,24 @@ public class DbBenchmark
                 acquireLoad();
             }
             else if (benchmark.equals("snappycomp")) {
-                snappyCompress();
+                if( Snappy.available() ) {
+                    snappyCompress();
+                }
             }
             else if (benchmark.equals("snappyuncomp")) {
-                snappyUncompressDirectBuffer();
+                if( Snappy.available() ) {
+                    snappyUncompressDirectBuffer();
+                }
             }
             else if (benchmark.equals("unsnap-array")) {
-                snappyUncompressArray();
+                if( Snappy.available() ) {
+                    snappyUncompressArray();
+                }
             }
             else if (benchmark.equals("unsnap-direct")) {
-                snappyUncompressDirectBuffer();
+                if( Snappy.available() ) {
+                    snappyUncompressDirectBuffer();
+                }
             }
             else if (benchmark.equals("heapprofile")) {
                 heapProfile();
@@ -324,7 +332,7 @@ public class DbBenchmark
             message_ = "";
         }
 
-        System.out.printf("%-12s : %11.3f micros/op;%s%s\n",
+        System.out.printf("%-12s : %11.5f micros/op;%s%s\n",
                 benchmark,
                 elapsedSeconds * 1e6 / done_,
                 (message_ == null ? "" : " "),
