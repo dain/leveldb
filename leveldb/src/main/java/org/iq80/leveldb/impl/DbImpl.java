@@ -133,8 +133,8 @@ public class DbImpl implements DB
 
         // create the database dir if it does not already exist
         databaseDir.mkdirs();
-        Preconditions.checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created");
-        Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory");
+        Preconditions.checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created", databaseDir);
+        Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory", databaseDir);
 
         mutex.lock();
         try {

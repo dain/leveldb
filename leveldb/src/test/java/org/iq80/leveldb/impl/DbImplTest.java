@@ -53,6 +53,8 @@ public class DbImplTest
     // You can set the STRESS_FACTOR system property to make the tests run more iterations.
     public static final double STRESS_FACTOR = Double.parseDouble(System.getProperty("STRESS_FACTOR", "1"));
 
+    private static final String DOESNOTEXIST_FILENAME = "/foo/bar/doowop/idontexist";
+
     private File databaseDir;
 
     @Test
@@ -755,6 +757,22 @@ public class DbImplTest
         for (int i = 1; i < entries.size(); i++) {
             testDb(db, entries);
         }
+    }
+
+    @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory '" + DOESNOTEXIST_FILENAME + "'.*")
+    public void testCantCreateDirectoryReturnMessage()
+        throws Exception
+    {
+        new DbStringWrapper(new Options(), new File(DOESNOTEXIST_FILENAME));
+    }
+
+    @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory.*is not a directory")
+    public void testDBDirectoryIsFileRetrunMessage()
+        throws Exception
+    {
+        File databaseFile = new File(databaseDir + "/imafile");
+        assertTrue(databaseFile.createNewFile());
+        new DbStringWrapper(new Options(), databaseFile);
     }
 
     private void testDb(DbStringWrapper db, Entry<String, String>... entries)
