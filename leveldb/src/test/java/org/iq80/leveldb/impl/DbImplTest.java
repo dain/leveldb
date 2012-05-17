@@ -775,6 +775,18 @@ public class DbImplTest
         new DbStringWrapper(new Options(), databaseFile);
     }
 
+    @Test
+    public void testSymbolicLinkForFileWithoutParent()
+    {
+        assertFalse(FileUtils.isSymbolicLink(new File("db")));
+    }
+
+    @Test
+    public void testSymbolicLinkForFileWithParent()
+    {
+        assertFalse(FileUtils.isSymbolicLink(new File(DOESNOTEXIST_FILENAME, "db")));
+    }
+
     private void testDb(DbStringWrapper db, Entry<String, String>... entries)
             throws IOException
     {
