@@ -22,6 +22,7 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
+import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.util.*;
@@ -440,7 +441,7 @@ public class DbBenchmark
                 bytes_ += entry.getKey().length + entry.getValue().length;
                 finishedSingleOp();
             }
-            iterator.close();
+            Closeables.closeQuietly(iterator);
         }
     }
 
@@ -603,10 +604,8 @@ public class DbBenchmark
 
     private void destroyDb()
     {
-        if (db_ != null) {
-            db_.close();
-            db_ = null;
-        }
+        Closeables.closeQuietly(db_);
+        db_ = null;
         FileUtils.deleteRecursively(databaseDir);
     }
 
