@@ -17,12 +17,13 @@
  */
 package org.iq80.leveldb;
 
+import java.io.Closeable;
 import java.util.Map;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public interface DB extends Iterable<Map.Entry<byte[], byte[]>>, Closable {
+public interface DB extends Iterable<Map.Entry<byte[], byte[]>>, Closeable {
 
     public byte[] get(byte[] key) throws DBException;
     public byte[] get(byte[] key, ReadOptions options) throws DBException;

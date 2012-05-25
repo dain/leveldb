@@ -17,13 +17,14 @@
  */
 package org.iq80.leveldb;
 
+import java.io.Closeable;
 import java.util.Iterator;
 import java.util.Map;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public interface DBIterator extends Iterator<Map.Entry<byte[], byte[]>>, Closable {
+public interface DBIterator extends Iterator<Map.Entry<byte[], byte[]>>, Closeable {
 
     /**
      * Repositions the iterator so the key of the next BlockElement
