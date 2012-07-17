@@ -260,6 +260,8 @@ public class DbImpl implements DB
 
         for (File file : Filename.listFiles(databaseDir)) {
             FileInfo fileInfo = Filename.parseFileName(file);
+            if (fileInfo == null)
+              continue;
             long number = fileInfo.getFileNumber();
             boolean keep = true;
             switch (fileInfo.getFileType()) {
