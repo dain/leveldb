@@ -142,7 +142,7 @@ public class FileChannelLogWriter implements LogWriter
             // fragment the record; otherwise write to the end of the record
             boolean end;
             int fragmentLength;
-            if (sliceInput.available() >= bytesAvailableInBlock) {
+            if (sliceInput.available() > bytesAvailableInBlock) {
                 end = false;
                 fragmentLength = bytesAvailableInBlock;
             }
