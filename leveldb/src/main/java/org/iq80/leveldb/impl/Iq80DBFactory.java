@@ -23,7 +23,6 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.FileUtils;
 
 import java.io.*;
-import java.net.URL;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
@@ -62,7 +61,7 @@ public class Iq80DBFactory implements DBFactory {
 
     @Override
     public void destroy(File path, Options options) throws IOException {
-        // TODO: This should really only delete leveldb created files.
+        // TODO: This should really only delete leveldb-created files.
         FileUtils.deleteRecursively(path);
     }
 

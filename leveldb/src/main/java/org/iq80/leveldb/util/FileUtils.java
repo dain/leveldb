@@ -32,12 +32,15 @@ public class FileUtils
     public static boolean isSymbolicLink(File file)
     {
         try {
-            File canonicalFile = file.getCanonicalFile();
-            File absoluteFile = file.getAbsoluteFile();
+            final File canonicalFile = file.getCanonicalFile();
+            final File absoluteFile = file.getAbsoluteFile();
+            final File parentFile;
             // a symbolic link has a different name between the canonical and absolute path
             return !canonicalFile.getName().equals(absoluteFile.getName()) ||
-                    // or the canonical parent path is not the same as the files parent path
-                    !canonicalFile.getParent().equals(file.getParentFile().getCanonicalPath());
+                    // or the canonical parent path is not the same as the file's parent path,
+                    // provided the file has a parent path
+                    (parentFile = file.getParentFile()) != null &&
+                    !parentFile.getCanonicalPath().equals(canonicalFile.getParent());
         }
         catch (IOException e) {
             // error on the side of caution
