@@ -13,106 +13,136 @@ others it has been converted to a more natural Java style.  The plan is to
 leave the code closer to the C++ original until the baseline performance has
 been established.
 
+## API Usage:
 
-## DB implementation
+Recommended Package imports:
 
-* Get, put, delete, batch writes and iteration implemented
-* Snapshots implemented (needs testing)
-* TX logging and recovery
+    import org.iq80.leveldb.*;
+    import static org.iq80.leveldb.impl.Iq80DBFactory.*;
+    import java.io.*;
 
-## Storage
+Opening and closing the database.
 
-* MemTables implemented
-* Read and write tables
-* Read and write blocks
-* Supports Snappy compression
-* Supports CRC32c checksums
+    Options options = new Options();
+    options.createIfMissing(true);
+    DB db = factory.open(new File("example"), options);
+    try {
+      // Use the db in here....
+    } finally {
+      // Make sure you close the db to shutdown the 
+      // database and avoid resource leaks.
+      db.close();
+    }
 
-## Compaction
+Putting, Getting, and Deleting key/values.
 
-* MemTable to Level0 compaction
-* Version persistence and VersionSet management
-* Read and write log files
-* Level0 compaction
-* Arbitrary range compaction
-* Compaction scheduling
+    db.put(bytes("Tampa"), bytes("rocks"));
+    String value = asString(db.get(bytes("Tampa")));
+    db.delete(wo, bytes("Tampa"));
 
-# Implementation Nodes
+Performing Batch/Bulk/Atomic Updates.
 
-## Iterators
+    WriteBatch batch = db.createWriteBatch();
+    try {
+      batch.delete(bytes("Denver"));
+      batch.put(bytes("Tampa"), bytes("green"));
+      batch.put(bytes("London"), bytes("red"));
 
-The iterator intensive design of this code comes directly from the C++ code.
-LevelDB can most easily described follows:
+      db.write(batch);
+    } finally {
+      // Make sure you close the batch to avoid resource leaks.
+      batch.close();
+    }
 
-* DB merge Iterator
-    * MemTable iterator
-    * Immutable MemTable iterator (the one being compacted)
-    * Version merge iterator
-        * Level0 merge iterator over files
-            * Table merge iterator
-                * Block iterator
-        * Level1 concat iterator over files
-            * Table merge iterator
-                * Block iterator
-        * ...
-        * LevelN concat iterator over files
-            * Table merge iterator
-               * Block iterator
+Iterating key/values.
 
-As you can see it is easy to get lost in these deeply nested data structures.
-In addition to these iterators from the original C++ code, this code wraps the
-DB  merge iterator with a snapshot filtering iterator and finally a
-transforming iterator to convert InternalKeys into the keys in the user space.
+    DBIterator iterator = db.iterator();
+    try {
+      for(iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
+        String key = asString(iterator.peekNext().getKey());
+        String value = asString(iterator.peekNext().getValue());
+        System.out.println(key+" = "+value);
+      }
+    } finally {
+      // Make sure you close the iterator to avoid resource leaks.
+      iterator.close();
+    }
 
-## Buffers
+Working against a Snapshot view of the Database.
 
-Currently the code uses Netty ChannelBuffers internally.  This is mainly
-because the Java ByteBuffer interface is so unfriendly.  ChannelBuffers
-are not really ideal for this code, either and a custom solution needs to be
-considered
+    ReadOptions ro = new ReadOptions();
+    ro.snapshot(db.getSnapshot());
+    try {
+      
+      // All read operations will now use the same 
+      // consistent view of the data.
+      ... = db.iterator(ro);
+      ... = db.get(bytes("Tampa"), ro);
 
-## Thread safety
+    } finally {
+      // Make sure you close the snapshot to avoid resource leaks.
+      ro.snapshot().close();
+    }
 
-None of the locking code from the original C++ was translated into Java largely
-because Java and C++ concurrent primitives and data structures are so different.
-Once the compaction is in place it should be more clear how to make the DB
-implementation thread safe and concurrent.
+Using a custom Comparator.
 
-## Memory usage
+    DBComparator comparator = new DBComparator(){
+        public int compare(byte[] key1, byte[] key2) {
+            return new String(key1).compareTo(new String(key2));
+        }
+        public String name() {
+            return "simple";
+        }
+        public byte[] findShortestSeparator(byte[] start, byte[] limit) {
+            return start;
+        }
+        public byte[] findShortSuccessor(byte[] key) {
+            return key;
+        }
+    };
+    Options options = new Options();
+    options.comparator(comparator);
+    DB db = factory.open(new File("example"), options);
+    
+Disabling Compression
 
-Since the code is a fairly literal translation of the original C++, the memory
-usage is more restrained that most Java code, but further work need to be done
-around clean up of abandoned user objects (like Snapshots).  The code also
-sometimes makes extra copies of buffers due to the ChannelBuffer, ByteBuffer
-and byte[] impedance.  Over time, the code should be tuned to reduce GC impact
-(the most problematic code is the skip list in the memtable which may need to
-be rewritten).  Of course, all of this must be verified in a profiler.
+    Options options = new Options();
+    options.compressionType(CompressionType.NONE);
+    DB db = factory.open(new File("example"), options);
 
-# TODO
+Configuring the Cache
+    
+    Options options = new Options();
+    options.cacheSize(100 * 1048576); // 100MB cache
+    DB db = factory.open(new File("example"), options);
 
-## Performance
+Getting approximate sizes.
 
-There has been no performance tests yet.
+    long[] sizes = db.getApproximateSizes(new Range(bytes("a"), bytes("k")), new Range(bytes("k"), bytes("z")));
+    System.out.println("Size: "+sizes[0]+", "+sizes[1]);
+    
+Getting database status.
 
-* Port C++ performance benchmark to Java
-* Establish performance base line against:
-    * C++ original
-    * Kyoto TreeDB
-    * SQLite3
-    * [LevelDB JNI] (https://github.com/fusesource/leveldbjni)
+    String stats = db.getProperty("leveldb.stats");
+    System.out.println(stats);
 
-## API
+Getting informational log messages.
 
-The user APIs have not really been started yet, but there are a few ideas on
-the drawing-board already.
+    Logger logger = new Logger() {
+      public void log(String message) {
+        System.out.println(message);
+      }
+    };
+    Options options = new Options();
+    options.logger(logger);
+    DB db = factory.open(new File("example"), options);
 
-* Factory/maker API for opening and creating databases (like Guava)
-* Low-level simple buffer only API
-* High-level java.util.Map like or full map wrapper with serialization support
-* SPI for UserComparator
+Destroying a database.
+    
+    Options options = new Options();
+    factory.destroy(new File("example"), options);
 
-## Other
+# Projects using this port of LevelDB
 
-* Need logging interface
-* Need iterator structure inspector for easier debugging
-* All buffers must be in little endian
+* [ActiveMQ Apollo](http://activemq.apache.org/apollo/): Defaults to using leveldbjni, but falls 
+  back to this port if the jni port is not available on your platform.
