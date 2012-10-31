@@ -58,4 +58,16 @@ public interface DB extends Iterable<Map.Entry<byte[], byte[]>>, Closable {
 
     public long[] getApproximateSizes(Range ... ranges);
     public String getProperty(String name);
+
+    /**
+     * Suspends any background compaction threads.  This methods
+     * returns once the background compactions are suspended.
+     */
+    public void suspendCompactions() throws InterruptedException;
+
+    /**
+     * Resumes the background compaction threads.
+     */
+    public void resumeCompactions();
+
 }

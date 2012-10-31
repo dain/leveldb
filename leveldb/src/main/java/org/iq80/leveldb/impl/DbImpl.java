@@ -123,7 +123,7 @@ public class DbImpl implements DB
                     }
                 })
                 .build();
-        compactionExecutor = Executors.newCachedThreadPool(compactionThreadFactory);
+        compactionExecutor = Executors.newSingleThreadExecutor(compactionThreadFactory);
 
         // Reserve ten files or so for other uses and give the rest to TableCache.
         int tableCacheSize = options.maxOpenFiles() - 10;
@@ -1318,4 +1318,40 @@ public class DbImpl implements DB
             super(cause);
         }
     }
+
+    private Object suspensionMutex = new Object();
+    private int suspensionCounter=0;
+
+    @Override
+    public void suspendCompactions() throws InterruptedException {
+        compactionExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    synchronized (suspensionMutex) {
+                        suspensionCounter ++;
+                        suspensionMutex.notifyAll();
+                        while( suspensionCounter > 0 && !compactionExecutor.isShutdown()) {
+                            suspensionMutex.wait(500);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                }
+            }
+        });
+        synchronized (suspensionMutex) {
+            while(suspensionCounter < 1) {
+                suspensionMutex.wait();
+            }
+        }
+    }
+
+    @Override
+    public void resumeCompactions() {
+        synchronized (suspensionMutex) {
+            suspensionCounter --;
+            suspensionMutex.notifyAll();
+        }
+    }
+
 }
