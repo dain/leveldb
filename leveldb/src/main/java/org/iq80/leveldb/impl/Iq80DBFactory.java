@@ -74,4 +74,27 @@ public class Iq80DBFactory implements DBFactory {
     public String toString() {
         return String.format("iq80 leveldb version %s", VERSION);
     }
+
+    public static byte[] bytes(String value) {
+        if( value == null) {
+            return null;
+        }
+        try {
+            return value.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String asString(byte value[]) {
+        if( value == null) {
+            return null;
+        }
+        try {
+            return new String(value, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }
