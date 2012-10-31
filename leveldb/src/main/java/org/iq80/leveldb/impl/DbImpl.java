@@ -133,8 +133,8 @@ public class DbImpl implements DB
 
         // create the database dir if it does not already exist
         databaseDir.mkdirs();
-        Preconditions.checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created");
-        Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory");
+        Preconditions.checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created", databaseDir);
+        Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory", databaseDir);
 
         mutex.lock();
         try {
@@ -260,6 +260,8 @@ public class DbImpl implements DB
 
         for (File file : Filename.listFiles(databaseDir)) {
             FileInfo fileInfo = Filename.parseFileName(file);
+            if (fileInfo == null)
+              continue;
             long number = fileInfo.getFileNumber();
             boolean keep = true;
             switch (fileInfo.getFileType()) {

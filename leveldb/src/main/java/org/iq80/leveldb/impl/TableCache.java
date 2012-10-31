@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutionException;
 
 public class TableCache
 {
-    private final Cache<Long, TableAndFile> cache;
+    private final LoadingCache<Long, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<Table>(1);
 
     public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
