@@ -36,14 +36,19 @@ public class DBTest {
 
         // Add an element
         byte[] ONE = new byte[] { 1 };
+        Assert.assertNull(db.get(ONE));
         WriteOptions writeOptions = new WriteOptions();
         writeOptions.sync(true);
         db.put(ONE, ONE, writeOptions);
+        Assert.assertNotNull(db.get(ONE));
 
         // Delete it
         db.delete(ONE, writeOptions);
 
-        // Test that it's gone
+        // Test that it's gone with get
+        Assert.assertNull(db.get(ONE));
+
+        // Test that it's gone with iterator
         DBIterator iter = db.iterator();
         long size = 0;
         while (iter.hasNext()) {
