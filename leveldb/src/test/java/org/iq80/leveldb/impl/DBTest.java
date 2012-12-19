@@ -50,6 +50,7 @@ public class DBTest {
 
         // Test that it's gone with iterator
         DBIterator iter = db.iterator();
+        iter.seekToFirst();
         long size = 0;
         while (iter.hasNext()) {
             iter.next();
