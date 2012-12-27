@@ -87,6 +87,26 @@ public class DbImplTest
     }
 
     @Test
+    public void testEmptyBatch()
+            throws Exception
+    {
+        // open new db
+        Options options = new Options().createIfMissing(true);
+        DB db = new Iq80DBFactory().open(databaseDir, options);
+
+        // write an empty batch
+        WriteBatch batch = db.createWriteBatch();
+        batch.close();
+        db.write(batch);
+
+        // close the db
+        db.close();
+
+        // reopen db
+        new Iq80DBFactory().open(databaseDir, options);
+    }
+
+    @Test
     public void testReadWrite()
             throws Exception
     {

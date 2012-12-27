@@ -520,7 +520,7 @@ public class DbImpl implements DB
         }
 
         // flush mem table
-        if (memTable != null) {
+        if (memTable != null && !memTable.isEmpty()) {
             writeLevel0Table(memTable, edit, null);
         }
 
@@ -636,26 +636,32 @@ public class DbImpl implements DB
         checkBackgroundException();
         mutex.lock();
         try {
-            makeRoomForWrite(false);
+            long sequenceEnd;
+            if (updates.size() != 0) {
+                makeRoomForWrite(false);
 
-            // Get sequence numbers for this change set
-            final long sequenceBegin = versions.getLastSequence() + 1;
-            final long sequenceEnd = sequenceBegin + updates.size() - 1;
+                // Get sequence numbers for this change set
+                final long sequenceBegin = versions.getLastSequence() + 1;
+                sequenceEnd = sequenceBegin + updates.size() - 1;
 
-            // Reserve this sequence in the version set
-            versions.setLastSequence(sequenceEnd);
+                // Reserve this sequence in the version set
+                versions.setLastSequence(sequenceEnd);
 
-            // Log write
-            Slice record = writeWriteBatch(updates, sequenceBegin);
-            try {
-                log.addRecord(record, options.sync());
+                // Log write
+                Slice record = writeWriteBatch(updates, sequenceBegin);
+                try {
+                    log.addRecord(record, options.sync());
+                }
+                catch (IOException e) {
+                    throw Throwables.propagate(e);
+                }
+
+                // Update memtable
+                updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
+            } else {
+                sequenceEnd = versions.getLastSequence();
             }
-            catch (IOException e) {
-                throw Throwables.propagate(e);
-            }
 
-            // Update memtable
-            updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
             if(options.snapshot()) {
                 return new SnapshotImpl(versions.getCurrent(), sequenceEnd);
             } else {
@@ -884,6 +890,11 @@ public class DbImpl implements DB
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
+        // skip empty mem table
+        if (mem.isEmpty()) {
+            return;
+        }
+
         // write the memtable to a new sstable
         long fileNumber = versions.getNextFileNumber();
         pendingOutputs.add(fileNumber);
@@ -896,10 +907,10 @@ public class DbImpl implements DB
         }
         pendingOutputs.remove(fileNumber);
 
-        // Note that if file_size is zero, the file has been deleted and
+        // Note that if file size is zero, the file has been deleted and
         // should not be added to the manifest.
         int level = 0;
-        if (meta.getFileSize() > 0) {
+        if (meta != null && meta.getFileSize() > 0) {
             Slice minUserKey = meta.getSmallest().getUserKey();
             Slice maxUserKey = meta.getLargest().getUserKey();
             if (base != null) {
