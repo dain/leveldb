@@ -58,7 +58,7 @@ public class DbImplTest
     private File databaseDir;
 
     @Test
-    public void testGitHubIssue5()
+    public void testBackgroundCompaction()
             throws Exception
     {
         Options options = new Options();
