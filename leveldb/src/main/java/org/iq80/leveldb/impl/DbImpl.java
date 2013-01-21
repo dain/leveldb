@@ -21,14 +21,28 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.iq80.leveldb.*;
+import org.iq80.leveldb.CompressionType;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBException;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.Range;
+import org.iq80.leveldb.ReadOptions;
+import org.iq80.leveldb.Snapshot;
+import org.iq80.leveldb.WriteBatch;
+import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.impl.Filename.FileInfo;
 import org.iq80.leveldb.impl.Filename.FileType;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.TableBuilder;
-import org.iq80.leveldb.util.*;
+import org.iq80.leveldb.util.DbIterator;
+import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -1147,17 +1161,20 @@ public class DbImpl implements DB
             compact.compaction.getEdit().addFile(level + 1, output);
             pendingOutputs.remove(output.getNumber());
         }
-        compact.outputs.clear();
 
         try {
             versions.logAndApply(compact.compaction.getEdit());
             deleteObsoleteFiles();
         }
         catch (IOException e) {
+            // Compaction failed for some reason.  Simply discard the work and try again later.
+
             // Discard any files we may have created during this failed compaction
             for (FileMetaData output : compact.outputs) {
-                new File(databaseDir, Filename.tableFileName(output.getNumber())).delete();
+                File file = new File(databaseDir, Filename.tableFileName(output.getNumber()));
+                file.delete();
             }
+            compact.outputs.clear();
         }
     }
 

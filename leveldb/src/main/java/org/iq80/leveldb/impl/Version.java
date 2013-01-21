@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import org.iq80.leveldb.util.*;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -63,6 +64,35 @@ public class Version implements SeekingIterable<InternalKey, Slice>
         }
         this.levels = builder.build();
 
+    }
+
+    public void assertNoOverlappingFiles()
+    {
+        for (int level = 1; level < NUM_LEVELS; level++) {
+            assertNoOverlappingFiles(level);
+        }
+    }
+
+    public void assertNoOverlappingFiles(int level)
+    {
+        if (level > 0) {
+            Collection<FileMetaData> files = getFiles().asMap().get(level);
+            if (files != null) {
+                long previousFileNumber = 0;
+                InternalKey previousEnd = null;
+                for (FileMetaData fileMetaData : files) {
+                    if (previousEnd != null) {
+                        Preconditions.checkArgument(getInternalKeyComparator().compare(
+                                previousEnd,
+                                fileMetaData.getSmallest()
+                        ) < 0, "Overlapping files %s and %s in level %s", previousFileNumber, fileMetaData.getNumber(), level);
+                    }
+
+                    previousFileNumber = fileMetaData.getNumber();
+                    previousEnd = fileMetaData.getLargest();
+                }
+            }
+        }
     }
 
     private TableCache getTableCache() {

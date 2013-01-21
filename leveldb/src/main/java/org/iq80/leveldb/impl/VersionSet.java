@@ -36,14 +36,22 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.LogMonitors.logMonitor;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
 public class VersionSet implements SeekingIterable<InternalKey, Slice>
@@ -57,7 +65,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
     public static final long MAX_GRAND_PARENT_OVERLAP_BYTES = 10 * TARGET_FILE_SIZE;
 
 
-    private AtomicLong nextFileNumber = new AtomicLong(2);
+    private final AtomicLong nextFileNumber = new AtomicLong(2);
     private long manifestFileNumber = 1;
     private Version current;
     private long lastSequence;
@@ -741,6 +749,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
          * Saves the current state in specified version.
          */
         public void saveTo(Version version)
+                throws IOException
         {
             FileMetaDataBySmallestKey cmp = new FileMetaDataBySmallestKey(versionSet.internalKeyComparator);
             for (int level = 0; level < baseVersion.numberOfLevels(); level++) {
@@ -757,7 +766,7 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
                     addedFiles = ImmutableSortedSet.of();
                 }
 
-                // files must be added in sorted order to assertion check in maybeAddFile works
+                // files must be added in sorted order so assertion check in maybeAddFile works
                 ArrayList<FileMetaData> sortedFiles = newArrayListWithCapacity(baseFiles.size() + addedFiles.size());
                 sortedFiles.addAll(baseFiles);
                 sortedFiles.addAll(addedFiles);
@@ -769,29 +778,13 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
 
                 //#ifndef NDEBUG  todo
                 // Make sure there is no overlap in levels > 0
-                if (level > 0) {
-                    long previousFileNumber = 0;
-                    InternalKey previousEnd = null;
-                    Collection<FileMetaData> files = version.getFiles().asMap().get(level);
-                    if (files != null) {
-                        for (FileMetaData fileMetaData : files) {
-                            if (previousEnd != null) {
-                                Preconditions.checkArgument(versionSet.internalKeyComparator.compare(
-                                        previousEnd,
-                                        fileMetaData.getSmallest()
-                                ) < 0, "Overlapping files %s and %s in level %s", previousFileNumber, fileMetaData.getNumber(), level);
-                            }
-
-                            previousFileNumber = fileMetaData.getNumber();
-                            previousEnd = fileMetaData.getLargest();
-                        }
-                    }
-                }
+                version.assertNoOverlappingFiles();
                 //#endif
             }
         }
 
-        public void maybeAddFile(Version version, int level, FileMetaData fileMetaData)
+        private void maybeAddFile(Version version, int level, FileMetaData fileMetaData)
+                throws IOException
         {
             if (levels.get(level).deletedFiles.contains(fileMetaData.getNumber())) {
                 // File is deleted: do nothing
@@ -800,10 +793,15 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
                 List<FileMetaData> files = version.getFiles(level);
                 if (level > 0 && !files.isEmpty()) {
                     // Must not overlap
-                    Preconditions.checkArgument(versionSet.internalKeyComparator.compare(
-                            files.get(files.size() - 1).getLargest(),
-                            fileMetaData.getSmallest()
-                    ) < 0, "new file overlaps existing files in range");
+                    boolean filesOverlap = versionSet.internalKeyComparator.compare(files.get(files.size() - 1).getLargest(), fileMetaData.getSmallest())  >= 0;
+                    if (filesOverlap) {
+                        // A memory compaction, while this compaction was running, resulted in a a database state that is
+                        // incompatible with the compaction.  This is rare and expensive to detect while the compaction is
+                        // running, so we catch here simply discard the work.
+                        throw new IOException(String.format("Compaction is obsolete: Overlapping files %s and %s in level %s",
+                                files.get(files.size() - 1).getNumber(),
+                                fileMetaData.getNumber(), level));
+                    }
                 }
                 version.addFile(level, fileMetaData);
             }

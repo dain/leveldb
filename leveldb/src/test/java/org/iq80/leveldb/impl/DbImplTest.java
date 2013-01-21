@@ -77,6 +77,20 @@ public class DbImplTest
     }
 
     @Test
+    public void testCompactionsOnBigDataSet()
+            throws Exception
+    {
+        Options options = new Options();
+        options.createIfMissing(true);
+        DbImpl db = new DbImpl(options, databaseDir);
+        for (int index = 0; index < 5000000; index++) {
+            String key = "Key LOOOOOOOOOOOOOOOOOONG KEY " + index;
+            String value = "This is element " + index + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABZASDFASDKLFJASDFKJSDFLKSDJFLKJSDHFLKJHSDJFSDFHJASDFLKJSDF";
+            db.put(key.getBytes("UTF-8"), value.getBytes("UTF-8"));
+        }
+    }
+
+    @Test
     public void testEmpty()
             throws Exception
     {
