@@ -404,17 +404,20 @@ public class DbImpl implements DB
             finally {
                 backgroundCompaction = null;
             }
-
-            // Previous compaction may have produced too many files in a level,
-            // so reschedule another compaction if needed.
-            maybeScheduleCompaction();
         }
         finally {
             try {
-                backgroundCondition.signalAll();
+                // Previous compaction may have produced too many files in a level,
+                // so reschedule another compaction if needed.
+                maybeScheduleCompaction();
             }
             finally {
-                mutex.unlock();
+                try {
+                    backgroundCondition.signalAll();
+                }
+                finally {
+                    mutex.unlock();
+                }
             }
         }
     }
