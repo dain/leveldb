@@ -111,9 +111,9 @@
                 </configuration>
             </plugin>
             <plugin>
-              <groupId>com.pyx4me</groupId>
+              <groupId>com.github.wvengen</groupId>
               <artifactId>proguard-maven-plugin</artifactId>
-              <version>2.0.4</version>
+              <version>2.0.5</version>
               <executions>
                 <execution>
                   <phase>package</phase>
@@ -123,6 +123,7 @@
                 </execution>
               </executions>
               <configuration>
+                <proguardVersion>4.8</proguardVersion>
                 <injar>${project.build.finalName}.jar</injar>
                 <outjar>${project.build.finalName}-slim.jar</outjar>          
                 <attach>true</attach>
@@ -169,8 +170,8 @@
               <dependencies>
                 <dependency>
                   <groupId>net.sf.proguard</groupId>
-                  <artifactId>proguard</artifactId>
-                  <version>4.4</version>
+                  <artifactId>proguard-base</artifactId>
+                  <version>4.8</version>
                   <scope>runtime</scope>
                 </dependency>
               </dependencies>        
@@ -202,24 +203,24 @@
     
     <profiles>
       <profile>
-        <id>unix</id>
-        <activation><os><family>unix</family></os></activation>
+        <id>lib/rt.jar</id>
+        <activation><file><exists>${java.home}/lib/rt.jar</exists></file></activation>
         <properties>
           <rt.jar.path>${java.home}/lib/rt.jar</rt.jar.path>
           <jsse.jar.path>${java.home}/lib/jsse.jar</jsse.jar.path>
         </properties>
       </profile>
       <profile>
-        <id>mac</id>
-        <activation><os><family>mac</family></os></activation>
+        <id>Classes/classes.jar</id>
+        <activation><file><exists>${java.home}/../Classes/classes.jar</exists></file></activation>
         <properties>
           <rt.jar.path>${java.home}/../Classes/classes.jar</rt.jar.path>
           <jsse.jar.path>${java.home}/../Classes/jsse.jar</jsse.jar.path>
         </properties>
       </profile>
       <profile>
-        <id>windows</id>
-        <activation><os><family>windows</family></os></activation>
+        <id>jre/lib/rt.jar</id>
+        <activation><file><exists>${java.home}/jre/lib/rt.jar</exists></file></activation>
         <properties>
           <rt.jar.path>${java.home}/jre/lib/rt.jar</rt.jar.path>
           <jsse.jar.path>${java.home}/jre/lib/jsse.jar</jsse.jar.path>
