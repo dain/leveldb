@@ -15,17 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb;
+package org.iq80.leveldb.benchmark;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.io.CharStreams;
-import com.google.common.io.Closeables;
-import com.google.common.io.Files;
-import org.iq80.leveldb.impl.DbImpl;
-import org.iq80.leveldb.util.*;
+import static com.google.common.base.Charsets.UTF_8;
+import static org.iq80.leveldb.benchmark.DbBenchmark.DBState.EXISTING;
+import static org.iq80.leveldb.benchmark.DbBenchmark.DBState.FRESH;
+import static org.iq80.leveldb.benchmark.DbBenchmark.Order.RANDOM;
+import static org.iq80.leveldb.benchmark.DbBenchmark.Order.SEQUENTIAL;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,12 +34,27 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.base.Charsets.UTF_8;
-import static org.iq80.leveldb.DbBenchmark.DBState.EXISTING;
-import static org.iq80.leveldb.DbBenchmark.DBState.FRESH;
-import static org.iq80.leveldb.DbBenchmark.Order.RANDOM;
-import static org.iq80.leveldb.DbBenchmark.Order.SEQUENTIAL;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBFactory;
+import org.iq80.leveldb.DBIterator;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.WriteBatch;
+import org.iq80.leveldb.WriteOptions;
+import org.iq80.leveldb.impl.DbImpl;
+import org.iq80.leveldb.util.FileUtils;
+import org.iq80.leveldb.util.PureJavaCrc32C;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.CharStreams;
+import com.google.common.io.Closeables;
+import com.google.common.io.Files;
 
 public class DbBenchmark
 {

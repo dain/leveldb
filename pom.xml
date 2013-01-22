@@ -16,6 +16,7 @@
     <modules>
         <module>leveldb-api</module>
         <module>leveldb</module>
+        <module>leveldb-benchmark</module>
     </modules>
 
     <inceptionYear>2011</inceptionYear>
@@ -247,9 +248,9 @@
                     </configuration>
                 </plugin>
 
-                <!-- 
-                  Do a license check by running       : mvn license:check  
-                  Update the license check by running : mvn license:format  
+                <!--
+                  Do a license check by running       : mvn license:check
+                  Update the license check by running : mvn license:format
                 -->
                 <plugin>
                     <groupId>com.mycila.maven-license-plugin</groupId>
@@ -315,7 +316,7 @@
                           <windowTitle>${project.name} Source Xref (${project.version})</windowTitle>
                         </configuration>
                       </plugin>
-                      
+
                       <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-javadoc-plugin</artifactId>
@@ -348,7 +349,7 @@
                               -->
                               <additionalJOption>-J-Xmx1024m</additionalJOption>
                           </configuration>
-                      </plugin>            
+                      </plugin>
                     </reportPlugins>
                   </configuration>
                 </plugin>
