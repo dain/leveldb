@@ -28,6 +28,7 @@ import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.TableBuilder;
+import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.*;
 
 import java.io.File;
@@ -104,7 +105,35 @@ public class DbImpl implements DB
 
         this.databaseDir = databaseDir;
 
-        internalKeyComparator = new InternalKeyComparator(new BytewiseComparator());
+        //use custom comparator if set
+        final DBComparator comparator = options.comparator();
+        UserComparator userComparator;
+        if (comparator != null) {
+            userComparator = new UserComparator() {
+                @Override
+                public String name() {
+                    return comparator.name();
+                }
+
+                @Override
+                public Slice findShortestSeparator(Slice start, Slice limit) {
+                    return new Slice(comparator.findShortestSeparator(start.getBytes(), limit.getBytes()));
+                }
+
+                @Override
+                public Slice findShortSuccessor(Slice key) {
+                    return new Slice(comparator.findShortSuccessor(key.getBytes()));
+                }
+
+                @Override
+                public int compare(Slice o1, Slice o2) {
+                    return comparator.compare(o1.getBytes(), o2.getBytes());
+                }
+            };
+        }else{
+            userComparator = new BytewiseComparator();
+        }
+        internalKeyComparator = new InternalKeyComparator(userComparator);
         memTable = new MemTable(internalKeyComparator);
         immutableMemTable = null;
 
