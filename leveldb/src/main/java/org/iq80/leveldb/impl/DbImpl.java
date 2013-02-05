@@ -122,7 +122,7 @@ public class DbImpl implements DB
 
         //use custom comparator if set
         final DBComparator comparator = options.comparator();
-        UserComparator userComparator;
+        final UserComparator userComparator;
         if (comparator != null) {
             userComparator = new UserComparator() {
                 @Override
