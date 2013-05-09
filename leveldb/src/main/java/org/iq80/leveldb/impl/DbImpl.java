@@ -1398,4 +1398,8 @@ public class DbImpl implements DB
         }
     }
 
+    @Override
+    public void compactRange(byte[] begin, byte[] end) throws DBException {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
 }

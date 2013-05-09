@@ -71,4 +71,12 @@ public interface DB extends Iterable<Map.Entry<byte[], byte[]>>, Closeable {
      */
     public void resumeCompactions();
 
+    /**
+     * Force a compaction of the specified key range.
+     *
+     * @param begin if null then compaction start from the first key
+     * @param end if null then compaction ends at the last key
+     * @throws DBException
+     */
+    public void compactRange(byte[] begin, byte[] end) throws DBException;
 }
