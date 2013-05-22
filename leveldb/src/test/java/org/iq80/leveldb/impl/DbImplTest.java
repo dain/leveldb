@@ -20,7 +20,17 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import org.iq80.leveldb.*;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.UnsignedBytes;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBComparator;
+import org.iq80.leveldb.DBIterator;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.Range;
+import org.iq80.leveldb.ReadOptions;
+import org.iq80.leveldb.Snapshot;
+import org.iq80.leveldb.WriteBatch;
+import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -30,8 +40,13 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
+import java.util.Random;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
@@ -822,6 +837,35 @@ public class DbImplTest
         assertFalse(FileUtils.isSymbolicLink(new File(DOES_NOT_EXIST_FILENAME, "db")));
     }
 
+    @Test
+    public void testCustomComparator()
+            throws Exception
+    {
+        DbStringWrapper db = new DbStringWrapper(new Options().comparator(new ReverseDBComparator()), databaseDir);
+
+        List<Entry<String, String>> entries = Arrays.asList(
+                immutableEntry("scotch/strong", "Lagavulin"),
+                immutableEntry("scotch/medium", "Highland Park"),
+                immutableEntry("scotch/light", "Oban 14"),
+                immutableEntry("beer/stout", "Lagunitas Imperial Stout"),
+                immutableEntry("beer/ipa", "Lagunitas IPA"),
+                immutableEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’")
+        );
+
+        for (Entry<String, String> entry : entries) {
+            db.put(entry.getKey(), entry.getValue());
+        }
+
+        SeekingIterator<String, String> seekingIterator = db.iterator();
+        for (Entry<String, String> entry : entries) {
+            assertTrue(seekingIterator.hasNext());
+            assertEquals(seekingIterator.peek(), entry);
+            assertEquals(seekingIterator.next(), entry);
+        }
+
+        assertFalse(seekingIterator.hasNext());
+    }
+
     private void testDb(DbStringWrapper db, Entry<String, String>... entries)
             throws IOException
     {
@@ -949,7 +993,76 @@ public class DbImplTest
     }
 
     ArrayList<DbStringWrapper> opened = new ArrayList<DbStringWrapper>();
-    
+
+    private static class ReverseDBComparator
+            implements DBComparator
+    {
+        @Override
+        public String name()
+        {
+            return "test";
+        }
+
+        @Override
+        public int compare(byte[] sliceA, byte[] sliceB)
+        {
+            // reverse order
+            return -(UnsignedBytes.lexicographicalComparator().compare(sliceA, sliceB));
+        }
+
+        @Override
+        public byte[] findShortestSeparator(byte[] start, byte[] limit)
+        {
+            // Find length of common prefix
+            int sharedBytes = calculateSharedBytes(start, limit);
+
+            // Do not shorten if one string is a prefix of the other
+            if (sharedBytes < Math.min(start.length, limit.length)) {
+                // if we can add one to the last shared byte without overflow and the two keys differ by more than
+                // one increment at this location.
+                int lastSharedByte = start[sharedBytes];
+                if (lastSharedByte < 0xff && lastSharedByte + 1 < limit[sharedBytes]) {
+                    byte[] result = Arrays.copyOf(start, sharedBytes + 1);
+                    result[sharedBytes] = (byte) (lastSharedByte + 1);
+
+                    assert (compare(result, limit) < 0) : "start must be less than last limit";
+                    return result;
+                }
+            }
+            return start;
+        }
+
+        @Override
+        public byte[] findShortSuccessor(byte[] key)
+        {
+            // Find first character that can be incremented
+            for (int i = 0; i < key.length; i++) {
+                int b = key[i];
+                if (b != 0xff) {
+                    byte[] result = Arrays.copyOf(key, i + 1);
+                    result[i] = (byte) (b + 1);
+                    return result;
+                }
+            }
+            // key is a run of 0xffs.  Leave it alone.
+            return key;
+        }
+
+        private int calculateSharedBytes(byte[] leftKey, byte[] rightKey)
+        {
+            int sharedKeyBytes = 0;
+
+            if (leftKey != null && rightKey != null) {
+                int minSharedKeyBytes = Ints.min(leftKey.length, rightKey.length);
+                while (sharedKeyBytes < minSharedKeyBytes && leftKey[sharedKeyBytes] == rightKey[sharedKeyBytes]) {
+                    sharedKeyBytes++;
+                }
+            }
+
+            return sharedKeyBytes;
+        }
+    }
+
     private class DbStringWrapper
     {
         private final Options options;
