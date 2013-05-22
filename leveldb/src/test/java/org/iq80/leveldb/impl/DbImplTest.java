@@ -53,7 +53,8 @@ public class DbImplTest
     // You can set the STRESS_FACTOR system property to make the tests run more iterations.
     public static final double STRESS_FACTOR = Double.parseDouble(System.getProperty("STRESS_FACTOR", "1"));
 
-    private static final String DOESNOTEXIST_FILENAME = "/foo/bar/doowop/idontexist";
+    private static final String DOES_NOT_EXIST_FILENAME = "/foo/bar/doowop/idontexist";
+    private static final String DOES_NOT_EXIST_FILENAME_PATTERN = ".foo.bar.doowop.idontexist";
 
     private File databaseDir;
 
@@ -793,11 +794,11 @@ public class DbImplTest
         }
     }
 
-    @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory '" + DOESNOTEXIST_FILENAME + "'.*")
+    @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory '" + DOES_NOT_EXIST_FILENAME_PATTERN + "'.*")
     public void testCantCreateDirectoryReturnMessage()
         throws Exception
     {
-        new DbStringWrapper(new Options(), new File(DOESNOTEXIST_FILENAME));
+        new DbStringWrapper(new Options(), new File(DOES_NOT_EXIST_FILENAME));
     }
 
     @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory.*is not a directory")
@@ -818,7 +819,7 @@ public class DbImplTest
     @Test
     public void testSymbolicLinkForFileWithParent()
     {
-        assertFalse(FileUtils.isSymbolicLink(new File(DOESNOTEXIST_FILENAME, "db")));
+        assertFalse(FileUtils.isSymbolicLink(new File(DOES_NOT_EXIST_FILENAME, "db")));
     }
 
     private void testDb(DbStringWrapper db, Entry<String, String>... entries)
