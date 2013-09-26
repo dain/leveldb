@@ -506,53 +506,56 @@ public class DbImpl implements DB
         Preconditions.checkState(mutex.isHeldByCurrentThread());
         File file = new File(databaseDir, Filename.logFileName(fileNumber));
         FileChannel channel = new FileInputStream(file).getChannel();
+        try {
+            LogMonitor logMonitor = LogMonitors.logMonitor();
+            LogReader logReader = new LogReader(channel, logMonitor, true, 0);
 
-        LogMonitor logMonitor = LogMonitors.logMonitor();
-        LogReader logReader = new LogReader(channel, logMonitor, true, 0);
+            // Log(options_.info_log, "Recovering log #%llu", (unsigned long long) log_number);
 
-        // Log(options_.info_log, "Recovering log #%llu", (unsigned long long) log_number);
+            // Read all the records and add to a memtable
+            long maxSequence = 0;
+            MemTable memTable = null;
+            for (Slice record = logReader.readRecord(); record != null; record = logReader.readRecord()) {
+                SliceInput sliceInput = record.input();
+                // read header
+                if (sliceInput.available() < 12) {
+                    logMonitor.corruption(sliceInput.available(), "log record too small");
+                    continue;
+                }
+                long sequenceBegin = sliceInput.readLong();
+                int updateSize = sliceInput.readInt();
 
-        // Read all the records and add to a memtable
-        long maxSequence = 0;
-        MemTable memTable = null;
-        for (Slice record = logReader.readRecord(); record != null; record = logReader.readRecord()) {
-            SliceInput sliceInput = record.input();
-            // read header
-            if (sliceInput.available() < 12) {
-                logMonitor.corruption(sliceInput.available(), "log record too small");
-                continue;
+                // read entries
+                WriteBatchImpl writeBatch = readWriteBatch(sliceInput, updateSize);
+
+                // apply entries to memTable
+                if (memTable == null) {
+                    memTable = new MemTable(internalKeyComparator);
+                }
+                writeBatch.forEach(new InsertIntoHandler(memTable, sequenceBegin));
+
+                // update the maxSequence
+                long lastSequence = sequenceBegin + updateSize - 1;
+                if (lastSequence > maxSequence) {
+                    maxSequence = lastSequence;
+                }
+
+                // flush mem table if necessary
+                if (memTable.approximateMemoryUsage() > options.writeBufferSize()) {
+                    writeLevel0Table(memTable, edit, null);
+                    memTable = null;
+                }
             }
-            long sequenceBegin = sliceInput.readLong();
-            int updateSize = sliceInput.readInt();
 
-            // read entries
-            WriteBatchImpl writeBatch = readWriteBatch(sliceInput, updateSize);
-
-            // apply entries to memTable
-            if (memTable == null) {
-                memTable = new MemTable(internalKeyComparator);
-            }
-            writeBatch.forEach(new InsertIntoHandler(memTable, sequenceBegin));
-
-            // update the maxSequence
-            long lastSequence = sequenceBegin + updateSize - 1;
-            if (lastSequence > maxSequence) {
-                maxSequence = lastSequence;
-            }
-
-            // flush mem table if necessary
-            if (memTable.approximateMemoryUsage() > options.writeBufferSize()) {
+            // flush mem table
+            if (memTable != null && !memTable.isEmpty()) {
                 writeLevel0Table(memTable, edit, null);
-                memTable = null;
             }
-        }
 
-        // flush mem table
-        if (memTable != null && !memTable.isEmpty()) {
-            writeLevel0Table(memTable, edit, null);
+            return maxSequence;
+        } finally {
+        	channel.close();
         }
-
-        return maxSequence;
     }
 
     @Override
@@ -954,29 +957,35 @@ public class DbImpl implements DB
 
     private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data, long fileNumber)
             throws IOException
-    {
+            {
         File file = new File(databaseDir, Filename.tableFileName(fileNumber));
         try {
-            FileChannel channel = new FileOutputStream(file).getChannel();
-            TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
-
             InternalKey smallest = null;
             InternalKey largest = null;
-            for (Entry<InternalKey, Slice> entry : data) {
-                // update keys
-                InternalKey key = entry.getKey();
-                if (smallest == null) {
-                    smallest = key;
+            FileChannel channel = new FileOutputStream(file).getChannel();
+            try {
+                TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
+
+                
+                for (Entry<InternalKey, Slice> entry : data) {
+                    // update keys
+                    InternalKey key = entry.getKey();
+                    if (smallest == null) {
+                        smallest = key;
+                    }
+                    largest = key;
+
+                    tableBuilder.add(key.encode(), entry.getValue());
                 }
-                largest = key;
 
-                tableBuilder.add(key.encode(), entry.getValue());
+                tableBuilder.finish();
+            } finally {
+                try {
+                    channel.force(true);
+                } finally {
+                    channel.close();
+                }
             }
-
-            tableBuilder.finish();
-
-            channel.force(true);
-            channel.close();
 
             if (smallest == null) {
                 return null;
@@ -989,12 +998,13 @@ public class DbImpl implements DB
             pendingOutputs.remove(fileNumber);
 
             return fileMetaData;
+
         }
         catch (IOException e) {
             file.delete();
             throw e;
         }
-    }
+            }
 
     private void doCompactionWork(CompactionState compactionState)
             throws IOException
