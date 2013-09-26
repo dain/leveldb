@@ -339,66 +339,70 @@ public class VersionSet implements SeekingIterable<InternalKey, Slice>
 
         // open file channel
         FileChannel fileChannel = new FileInputStream(new File(databaseDir, currentName)).getChannel();
-
-        // read log edit log
-        Long nextFileNumber = null;
-        Long lastSequence = null;
-        Long logNumber = null;
-        Long prevLogNumber = null;
-        Builder builder = new Builder(this, current);
-
-        LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
-        for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
-            // read version edit
-            VersionEdit edit = new VersionEdit(record);
-
-            // verify comparator
-            // todo implement user comparator
-            String editComparator = edit.getComparatorName();
-            String userComparator = internalKeyComparator.name();
-            Preconditions.checkArgument(editComparator == null || editComparator.equals(userComparator),
-                    "Expected user comparator %s to match existing database comparator ", userComparator, editComparator);
-
-            // apply edit
-            builder.apply(edit);
-
-            // save edit values for verification below
-            logNumber = coalesce(edit.getLogNumber(), logNumber);
-            prevLogNumber = coalesce(edit.getPreviousLogNumber(), prevLogNumber);
-            nextFileNumber = coalesce(edit.getNextFileNumber(), nextFileNumber);
-            lastSequence = coalesce(edit.getLastSequenceNumber(), lastSequence);
+        try {
+	
+	        // read log edit log
+	        Long nextFileNumber = null;
+	        Long lastSequence = null;
+	        Long logNumber = null;
+	        Long prevLogNumber = null;
+	        Builder builder = new Builder(this, current);
+	
+	        LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
+	        for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
+	            // read version edit
+	            VersionEdit edit = new VersionEdit(record);
+	
+	            // verify comparator
+	            // todo implement user comparator
+	            String editComparator = edit.getComparatorName();
+	            String userComparator = internalKeyComparator.name();
+	            Preconditions.checkArgument(editComparator == null || editComparator.equals(userComparator),
+	                    "Expected user comparator %s to match existing database comparator ", userComparator, editComparator);
+	
+	            // apply edit
+	            builder.apply(edit);
+	
+	            // save edit values for verification below
+	            logNumber = coalesce(edit.getLogNumber(), logNumber);
+	            prevLogNumber = coalesce(edit.getPreviousLogNumber(), prevLogNumber);
+	            nextFileNumber = coalesce(edit.getNextFileNumber(), nextFileNumber);
+	            lastSequence = coalesce(edit.getLastSequenceNumber(), lastSequence);
+	        }
+	
+	        List<String> problems = newArrayList();
+	        if (nextFileNumber == null) {
+	            problems.add("Descriptor does not contain a meta-nextfile entry");
+	        }
+	        if (logNumber == null) {
+	            problems.add("Descriptor does not contain a meta-lognumber entry");
+	        }
+	        if (lastSequence == null) {
+	            problems.add("Descriptor does not contain a last-sequence-number entry");
+	        }
+	        if (!problems.isEmpty()) {
+	            throw new RuntimeException("Corruption: \n\t" + Joiner.on("\n\t").join(problems));
+	        }
+	
+	        if (prevLogNumber == null) {
+	            prevLogNumber = 0L;
+	        }
+	
+	        Version newVersion = new Version(this);
+	        builder.saveTo(newVersion);
+	
+	        // Install recovered version
+	        finalizeVersion(newVersion);
+	
+	        appendVersion(newVersion);
+	        manifestFileNumber = nextFileNumber;
+	        this.nextFileNumber.set(nextFileNumber + 1);
+	        this.lastSequence = lastSequence;
+	        this.logNumber = logNumber;
+	        this.prevLogNumber = prevLogNumber;
+        } finally {
+        	fileChannel.close();
         }
-
-        List<String> problems = newArrayList();
-        if (nextFileNumber == null) {
-            problems.add("Descriptor does not contain a meta-nextfile entry");
-        }
-        if (logNumber == null) {
-            problems.add("Descriptor does not contain a meta-lognumber entry");
-        }
-        if (lastSequence == null) {
-            problems.add("Descriptor does not contain a last-sequence-number entry");
-        }
-        if (!problems.isEmpty()) {
-            throw new RuntimeException("Corruption: \n\t" + Joiner.on("\n\t").join(problems));
-        }
-
-        if (prevLogNumber == null) {
-            prevLogNumber = 0L;
-        }
-
-        Version newVersion = new Version(this);
-        builder.saveTo(newVersion);
-
-        // Install recovered version
-        finalizeVersion(newVersion);
-
-        appendVersion(newVersion);
-        manifestFileNumber = nextFileNumber;
-        this.nextFileNumber.set(nextFileNumber + 1);
-        this.lastSequence = lastSequence;
-        this.logNumber = logNumber;
-        this.prevLogNumber = prevLogNumber;
     }
 
     private void finalizeVersion(Version version)
