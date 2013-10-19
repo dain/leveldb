@@ -585,7 +585,11 @@ public class DbImpl implements DB
             if (immutableMemTable != null) {
                 lookupResult = immutableMemTable.get(lookupKey);
                 if (lookupResult != null) {
-                    return lookupResult.getValue().getBytes();
+                    Slice value = lookupResult.getValue();
+					if (value == null) {
+						return null;
+					}
+					return value.getBytes();
                 }
             }
         }
