@@ -48,17 +48,10 @@
     <dependency>
       <groupId>org.iq80.leveldb</groupId>
       <artifactId>leveldb-api</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.iq80.leveldb</groupId>
       <artifactId>leveldb</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.iq80.leveldb</groupId>
-      <artifactId>leveldb-api</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.xerial.snappy</groupId>
