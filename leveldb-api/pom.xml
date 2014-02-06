@@ -8,12 +8,10 @@
         <version>0.7-SNAPSHOT</version>
     </parent>
 
-    <groupId>org.iq80.leveldb</groupId>
     <artifactId>leveldb-api</artifactId>
     <version>0.7-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>${project.artifactId}</name>
     <description>High level Java API for LevelDB</description>
-
 </project>
