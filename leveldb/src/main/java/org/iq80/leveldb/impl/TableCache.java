@@ -18,8 +18,12 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
-import com.google.common.cache.*;
-import com.google.common.io.Closeables;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.table.FileChannelTable;
 import org.iq80.leveldb.table.MMapTable;
 import org.iq80.leveldb.table.Table;

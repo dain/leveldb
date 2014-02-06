@@ -19,15 +19,15 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.io.Closeables;
 import org.iq80.leveldb.impl.SeekingIterable;
-import org.iq80.leveldb.util.*;
+import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.TableIterator;
+import org.iq80.leveldb.util.VariableLengthQuantity;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 import java.util.concurrent.Callable;

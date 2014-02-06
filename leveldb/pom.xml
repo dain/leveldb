@@ -47,7 +47,15 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>12.0</version>
+            <version>16.0.1</version>
+        </dependency>
+
+        <!-- only needed for ProGuard -->
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <version>1.3.9</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- for testing -->
@@ -162,6 +170,9 @@
 
                   <option>-keep class org.iq80.snappy.*{*;}</option>
                   <!-- <option>-keep class org.xerial.snappy.Snappy{*;}</option> -->
+                  <option>-dontnote com.google.common.cache.Striped64</option>
+                  <option>-dontnote com.google.common.cache.Striped64$*</option>
+                  <option>-dontnote com.google.common.util.concurrent.MoreExecutors</option>
                   <option>-dontwarn com.google.common.collect.MinMaxPriorityQueue</option>
                   <option>-dontwarn org.xerial.snappy.SnappyLoader</option>
                   <option>-dontwarn org.xerial.snappy.SnappyBundleActivator</option>

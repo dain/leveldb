@@ -18,11 +18,11 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
-import com.google.common.io.Closeables;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 
 import java.io.File;
 import java.io.FileNotFoundException;

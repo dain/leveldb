@@ -17,8 +17,11 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.io.Closeables;
-import org.iq80.leveldb.util.*;
+import org.iq80.leveldb.util.ByteBufferSupport;
+import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
 
 import java.io.Closeable;
 import java.io.IOException;
