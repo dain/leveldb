@@ -18,10 +18,10 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Closeables;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;

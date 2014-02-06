@@ -19,7 +19,7 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.io.Closeables;
+import org.iq80.leveldb.util.Closeables;
 
 import java.io.File;
 import java.io.IOException;
