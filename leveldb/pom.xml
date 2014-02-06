@@ -5,11 +5,11 @@
     <parent>
         <groupId>org.iq80.leveldb</groupId>
         <artifactId>leveldb-project</artifactId>
-        <version>0.7-SNAPSHOT</version>
+        <version>0.7</version>
     </parent>
 
     <artifactId>leveldb</artifactId>
-    <version>0.7-SNAPSHOT</version>
+    <version>0.7</version>
     <packaging>jar</packaging>
 
     <name>${project.artifactId}</name>
