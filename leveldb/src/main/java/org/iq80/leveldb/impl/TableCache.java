@@ -23,6 +23,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.table.FileChannelTable;
 import org.iq80.leveldb.table.MMapTable;
@@ -34,6 +35,7 @@ import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ExecutionException;
@@ -106,14 +108,24 @@ public class TableCache
     private static final class TableAndFile
     {
         private final Table table;
-        private final FileChannel fileChannel;
+        private FileChannel fileChannel;
 
         private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
                 throws IOException
         {
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
-            fileChannel = new FileInputStream(tableFile).getChannel();
+
+            try{
+               fileChannel = new FileInputStream(tableFile).getChannel();
+            }
+            catch(FileNotFoundException e){
+               // attempt to open older .sst extension
+               tableFileName = Filename.sstTableFileName(fileNumber);
+               tableFile = new File(databaseDir, tableFileName);
+               fileChannel = new FileInputStream(tableFile).getChannel();
+            }
+
             try {
                 if( Iq80DBFactory.USE_MMAP ) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
