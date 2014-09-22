@@ -119,11 +119,17 @@ public class TableCache
             try{
                fileChannel = new FileInputStream(tableFile).getChannel();
             }
-            catch(FileNotFoundException e){
-               // attempt to open older .sst extension
-               tableFileName = Filename.sstTableFileName(fileNumber);
-               tableFile = new File(databaseDir, tableFileName);
-               fileChannel = new FileInputStream(tableFile).getChannel();
+            catch(FileNotFoundException ldbNotFound){
+               try{
+                  // attempt to open older .sst extension
+                  tableFileName = Filename.sstTableFileName(fileNumber);
+                  tableFile = new File(databaseDir, tableFileName);
+                  fileChannel = new FileInputStream(tableFile).getChannel();
+               }
+               catch(FileNotFoundException sstNotFound){
+                  throw new FileNotFoundException("Neither " + Filename.tableFileName(fileNumber)
+                        + " nor " + tableFileName + " could be found");
+               }
             }
 
             try {
