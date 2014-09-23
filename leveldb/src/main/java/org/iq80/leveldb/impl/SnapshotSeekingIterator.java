@@ -50,7 +50,7 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
       this.userComparator = userComparator;
       this.snapshot.getVersion().retain();
       this.savedEntry = null;
-      this.direction = FORWARD;
+      seekToFirst();
    }
 
    public void close()
@@ -63,7 +63,6 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
    {
       iterator.seekToFirst();
       direction = FORWARD;
-      findNextUserEntry(false, null);
    }
 
    @Override
@@ -107,7 +106,7 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
       }
       else
       {
-         findNextUserEntry(true, savedEntry == null ? null : savedEntry.getKey().getUserKey());
+         findNextUserEntry(true, savedEntry);
 
          if (!iterator.hasNext())
          {
@@ -170,12 +169,18 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
       return null;
    }
 
-   private void findNextUserEntry(boolean skipping, Slice skipKey)
+   private void findNextUserEntry(boolean skipping, Entry<InternalKey, Slice> skipEntry)
    {
-      if (skipKey == null)
+      Slice skipKey;
+      if (skipEntry == null)
       {
          skipping = false;
+         skipKey = null;
       }
+      else{
+         skipKey = skipEntry.getKey().getUserKey();
+      }
+      
       while (iterator.hasNext())
       {
          InternalKey internalKey = iterator.peek().getKey();
@@ -190,6 +195,7 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
                case VALUE :
                   if (!skipping || userComparator.compare(internalKey.getUserKey(), skipKey) > 0)
                   {
+                     savedEntry = null;
                      return;
                   }
                   break;
@@ -225,6 +231,11 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
                savedEntry = peekPrev;
             }
          }
+         else if(valueType == ValueType.VALUE){
+            //we've found an entry out of this sequence after finding a value type
+            //the value type is a valid entry to return, stop advancing prev
+            return;
+         }
          iterator.prev();
       }
 
@@ -251,8 +262,8 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
    {
       if (direction == FORWARD)
       {
-         findNextUserEntry(true, savedEntry == null ? null : savedEntry.getKey().getUserKey());
-         // calls to findNextUserEntry without skipping will place the iterator in a state where
+         findNextUserEntry(true, savedEntry);
+         // calls to findNextUserEntry will place the iterator in a state where
          // next() is valid, which is the same as a state of coming from a reverse advance
          direction = REVERSE;
       }
@@ -270,9 +281,10 @@ public final class SnapshotSeekingIterator extends AbstractReverseSeekingIterato
             // findPrevUserEntry places the iterator before the valid user entry
             // so hasPrev after this call is answered by hasNext
             // but the has... functions should not advance the iterator
-            // so advance forward to a position effectively the same as before this call
-            // (though not exactly identical if deletions are present)
-            getNextElement();
+            // so advance forward to a position that appears externally the same as before this call
+            // (though not identical if deletions are present)
+            iterator.next();
+            direction = FORWARD;
          }
       }
       return iterator.hasPrev();
