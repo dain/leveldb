@@ -52,6 +52,14 @@ public class Filename
      */
     public static String tableFileName(long number)
     {
+        return makeFileName(number, "ldb");
+    }
+
+    /**
+     * Return the deprecated name of the sstable with the specified number.
+     */
+    public static String sstTableFileName(long number)
+    {
         return makeFileName(number, "sst");
     }
 
