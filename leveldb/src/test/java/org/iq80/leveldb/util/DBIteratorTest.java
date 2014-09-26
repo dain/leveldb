@@ -198,7 +198,7 @@ public class DBIteratorTest extends TestCase
       put(db, "f", "2");
 
       String[] _expected = {"a1","b0","e1","g1"};
-      List<Entry<String, String>> expected = new ArrayList<>();
+      List<Entry<String, String>> expected = new ArrayList<Entry<String, String>>();
       for(String s:_expected){
          expected.add(Maps.immutableEntry(""+s.charAt(0), ""+s.charAt(1)));
       }
