@@ -17,11 +17,32 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.UnsignedBytes;
+import static com.google.common.base.Charsets.UTF_8;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Maps.immutableEntry;
+import static java.util.Arrays.asList;
+import static org.iq80.leveldb.CompressionType.NONE;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.table.BlockHelper.afterString;
+import static org.iq80.leveldb.table.BlockHelper.assertReverseSequence;
+import static org.iq80.leveldb.table.BlockHelper.assertSequence;
+import static org.iq80.leveldb.table.BlockHelper.beforeString;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
+import java.util.Random;
+
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBComparator;
 import org.iq80.leveldb.DBIterator;
@@ -38,30 +59,11 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.NoSuchElementException;
-import java.util.Random;
-
-import static com.google.common.base.Charsets.UTF_8;
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Maps.immutableEntry;
-import static java.util.Arrays.asList;
-import static org.iq80.leveldb.CompressionType.NONE;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.table.BlockHelper.afterString;
-import static org.iq80.leveldb.table.BlockHelper.assertSequence;
-import static org.iq80.leveldb.table.BlockHelper.beforeString;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.UnsignedBytes;
 
 public class DbImplTest
 {
@@ -805,7 +807,11 @@ public class DbImplTest
                 immutableEntry("scotch/strong", "Lagavulin"));
 
         for (int i = 1; i < entries.size(); i++) {
-            testDb(db, entries);
+           List<Entry<String, String>> incrementalEntries = new ArrayList<Entry<String, String>>();
+           for(Entry<String, String> e:entries){
+              incrementalEntries.add(immutableEntry(e.getKey(), "v"+i+":"+e.getValue()));
+           }
+            testDb(db, incrementalEntries);
         }
     }
 
@@ -875,6 +881,9 @@ public class DbImplTest
     private void testDb(DbStringWrapper db, List<Entry<String, String>> entries)
             throws IOException
     {
+       
+       List<Entry<String, String>> reverseEntries = newArrayList(entries);
+       Collections.reverse(reverseEntries);
 
         for (Entry<String, String> entry : entries) {
             db.put(entry.getKey(), entry.getValue());
@@ -885,14 +894,27 @@ public class DbImplTest
             assertEquals(actual, entry.getValue(), "Key: " + entry.getKey());
         }
 
-        SeekingIterator<String, String> seekingIterator = db.iterator();
+        ReverseSeekingIterator<String, String> seekingIterator = db.iterator();
+        assertReverseSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
         assertSequence(seekingIterator, entries);
+        assertReverseSequence(seekingIterator, reverseEntries);
 
         seekingIterator.seekToFirst();
+        assertReverseSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
+        assertSequence(seekingIterator, entries);
+        assertReverseSequence(seekingIterator, reverseEntries);
+
+        seekingIterator.seekToLast();
+        if(reverseEntries.size() > 0){
+           assertSequence(seekingIterator, reverseEntries.get(0));
+           seekingIterator.seekToLast();
+           assertReverseSequence(seekingIterator, reverseEntries.subList(1, reverseEntries.size()));
+        }
         assertSequence(seekingIterator, entries);
 
         for (Entry<String, String> entry : entries) {
             List<Entry<String, String>> nextEntries = entries.subList(entries.indexOf(entry), entries.size());
+            List<Entry<String, String>> prevEntries = reverseEntries.subList(reverseEntries.indexOf(entry), reverseEntries.size());
             seekingIterator.seek(entry.getKey());
             assertSequence(seekingIterator, nextEntries);
 
@@ -901,11 +923,21 @@ public class DbImplTest
 
             seekingIterator.seek(afterString(entry));
             assertSequence(seekingIterator, nextEntries.subList(1, nextEntries.size()));
+
+            seekingIterator.seek(beforeString(entry));
+            assertReverseSequence(seekingIterator, prevEntries.subList(1, prevEntries.size()));
+
+            seekingIterator.seek(entry.getKey());
+            assertReverseSequence(seekingIterator, prevEntries.subList(1, prevEntries.size()));
+
+            seekingIterator.seek(afterString(entry));
+            assertReverseSequence(seekingIterator, prevEntries);
         }
 
         Slice endKey = Slices.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey.toString(Charsets.UTF_8));
         assertSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
+        assertReverseSequence(seekingIterator, reverseEntries);
     }
 
     @BeforeMethod
@@ -1077,6 +1109,13 @@ public class DbImplTest
             this.db = new DbImpl(options, databaseDir);
             opened.add(this);
         }
+        
+        private DbStringWrapper(){
+           //crash and burn
+           options = null;
+           databaseDir = null;
+           db = null;
+        }
 
         public String get(String key)
         {
@@ -1106,7 +1145,7 @@ public class DbImplTest
             db.delete(toByteArray(key));
         }
 
-        public SeekingIterator<String, String> iterator()
+        public ReverseSeekingIterator<String, String> iterator()
         {
             return new StringDbIterator(db.iterator());
         }
@@ -1202,7 +1241,7 @@ public class DbImplTest
 
     }
 
-    private static class StringDbIterator implements SeekingIterator<String, String>
+    private static class StringDbIterator implements ReverseSeekingIterator<String, String>
     {
         private DBIterator iterator;
 
@@ -1251,5 +1290,37 @@ public class DbImplTest
         {
             return Maps.immutableEntry(new String(next.getKey(), UTF_8), new String(next.getValue(), UTF_8));
         }
+
+      @Override
+      public Entry<String, String> peekPrev()
+      {
+         return adapt(iterator.peekPrev());
+      }
+
+      @Override
+      public Entry<String, String> prev()
+      {
+         return adapt(iterator.prev());
+      }
+
+      @Override
+      public boolean hasPrev()
+      {
+         return iterator.hasPrev();
+      }
+
+      @Override
+      public void seekToLast()
+      {
+         iterator.seekToLast();
+      }
+
+      @Override
+      public void seekToEnd()
+      {
+         // ignore this, it's a complication of the class hierarchy that doesnt need to be fixed for
+         // testing as of yet
+         throw new UnsupportedOperationException();
+      }
     }
 }

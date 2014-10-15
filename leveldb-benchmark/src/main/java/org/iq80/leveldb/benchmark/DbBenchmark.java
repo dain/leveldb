@@ -447,6 +447,7 @@ public class DbBenchmark
     {
         for (int loops = 0; loops < 5; loops++) {
             DBIterator iterator = db_.iterator();
+            iterator.seekToFirst();
             for (int i = 0; i < reads_ && iterator.hasNext(); i++) {
                 Map.Entry<byte[], byte[]> entry = iterator.next();
                 bytes_ += entry.getKey().length + entry.getValue().length;
@@ -458,7 +459,16 @@ public class DbBenchmark
 
     private void readReverse()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        for (int loops = 0; loops < 3; loops++) {
+            DBIterator iterator = db_.iterator();
+            iterator.seekToLast();
+            for (int i = 0; i < reads_ && iterator.hasPrev(); i++) {
+                Map.Entry<byte[], byte[]> entry = iterator.prev();
+                bytes_ += entry.getKey().length + entry.getValue().length;
+                finishedSingleOp();
+            }
+            Closeables.closeQuietly(iterator);
+        }
     }
 
     private void readRandom()
