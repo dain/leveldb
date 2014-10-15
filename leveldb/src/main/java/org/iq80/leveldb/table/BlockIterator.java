@@ -124,8 +124,8 @@ public class BlockIterator implements ReverseSeekingIterator<Slice, Slice>
       {
          // read entry at current data position
          nextEntry = readEntry(data, prevEntry);
-         resetCache();
       }
+      resetCache();
       return prevEntry;
    }
 
