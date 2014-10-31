@@ -22,7 +22,8 @@ public enum ValueType
     DELETION(0x00),
     VALUE(0x01);
 
-    public static ValueType getValueTypeByPersistentId(int persistentId) {
+    public static ValueType getValueTypeByPersistentId(int persistentId)
+    {
         switch (persistentId) {
             case 0:
                 return DELETION;

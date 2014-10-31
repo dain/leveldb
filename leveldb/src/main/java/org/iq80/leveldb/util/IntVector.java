@@ -56,7 +56,6 @@ public class IntVector
             return;
         }
 
-
         int newLength = values.length;
         if (newLength == 0) {
             newLength = 1;
@@ -73,7 +72,8 @@ public class IntVector
         return Arrays.copyOf(values, size);
     }
 
-    public void write(SliceOutput sliceOutput) {
+    public void write(SliceOutput sliceOutput)
+    {
         for (int index = 0; index < size; index++) {
             sliceOutput.writeInt(values[index]);
         }

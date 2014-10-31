@@ -23,11 +23,10 @@ import sun.nio.ch.FileChannelImpl;
 import java.lang.reflect.Method;
 import java.nio.MappedByteBuffer;
 
-/**
- */
-public class ByteBufferSupport {
-
+public final class ByteBufferSupport
+{
     private static final Method unmap;
+
     static {
         Method x;
         try {
@@ -40,6 +39,10 @@ public class ByteBufferSupport {
         unmap = x;
     }
 
+    private ByteBufferSupport()
+    {
+    }
+
     public static void unmap(MappedByteBuffer buffer)
     {
         try {
@@ -49,6 +52,4 @@ public class ByteBufferSupport {
             throw Throwables.propagate(ignored);
         }
     }
-
-
 }

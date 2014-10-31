@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class FileMetaData
 {
-    public static Function<FileMetaData, InternalKey> GET_LARGEST_USER_KEY = new Function<FileMetaData, InternalKey>()
+    public static final Function<FileMetaData, InternalKey> GET_LARGEST_USER_KEY = new Function<FileMetaData, InternalKey>()
     {
         @Override
         public InternalKey apply(FileMetaData fileMetaData)

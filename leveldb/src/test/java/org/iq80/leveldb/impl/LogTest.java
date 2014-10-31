@@ -41,7 +41,7 @@ import static org.testng.FileAssert.fail;
 
 public class LogTest
 {
-    private final LogMonitor NO_CORRUPTION_MONITOR = new LogMonitor()
+    private static final LogMonitor NO_CORRUPTION_MONITOR = new LogMonitor()
     {
         @Override
         public void corruption(long bytes, String reason)
@@ -71,7 +71,6 @@ public class LogTest
     {
         testLog(toSlice("dain sundstrom"));
     }
-
 
     @Test
     public void testMultipleSmallRecords()

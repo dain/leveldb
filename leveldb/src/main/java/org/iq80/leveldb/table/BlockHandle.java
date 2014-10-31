@@ -19,9 +19,9 @@ package org.iq80.leveldb.table;
 
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.VariableLengthQuantity;
-import org.iq80.leveldb.util.SliceOutput;
 
 public class BlockHandle
 {
@@ -46,7 +46,8 @@ public class BlockHandle
         return dataSize;
     }
 
-    public int getFullBlockSize() {
+    public int getFullBlockSize()
+    {
         return dataSize + BlockTrailer.ENCODED_LENGTH;
     }
 
@@ -110,6 +111,7 @@ public class BlockHandle
         writeBlockHandleTo(blockHandle, sliceOutput);
         return slice.slice();
     }
+
     public static void writeBlockHandleTo(BlockHandle blockHandle, SliceOutput sliceOutput)
     {
         VariableLengthQuantity.writeVariableLengthLong(blockHandle.offset, sliceOutput);

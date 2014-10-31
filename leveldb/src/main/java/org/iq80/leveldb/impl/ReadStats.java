@@ -22,7 +22,8 @@ public class ReadStats
     private int seekFileLevel = -1;
     private FileMetaData seekFile;
 
-    public void clear() {
+    public void clear()
+    {
         seekFileLevel = -1;
         seekFile = null;
     }

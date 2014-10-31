@@ -23,12 +23,14 @@ import java.io.IOException;
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public interface DBFactory {
+public interface DBFactory
+{
+    public DB open(File path, Options options)
+            throws IOException;
 
-    public DB open(File path, Options options) throws IOException;
+    public void destroy(File path, Options options)
+            throws IOException;
 
-    public void destroy(File path, Options options) throws IOException;
-
-    public void repair(File path, Options options) throws IOException;
-
+    public void repair(File path, Options options)
+            throws IOException;
 }

@@ -28,7 +28,8 @@ import java.util.Map.Entry;
 
 import static com.google.common.collect.Lists.newArrayList;
 
-public class WriteBatchImpl implements WriteBatch
+public class WriteBatchImpl
+        implements WriteBatch
 {
     private List<Entry<Slice, Slice>> batch = newArrayList();
     private int approximateSize;
@@ -104,5 +105,4 @@ public class WriteBatchImpl implements WriteBatch
 
         void delete(Slice key);
     }
-
 }

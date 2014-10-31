@@ -22,7 +22,9 @@ import java.io.IOException;
 
 public final class Closeables
 {
-    private Closeables() {}
+    private Closeables()
+    {
+    }
 
     public static void closeQuietly(Closeable closeable)
     {

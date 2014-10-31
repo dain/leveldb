@@ -195,7 +195,7 @@ public class TableBuilder
         BlockHandle blockHandle = new BlockHandle(position, blockContents.length());
 
         // write data and trailer
-        position += fileChannel.write(new ByteBuffer[]{blockContents.toByteBuffer(), trailer.toByteBuffer()});
+        position += fileChannel.write(new ByteBuffer[] {blockContents.toByteBuffer(), trailer.toByteBuffer()});
 
         // clean up state
         blockBuilder.reset();

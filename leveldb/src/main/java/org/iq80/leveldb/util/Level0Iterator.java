@@ -33,7 +33,9 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 
-public final class Level0Iterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
+public final class Level0Iterator
+        extends AbstractSeekingIterator<InternalKey, Slice>
+        implements InternalIterator
 {
     private final List<InternalTableIterator> inputs;
     private final PriorityQueue<ComparableIterator> priorityQueue;
@@ -114,11 +116,13 @@ public final class Level0Iterator extends AbstractSeekingIterator<InternalKey, S
         return sb.toString();
     }
 
-    private static class ComparableIterator implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator> {
+    private static class ComparableIterator
+            implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
+    {
         private final SeekingIterator<InternalKey, Slice> iterator;
         private final Comparator<InternalKey> comparator;
         private final int ordinal;
-        private Entry<InternalKey,Slice> nextElement;
+        private Entry<InternalKey, Slice> nextElement;
 
         private ComparableIterator(SeekingIterator<InternalKey, Slice> iterator, Comparator<InternalKey> comparator, int ordinal, Entry<InternalKey, Slice> nextElement)
         {
@@ -143,7 +147,8 @@ public final class Level0Iterator extends AbstractSeekingIterator<InternalKey, S
             Entry<InternalKey, Slice> result = nextElement;
             if (iterator.hasNext()) {
                 nextElement = iterator.next();
-            } else {
+            }
+            else {
                 nextElement = null;
             }
             return result;

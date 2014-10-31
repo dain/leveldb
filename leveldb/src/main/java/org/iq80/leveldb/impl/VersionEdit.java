@@ -47,7 +47,7 @@ public class VersionEdit
     public VersionEdit(Slice slice)
     {
         SliceInput sliceInput = slice.input();
-        while(sliceInput.isReadable()) {
+        while (sliceInput.isReadable()) {
             int i = VariableLengthQuantity.readVariableLengthInt(sliceInput);
             VersionEditTag tag = VersionEditTag.getValueTypeByPersistentId(i);
             tag.readValue(sliceInput, this);
@@ -132,7 +132,6 @@ public class VersionEdit
             InternalKey smallest,
             InternalKey largest)
     {
-
         FileMetaData fileMetaData = new FileMetaData(fileNumber, fileSize, smallest, largest);
         addFile(level, fileMetaData);
     }
@@ -146,7 +145,6 @@ public class VersionEdit
     {
         newFiles.putAll(files);
     }
-
 
     public Multimap<Integer, Long> getDeletedFiles()
     {

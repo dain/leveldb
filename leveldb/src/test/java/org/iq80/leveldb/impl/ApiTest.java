@@ -37,39 +37,46 @@ import static org.testng.Assert.assertTrue;
  *
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public class ApiTest {
-
+public class ApiTest
+{
     File databaseDir = FileUtils.createTempDir("leveldb");
 
-    public static byte[] bytes(String value) {
-        if( value == null) {
+    public static byte[] bytes(String value)
+    {
+        if (value == null) {
             return null;
         }
         try {
             return value.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
+        }
+        catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String asString(byte value[]) {
-        if( value == null) {
+    public static String asString(byte[] value)
+    {
+        if (value == null) {
             return null;
         }
         try {
             return new String(value, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
+        }
+        catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void assertEquals(byte[] arg1, byte[] arg2) {
-        assertTrue(Arrays.equals(arg1, arg2), asString(arg1)+" != "+asString(arg2));
+    public void assertEquals(byte[] arg1, byte[] arg2)
+    {
+        assertTrue(Arrays.equals(arg1, arg2), asString(arg1) + " != " + asString(arg2));
     }
 
     DBFactory factory = Iq80DBFactory.factory;
 
-    File getTestDirectory(String name) throws IOException {
+    File getTestDirectory(String name)
+            throws IOException
+    {
         File rc = new File(databaseDir, name);
         factory.destroy(rc, new Options().createIfMissing(true));
         rc.mkdirs();
@@ -77,44 +84,44 @@ public class ApiTest {
     }
 
     @Test
-    public void testCompaction() throws IOException, DBException {
-
+    public void testCompaction()
+            throws IOException, DBException
+    {
         Options options = new Options().createIfMissing(true).compressionType(CompressionType.NONE);
 
         File path = getTestDirectory("testCompaction");
         DB db = factory.open(path, options);
 
         System.out.println("Adding");
-        for( int i=0 ; i < 1000*1000; i++) {
-            if(i%100000 == 0 ) {
-                System.out.println("  at: "+i);
+        for (int i = 0; i < 1000 * 1000; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("  at: " + i);
             }
-            db.put(bytes("key"+i), bytes("value"+i));
+            db.put(bytes("key" + i), bytes("value" + i));
         }
 
         db.close();
         db = factory.open(path, options);
 
         System.out.println("Deleting");
-        for( int i=0 ; i < 1000*1000; i++) {
-            if(i%100000 == 0 ) {
-                System.out.println("  at: "+i);
+        for (int i = 0; i < 1000 * 1000; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("  at: " + i);
             }
-            db.delete(bytes("key"+i));
+            db.delete(bytes("key" + i));
         }
 
         db.close();
         db = factory.open(path, options);
 
         System.out.println("Adding");
-        for( int i=0 ; i < 1000*1000; i++) {
-            if(i%100000 == 0 ) {
-                System.out.println("  at: "+i);
+        for (int i = 0; i < 1000 * 1000; i++) {
+            if (i % 100000 == 0) {
+                System.out.println("  at: " + i);
             }
-            db.put(bytes("key"+i), bytes("value"+i));
+            db.put(bytes("key" + i), bytes("value" + i));
         }
 
         db.close();
     }
-
 }

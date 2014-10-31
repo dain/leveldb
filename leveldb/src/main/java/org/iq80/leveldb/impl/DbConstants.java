@@ -17,7 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
-public class DbConstants
+public final class DbConstants
 {
     public static final int MAJOR_VERSION = 0;
     public static final int MINOR_VERSION = 1;
@@ -54,4 +54,7 @@ public class DbConstants
      */
     public static final int MAX_MEM_COMPACT_LEVEL = 2;
 
+    private DbConstants()
+    {
+    }
 }

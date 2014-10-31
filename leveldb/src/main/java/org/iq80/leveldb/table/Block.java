@@ -60,7 +60,8 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
  * </tbody>
  * </table>
  */
-public class Block implements SeekingIterable<Slice, Slice>
+public class Block
+        implements SeekingIterable<Slice, Slice>
 {
     private final Slice block;
     private final Comparator<Slice> comparator;
@@ -110,5 +111,4 @@ public class Block implements SeekingIterable<Slice, Slice>
     {
         return new BlockIterator(data, restartPositions, comparator);
     }
-
 }

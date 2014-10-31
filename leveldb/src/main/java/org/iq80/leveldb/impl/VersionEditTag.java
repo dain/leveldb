@@ -19,8 +19,8 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Charsets;
 import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.VariableLengthQuantity;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.VariableLengthQuantity;
 
 import java.util.Map.Entry;
 
@@ -29,6 +29,8 @@ import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
 public enum VersionEditTag
 {
+    // 8 is no longer used. It was used for large value refs.
+
     COMPARATOR(1)
             {
                 @Override
@@ -218,7 +220,6 @@ public enum VersionEditTag
                         // level
                         VariableLengthQuantity.writeVariableLengthInt(entry.getKey(), sliceOutput);
 
-
                         // file number
                         FileMetaData fileMetaData = entry.getValue();
                         VariableLengthQuantity.writeVariableLengthLong(fileMetaData.getNumber(), sliceOutput);
@@ -233,9 +234,7 @@ public enum VersionEditTag
                         writeLengthPrefixedBytes(sliceOutput, fileMetaData.getLargest().encode());
                     }
                 }
-            }
-    // 8 was used for large value refs
-            ;
+            };
 
     public static VersionEditTag getValueTypeByPersistentId(int persistentId)
     {

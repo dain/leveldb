@@ -24,7 +24,8 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
-public class BasicSliceOutput extends SliceOutput
+public class BasicSliceOutput
+        extends SliceOutput
 {
     private final Slice slice;
     private int size;

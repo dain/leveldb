@@ -22,7 +22,8 @@ import org.iq80.leveldb.impl.SeekingIterator;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
-public abstract class AbstractSeekingIterator<K, V> implements SeekingIterator<K, V>
+public abstract class AbstractSeekingIterator<K, V>
+        implements SeekingIterator<K, V>
 {
     private Entry<K, V> nextElement;
 
@@ -84,6 +85,8 @@ public abstract class AbstractSeekingIterator<K, V> implements SeekingIterator<K
     }
 
     protected abstract void seekToFirstInternal();
+
     protected abstract void seekInternal(K targetKey);
+
     protected abstract Entry<K, V> getNextElement();
 }

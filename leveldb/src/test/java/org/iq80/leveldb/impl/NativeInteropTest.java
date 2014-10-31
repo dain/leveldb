@@ -38,52 +38,63 @@ import static org.testng.Assert.assertTrue;
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public class NativeInteropTest {
+public class NativeInteropTest
+{
+    private static final AtomicInteger NEXT_ID = new AtomicInteger();
 
-    private static AtomicInteger NEXT_ID = new AtomicInteger();
+    private final File databaseDir = FileUtils.createTempDir("leveldb");
 
-    File databaseDir = FileUtils.createTempDir("leveldb");
-    
-    public static byte[] bytes(String value) {
-        if( value == null) {
+    public static byte[] bytes(String value)
+    {
+        if (value == null) {
             return null;
         }
         try {
             return value.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
+        }
+        catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String asString(byte value[]) {
-        if( value == null) {
+    public static String asString(byte[] value)
+    {
+        if (value == null) {
             return null;
         }
         try {
             return new String(value, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
+        }
+        catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void assertEquals(byte[] arg1, byte[] arg2) {
-        assertTrue(Arrays.equals(arg1, arg2), asString(arg1)+" != "+asString(arg2));
+    public void assertEquals(byte[] arg1, byte[] arg2)
+    {
+        assertTrue(Arrays.equals(arg1, arg2), asString(arg1) + " != " + asString(arg2));
     }
 
-    DBFactory iq80factory = Iq80DBFactory.factory;
-    DBFactory jnifactory = Iq80DBFactory.factory;
+    private final DBFactory iq80factory = Iq80DBFactory.factory;
+    private final DBFactory jnifactory;
 
-    public NativeInteropTest() {
+    public NativeInteropTest()
+    {
+        DBFactory jnifactory = Iq80DBFactory.factory;
         try {
             ClassLoader cl = NativeInteropTest.class.getClassLoader();
             jnifactory = (DBFactory) cl.loadClass("org.fusesource.leveldbjni.JniDBFactory").newInstance();
-        } catch (Throwable e) {
+        }
+        catch (Throwable e) {
             // We cannot create a JniDBFactory on windows :( so just use a Iq80DBFactory for both
             // to avoid test failures.
         }
+        this.jnifactory = jnifactory;
     }
 
-    File getTestDirectory(String name) throws IOException {
+    File getTestDirectory(String name)
+            throws IOException
+    {
         File rc = new File(databaseDir, name);
         iq80factory.destroy(rc, new Options().createIfMissing(true));
         rc.mkdirs();
@@ -91,27 +102,36 @@ public class NativeInteropTest {
     }
 
     @Test
-    public void testCRUDviaIQ80() throws IOException, DBException {
+    public void testCRUDviaIQ80()
+            throws IOException, DBException
+    {
         crud(iq80factory, iq80factory);
     }
 
     @Test
-    public void testCRUDviaJNI() throws IOException, DBException {
+    public void testCRUDviaJNI()
+            throws IOException, DBException
+    {
         crud(jnifactory, jnifactory);
     }
 
     @Test
-    public void testCRUDviaIQ80thenJNI() throws IOException, DBException {
+    public void testCRUDviaIQ80thenJNI()
+            throws IOException, DBException
+    {
         crud(iq80factory, jnifactory);
     }
 
     @Test
-    public void testCRUDviaJNIthenIQ80() throws IOException, DBException {
+    public void testCRUDviaJNIthenIQ80()
+            throws IOException, DBException
+    {
         crud(jnifactory, iq80factory);
     }
 
-    public void crud(DBFactory firstFactory, DBFactory secondFactory) throws IOException, DBException {
-
+    public void crud(DBFactory firstFactory, DBFactory secondFactory)
+            throws IOException, DBException
+    {
         Options options = new Options().createIfMissing(true);
 
         File path = getTestDirectory(getClass().getName() + "_" + NEXT_ID.incrementAndGet());
@@ -145,5 +165,4 @@ public class NativeInteropTest {
 
         db.close();
     }
-
 }

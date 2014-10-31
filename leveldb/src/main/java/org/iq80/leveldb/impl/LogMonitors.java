@@ -19,7 +19,8 @@ package org.iq80.leveldb.impl;
 
 public final class LogMonitors
 {
-    public static LogMonitor throwExceptionMonitor() {
+    public static LogMonitor throwExceptionMonitor()
+    {
         return new LogMonitor()
         {
             @Override
@@ -37,7 +38,8 @@ public final class LogMonitors
     }
 
     // todo implement real logging
-    public static LogMonitor logMonitor() {
+    public static LogMonitor logMonitor()
+    {
         return new LogMonitor()
         {
             @Override

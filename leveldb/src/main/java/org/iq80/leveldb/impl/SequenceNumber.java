@@ -25,6 +25,10 @@ public final class SequenceNumber
     // can be packed together into 64-bits.
     public static final long MAX_SEQUENCE_NUMBER = ((0x1L << 56) - 1);
 
+    private SequenceNumber()
+    {
+    }
+
     public static long packSequenceAndValueType(long sequence, ValueType valueType)
     {
         Preconditions.checkArgument(sequence <= MAX_SEQUENCE_NUMBER, "Sequence number is greater than MAX_SEQUENCE_NUMBER");

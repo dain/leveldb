@@ -26,8 +26,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-public class Filename
+public final class Filename
 {
+    private Filename()
+    {
+    }
+
     public enum FileType
     {
         LOG,
@@ -153,6 +157,7 @@ public class Filename
     /**
      * Make the CURRENT file point to the descriptor file with the
      * specified number.
+     *
      * @return true if successful; false otherwise
      */
     public static boolean setCurrentFile(File databaseDir, long descriptorNumber)

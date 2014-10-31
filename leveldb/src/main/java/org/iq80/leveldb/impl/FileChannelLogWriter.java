@@ -35,7 +35,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 
-public class FileChannelLogWriter implements LogWriter
+public class FileChannelLogWriter
+        implements LogWriter
 {
     private final File file;
     private final long fileNumber;

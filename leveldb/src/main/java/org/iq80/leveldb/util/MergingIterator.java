@@ -20,10 +20,15 @@ package org.iq80.leveldb.util;
 import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.InternalKey;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
+import java.util.PriorityQueue;
 
-public final class MergingIterator extends AbstractSeekingIterator<InternalKey, Slice>
+public final class MergingIterator
+        extends AbstractSeekingIterator<InternalKey, Slice>
 {
     private final List<? extends InternalIterator> levels;
     private final PriorityQueue<ComparableIterator> priorityQueue;
@@ -91,7 +96,8 @@ public final class MergingIterator extends AbstractSeekingIterator<InternalKey, 
         return sb.toString();
     }
 
-    private static class ComparableIterator implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
+    private static class ComparableIterator
+            implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
     {
         private final InternalIterator iterator;
         private final Comparator<InternalKey> comparator;

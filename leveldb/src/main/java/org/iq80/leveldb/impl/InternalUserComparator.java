@@ -23,7 +23,8 @@ import org.iq80.leveldb.util.Slice;
 
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 
-public class InternalUserComparator implements UserComparator
+public class InternalUserComparator
+        implements UserComparator
 {
     private final InternalKeyComparator internalKeyComparator;
 
@@ -39,7 +40,8 @@ public class InternalUserComparator implements UserComparator
     }
 
     @Override
-    public String name() {
+    public String name()
+    {
         return internalKeyComparator.name();
     }
 
@@ -58,8 +60,8 @@ public class InternalUserComparator implements UserComparator
             // User key has become larger.  Tack on the earliest possible
             // number to the shortened user key.
             InternalKey newInternalKey = new InternalKey(shortestSeparator, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            Preconditions.checkState(compare(start, newInternalKey.encode()) < 0);// todo
-            Preconditions.checkState(compare(newInternalKey.encode(), limit) < 0);// todo
+            Preconditions.checkState(compare(start, newInternalKey.encode()) < 0); // todo
+            Preconditions.checkState(compare(newInternalKey.encode(), limit) < 0); // todo
 
             return newInternalKey.encode();
         }
@@ -77,7 +79,7 @@ public class InternalUserComparator implements UserComparator
             // User key has become larger.  Tack on the earliest possible
             // number to the shortened user key.
             InternalKey newInternalKey = new InternalKey(shortSuccessor, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            Preconditions.checkState(compare(key, newInternalKey.encode()) < 0);// todo
+            Preconditions.checkState(compare(key, newInternalKey.encode()) < 0); // todo
 
             return newInternalKey.encode();
         }

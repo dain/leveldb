@@ -25,7 +25,9 @@ import org.iq80.leveldb.impl.TableCache;
 import java.util.List;
 import java.util.Map.Entry;
 
-public final class LevelIterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
+public final class LevelIterator
+        extends AbstractSeekingIterator<InternalKey, Slice>
+        implements InternalIterator
 {
     private final TableCache tableCache;
     private final List<FileMetaData> files;

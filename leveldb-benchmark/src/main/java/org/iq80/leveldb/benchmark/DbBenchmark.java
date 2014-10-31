@@ -76,41 +76,41 @@ public class DbBenchmark
     }
 
     //    Cache cache_;
-    private List<String> benchmarks;
-    private DB db_;
-    private final int num_;
-    private int reads_;
+    private final List<String> benchmarks;
+    private DB db;
+    private final int num;
+    private int reads;
     private final int valueSize;
-    private int heap_counter_;
-    private double last_op_finish_;
-    private long bytes_;
-    private String message_;
-    private String post_message_;
+    private int heapCounter;
+    private double lastOpFinish;
+    private long bytes;
+    private String message;
+    private String postMessage;
     //    private Histogram hist_;
-    private RandomGenerator gen_;
-    private final Random rand_;
+    private RandomGenerator generator;
+    private final Random random;
 
     // State kept for progress messages
-    int done_;
-    int next_report_;     // When to report next
+    int done;
+    int nextReport;     // When to report next
 
     final DBFactory factory;
 
-    public DbBenchmark(Map<Flag, Object> flags) throws Exception
+    public DbBenchmark(Map<Flag, Object> flags)
+            throws Exception
     {
         ClassLoader cl = DbBenchmark.class.getClassLoader();
         factory = (DBFactory) cl.loadClass(System.getProperty("leveldb.factory", "org.iq80.leveldb.impl.Iq80DBFactory")).newInstance();
         benchmarks = (List<String>) flags.get(Flag.benchmarks);
-        num_ = (Integer) flags.get(Flag.num);
-        reads_ = (Integer) (flags.get(Flag.reads) == null ? flags.get(Flag.num) : flags.get(Flag.reads));
+        num = (Integer) flags.get(Flag.num);
+        reads = (Integer) (flags.get(Flag.reads) == null ? flags.get(Flag.num) : flags.get(Flag.reads));
         valueSize = (Integer) flags.get(Flag.value_size);
         writeBufferSize = (Integer) flags.get(Flag.write_buffer_size);
         compressionRatio = (Double) flags.get(Flag.compression_ratio);
         useExisting = (Boolean) flags.get(Flag.use_existing_db);
-        heap_counter_ = 0;
-        bytes_ = 0;
-        rand_ = new Random(301);
-
+        heapCounter = 0;
+        bytes = 0;
+        random = new Random(301);
 
         databaseDir = new File((String) flags.get(Flag.db));
 
@@ -125,7 +125,7 @@ public class DbBenchmark
             destroyDb();
         }
 
-        gen_ = new RandomGenerator(compressionRatio);
+        generator = new RandomGenerator(compressionRatio);
     }
 
     private void run()
@@ -140,22 +140,22 @@ public class DbBenchmark
             boolean known = true;
 
             if (benchmark.equals("fillseq")) {
-                write(new WriteOptions(), SEQUENTIAL, FRESH, num_, valueSize, 1);
+                write(new WriteOptions(), SEQUENTIAL, FRESH, num, valueSize, 1);
             }
             else if (benchmark.equals("fillbatch")) {
-                write(new WriteOptions(), SEQUENTIAL, FRESH, num_, valueSize, 1000);
+                write(new WriteOptions(), SEQUENTIAL, FRESH, num, valueSize, 1000);
             }
             else if (benchmark.equals("fillrandom")) {
-                write(new WriteOptions(), RANDOM, FRESH, num_, valueSize, 1);
+                write(new WriteOptions(), RANDOM, FRESH, num, valueSize, 1);
             }
             else if (benchmark.equals("overwrite")) {
-                write(new WriteOptions(), RANDOM, EXISTING, num_, valueSize, 1);
+                write(new WriteOptions(), RANDOM, EXISTING, num, valueSize, 1);
             }
             else if (benchmark.equals("fillsync")) {
-                write(new WriteOptions().sync(true), RANDOM, FRESH, num_ / 1000, valueSize, 1);
+                write(new WriteOptions().sync(true), RANDOM, FRESH, num / 1000, valueSize, 1);
             }
             else if (benchmark.equals("fill100K")) {
-                write(new WriteOptions(), RANDOM, FRESH, num_ / 1000, 100 * 1000, 1);
+                write(new WriteOptions(), RANDOM, FRESH, num / 1000, 100 * 1000, 1);
             }
             else if (benchmark.equals("readseq")) {
                 readSequential();
@@ -170,10 +170,10 @@ public class DbBenchmark
                 readHot();
             }
             else if (benchmark.equals("readrandomsmall")) {
-                int n = reads_;
-                reads_ /= 1000;
+                int n = reads;
+                reads /= 1000;
                 readRandom();
-                reads_ = n;
+                reads = n;
             }
             else if (benchmark.equals("compact")) {
                 compact();
@@ -185,22 +185,22 @@ public class DbBenchmark
                 acquireLoad();
             }
             else if (benchmark.equals("snappycomp")) {
-                if( Snappy.available() ) {
+                if (Snappy.available()) {
                     snappyCompress();
                 }
             }
             else if (benchmark.equals("snappyuncomp")) {
-                if( Snappy.available() ) {
+                if (Snappy.available()) {
                     snappyUncompressDirectBuffer();
                 }
             }
             else if (benchmark.equals("unsnap-array")) {
-                if( Snappy.available() ) {
+                if (Snappy.available()) {
                     snappyUncompressArray();
                 }
             }
             else if (benchmark.equals("unsnap-direct")) {
-                if( Snappy.available() ) {
+                if (Snappy.available()) {
                     snappyUncompressDirectBuffer();
                 }
             }
@@ -218,7 +218,7 @@ public class DbBenchmark
                 stop(benchmark);
             }
         }
-        db_.close();
+        db.close();
     }
 
     private void printHeader()
@@ -230,11 +230,11 @@ public class DbBenchmark
         System.out.printf("Values:     %d bytes each (%d bytes after compression)\n",
                 valueSize,
                 (int) (valueSize * compressionRatio + 0.5));
-        System.out.printf("Entries:    %d\n", num_);
+        System.out.printf("Entries:    %d\n", num);
         System.out.printf("RawSize:    %.1f MB (estimated)\n",
-                ((kKeySize + valueSize) * num_) / 1048576.0);
+                ((kKeySize + valueSize) * num) / 1048576.0);
         System.out.printf("FileSize:   %.1f MB (estimated)\n",
-                (((kKeySize + valueSize * compressionRatio) * num_)
+                (((kKeySize + valueSize * compressionRatio) * num)
                         / 1048576.0));
         printWarnings();
         System.out.printf("------------------------------------------------\n");
@@ -242,8 +242,8 @@ public class DbBenchmark
 
     void printWarnings()
     {
-        boolean assertsEnabled = false;
-        assert assertsEnabled = true; // Intentional side effect!!!
+        boolean assertsEnabled = true;
+        assert assertsEnabled; // Intentional side effect!!!
         if (assertsEnabled) {
             System.out.printf("WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
         }
@@ -306,18 +306,18 @@ public class DbBenchmark
         if (writeBufferSize != null) {
             options.writeBufferSize(writeBufferSize);
         }
-        db_ = factory.open(databaseDir, options);
+        db = factory.open(databaseDir, options);
     }
 
     private void start()
     {
         startTime = System.nanoTime();
-        bytes_ = 0;
-        message_ = null;
-        last_op_finish_ = startTime;
+        bytes = 0;
+        message = null;
+        lastOpFinish = startTime;
         // hist.clear();
-        done_ = 0;
-        next_report_ = 100;
+        done = 0;
+        nextReport = 100;
     }
 
     private void stop(String benchmark)
@@ -327,68 +327,68 @@ public class DbBenchmark
 
         // Pretend at least one op was done in case we are running a benchmark
         // that does nto call FinishedSingleOp().
-        if (done_ < 1) {
-            done_ = 1;
+        if (done < 1) {
+            done = 1;
         }
 
-        if (bytes_ > 0) {
-            String rate = String.format("%6.1f MB/s", (bytes_ / 1048576.0) / elapsedSeconds);
-            if (message_ != null) {
-                message_ = rate + " " + message_;
+        if (bytes > 0) {
+            String rate = String.format("%6.1f MB/s", (bytes / 1048576.0) / elapsedSeconds);
+            if (message != null) {
+                message = rate + " " + message;
             }
             else {
-                message_ = rate;
+                message = rate;
             }
         }
-        else if (message_ == null) {
-            message_ = "";
+        else if (message == null) {
+            message = "";
         }
 
         System.out.printf("%-12s : %11.5f micros/op;%s%s\n",
                 benchmark,
-                elapsedSeconds * 1e6 / done_,
-                (message_ == null ? "" : " "),
-                message_);
+                elapsedSeconds * 1e6 / done,
+                (message == null ? "" : " "),
+                message);
 //        if (FLAGS_histogram) {
 //            System.out.printf("Microseconds per op:\n%s\n", hist_.ToString().c_str());
 //        }
 
-        if (post_message_ != null) {
-            System.out.printf("\n%s\n", post_message_);
-            post_message_ = null;
+        if (postMessage != null) {
+            System.out.printf("\n%s\n", postMessage);
+            postMessage = null;
         }
 
     }
 
-    private void write(WriteOptions writeOptions, Order order, DBState state, int numEntries, int valueSize, int entries_per_batch)
+    private void write(WriteOptions writeOptions, Order order, DBState state, int numEntries, int valueSize, int entriesPerBatch)
             throws IOException
     {
         if (state == FRESH) {
             if (useExisting) {
-                message_ = "skipping (--use_existing_db is true)";
+                message = "skipping (--use_existing_db is true)";
                 return;
             }
-            db_.close();
-            db_ = null;
+            db.close();
+            db = null;
             destroyDb();
             open();
             start(); // Do not count time taken to destroy/open
         }
 
-        if (numEntries != num_) {
-            message_ = String.format("(%d ops)", numEntries);
+        if (numEntries != num) {
+            message = String.format("(%d ops)", numEntries);
         }
 
-        for (int i = 0; i < numEntries; i += entries_per_batch) {
-            WriteBatch batch = db_.createWriteBatch();
-            for (int j = 0; j < entries_per_batch; j++) {
-                int k = (order == SEQUENTIAL) ? i + j : rand_.nextInt(num_);
+        for (int i = 0; i < numEntries; i += entriesPerBatch) {
+            WriteBatch batch = db.createWriteBatch();
+            for (int j = 0; j < entriesPerBatch; j++) {
+                int k = (order == SEQUENTIAL) ? i + j : random.nextInt(num);
                 byte[] key = formatNumber(k);
-                batch.put(key, gen_.generate(valueSize));
-                bytes_ += valueSize + key.length;
+                batch.put(key, generator.generate(valueSize));
+                bytes += valueSize + key.length;
                 finishedSingleOp();
             }
-            db_.write(batch, writeOptions);
+            db.write(batch, writeOptions);
             batch.close();
         }
     }
@@ -397,7 +397,7 @@ public class DbBenchmark
     {
         Preconditions.checkArgument(n >= 0, "number must be positive");
 
-        byte []slice = new byte[16];
+        byte[] slice = new byte[16];
 
         int i = 15;
         while (n > 0) {
@@ -415,30 +415,30 @@ public class DbBenchmark
 //        if (histogram) {
 //            todo
 //        }
-        done_++;
-        if (done_ >= next_report_) {
-            if (next_report_ < 1000) {
-                next_report_ += 100;
+        done++;
+        if (done >= nextReport) {
+            if (nextReport < 1000) {
+                nextReport += 100;
             }
-            else if (next_report_ < 5000) {
-                next_report_ += 500;
+            else if (nextReport < 5000) {
+                nextReport += 500;
             }
-            else if (next_report_ < 10000) {
-                next_report_ += 1000;
+            else if (nextReport < 10000) {
+                nextReport += 1000;
             }
-            else if (next_report_ < 50000) {
-                next_report_ += 5000;
+            else if (nextReport < 50000) {
+                nextReport += 5000;
             }
-            else if (next_report_ < 100000) {
-                next_report_ += 10000;
+            else if (nextReport < 100000) {
+                nextReport += 10000;
             }
-            else if (next_report_ < 500000) {
-                next_report_ += 50000;
+            else if (nextReport < 500000) {
+                nextReport += 50000;
             }
             else {
-                next_report_ += 100000;
+                nextReport += 100000;
             }
-            System.out.printf("... finished %d ops%30s\r", done_, "");
+            System.out.printf("... finished %d ops%30s\r", done, "");
 
         }
     }
@@ -446,10 +446,10 @@ public class DbBenchmark
     private void readSequential()
     {
         for (int loops = 0; loops < 5; loops++) {
-            DBIterator iterator = db_.iterator();
-            for (int i = 0; i < reads_ && iterator.hasNext(); i++) {
+            DBIterator iterator = db.iterator();
+            for (int i = 0; i < reads && iterator.hasNext(); i++) {
                 Map.Entry<byte[], byte[]> entry = iterator.next();
-                bytes_ += entry.getKey().length + entry.getValue().length;
+                bytes += entry.getKey().length + entry.getValue().length;
                 finishedSingleOp();
             }
             Closeables.closeQuietly(iterator);
@@ -463,22 +463,22 @@ public class DbBenchmark
 
     private void readRandom()
     {
-        for (int i = 0; i < reads_; i++) {
-            byte[] key = formatNumber(rand_.nextInt(num_));
-            byte[] value = db_.get(key);
+        for (int i = 0; i < reads; i++) {
+            byte[] key = formatNumber(random.nextInt(num));
+            byte[] value = db.get(key);
             Preconditions.checkNotNull(value, "db.get(%s) is null", new String(key, UTF_8));
-            bytes_ += key.length + value.length;
+            bytes += key.length + value.length;
             finishedSingleOp();
         }
     }
 
     private void readHot()
     {
-        int range = (num_ + 99) / 100;
-        for (int i = 0; i < reads_; i++) {
-            byte[] key = formatNumber(rand_.nextInt(range));
-            byte[] value = db_.get(key);
-            bytes_ += key.length + value.length;
+        int range = (num + 99) / 100;
+        for (int i = 0; i < reads; i++) {
+            byte[] key = formatNumber(random.nextInt(range));
+            byte[] value = db.get(key);
+            bytes += key.length + value.length;
             finishedSingleOp();
         }
     }
@@ -486,10 +486,10 @@ public class DbBenchmark
     private void compact()
             throws IOException
     {
-        if(db_ instanceof DbImpl) {
-            ((DbImpl)db_).compactMemTable();
+        if (db instanceof DbImpl) {
+            ((DbImpl) db).compactMemTable();
             for (int level = 0; level < NUM_LEVELS - 1; level++) {
-                ((DbImpl)db_).compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
+                ((DbImpl) db).compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
             }
         }
     }
@@ -514,9 +514,9 @@ public class DbBenchmark
         }
         System.out.printf("... crc=0x%x\r", crc);
 
-        bytes_ = bytes;
+        this.bytes = bytes;
         // Print so result is not dead
-        message_ = message;
+        this.message = message;
     }
 
     private void acquireLoad()
@@ -526,16 +526,16 @@ public class DbBenchmark
 
     private void snappyCompress()
     {
-        byte[] raw = gen_.generate(new Options().blockSize());
+        byte[] raw = generator.generate(new Options().blockSize());
         byte[] compressedOutput = new byte[Snappy.maxCompressedLength(raw.length)];
 
         long produced = 0;
 
         // attempt to compress the block
-        while (bytes_ < 1024 * 1048576) {  // Compress 1G
+        while (bytes < 1024 * 1048576) {  // Compress 1G
             try {
                 int compressedSize = Snappy.compress(raw, 0, raw.length, compressedOutput, 0);
-                bytes_ += raw.length;
+                bytes += raw.length;
                 produced += compressedSize;
             }
             catch (IOException ignored) {
@@ -545,14 +545,14 @@ public class DbBenchmark
             finishedSingleOp();
         }
 
-        message_ = String.format("(output: %.1f%%)", (produced * 100.0) / bytes_);
+        message = String.format("(output: %.1f%%)", (produced * 100.0) / bytes);
     }
 
     private void snappyUncompressArray()
     {
         int inputSize = new Options().blockSize();
         byte[] compressedOutput = new byte[Snappy.maxCompressedLength(inputSize)];
-        byte raw[] = gen_.generate(inputSize);
+        byte[] raw = generator.generate(inputSize);
         int compressedLength;
         try {
             compressedLength = Snappy.compress(raw, 0, raw.length, compressedOutput, 0);
@@ -561,10 +561,10 @@ public class DbBenchmark
             throw Throwables.propagate(e);
         }
         // attempt to uncompress the block
-        while (bytes_ < 5L * 1024 * 1048576) {  // Compress 1G
+        while (bytes < 5L * 1024 * 1048576) {  // Compress 1G
             try {
                 Snappy.uncompress(compressedOutput, 0, compressedLength, raw, 0);
-                bytes_ += inputSize;
+                bytes += inputSize;
             }
             catch (IOException ignored) {
                 throw Throwables.propagate(ignored);
@@ -578,7 +578,7 @@ public class DbBenchmark
     {
         int inputSize = new Options().blockSize();
         byte[] compressedOutput = new byte[Snappy.maxCompressedLength(inputSize)];
-        byte raw[] = gen_.generate(inputSize);
+        byte[] raw = generator.generate(inputSize);
         int compressedLength;
         try {
             compressedLength = Snappy.compress(raw, 0, raw.length, compressedOutput, 0);
@@ -592,13 +592,13 @@ public class DbBenchmark
         compressedBuffer.put(compressedOutput, 0, compressedLength);
 
         // attempt to uncompress the block
-        while (bytes_ < 5L * 1024 * 1048576) {  // Compress 1G
+        while (bytes < 5L * 1024 * 1048576) {  // Compress 1G
             try {
                 uncompressedBuffer.clear();
                 compressedBuffer.position(0);
                 compressedBuffer.limit(compressedLength);
                 Snappy.uncompress(compressedBuffer, uncompressedBuffer);
-                bytes_ += inputSize;
+                bytes += inputSize;
             }
             catch (IOException ignored) {
                 throw Throwables.propagate(ignored);
@@ -615,8 +615,8 @@ public class DbBenchmark
 
     private void destroyDb()
     {
-        Closeables.closeQuietly(db_);
-        db_ = null;
+        Closeables.closeQuietly(db);
+        db = null;
         FileUtils.deleteRecursively(databaseDir);
     }
 
@@ -637,9 +637,6 @@ public class DbBenchmark
             if (arg.startsWith("--")) {
                 try {
                     ImmutableList<String> parts = ImmutableList.copyOf(Splitter.on("=").limit(2).split(arg.substring(2)));
-                    if (parts.size() != 2) {
-
-                    }
                     Flag key = Flag.valueOf(parts.get(0));
                     Object value = key.parseValue(parts.get(1));
                     flags.put(key, value);
@@ -657,7 +654,6 @@ public class DbBenchmark
         }
         new DbBenchmark(flags).run();
     }
-
 
     private enum Flag
     {
@@ -812,11 +808,11 @@ public class DbBenchmark
                     {
                         return value;
                     }
-                },;
+                };
 
         private final Object defaultValue;
 
-        private Flag(Object defaultValue)
+        Flag(Object defaultValue)
         {
             this.defaultValue = defaultValue;
         }

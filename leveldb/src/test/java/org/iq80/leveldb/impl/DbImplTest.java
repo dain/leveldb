@@ -82,12 +82,11 @@ public class DbImplTest
         options.createIfMissing(true);
         DbImpl db = new DbImpl(options, this.databaseDir);
         Random random = new Random(301);
-        for(int i=0; i < 200000*STRESS_FACTOR; i++)
-        {
-            db.put(randomString(random, 64).getBytes(), new byte[]{0x01}, new WriteOptions().sync(false));
+        for (int i = 0; i < 200000 * STRESS_FACTOR; i++) {
+            db.put(randomString(random, 64).getBytes(), new byte[] {0x01}, new WriteOptions().sync(false));
             db.get(randomString(random, 64).getBytes());
-            if ((i%50000)==0 && i!=0 ) {
-                System.out.println(i+" rows written");
+            if ((i % 50000) == 0 && i != 0) {
+                System.out.println(i + " rows written");
             }
         }
     }
@@ -437,7 +436,7 @@ public class DbImplTest
         Random random = new Random(301);
         List<String> values = newArrayList();
         for (int i = 0; i < 80; i++) {
-            String value = randomString(random, 100*1024);
+            String value = randomString(random, 100 * 1024);
             db.put(key(i), value);
             values.add(value);
         }
@@ -809,16 +808,16 @@ public class DbImplTest
         }
     }
 
-    @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory '" + DOES_NOT_EXIST_FILENAME_PATTERN + "'.*")
+    @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory '" + DOES_NOT_EXIST_FILENAME_PATTERN + "'.*")
     public void testCantCreateDirectoryReturnMessage()
-        throws Exception
+            throws Exception
     {
         new DbStringWrapper(new Options(), new File(DOES_NOT_EXIST_FILENAME));
     }
 
-    @Test (expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory.*is not a directory")
+    @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory.*is not a directory")
     public void testDBDirectoryIsFileRetrunMessage()
-        throws Exception
+            throws Exception
     {
         File databaseFile = new File(databaseDir + "/imafile");
         assertTrue(databaseFile.createNewFile());
@@ -875,7 +874,6 @@ public class DbImplTest
     private void testDb(DbStringWrapper db, List<Entry<String, String>> entries)
             throws IOException
     {
-
         for (Entry<String, String> entry : entries) {
             db.put(entry.getKey(), entry.getValue());
         }
@@ -903,7 +901,7 @@ public class DbImplTest
             assertSequence(seekingIterator, nextEntries.subList(1, nextEntries.size()));
         }
 
-        Slice endKey = Slices.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+        Slice endKey = Slices.wrappedBuffer(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey.toString(Charsets.UTF_8));
         assertSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
     }
@@ -954,7 +952,6 @@ public class DbImplTest
     {
         return value.getBytes(UTF_8);
     }
-
 
     private static String randomString(Random random, int length)
     {
@@ -1202,7 +1199,8 @@ public class DbImplTest
 
     }
 
-    private static class StringDbIterator implements SeekingIterator<String, String>
+    private static class StringDbIterator
+            implements SeekingIterator<String, String>
     {
         private DBIterator iterator;
 

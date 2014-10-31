@@ -25,7 +25,8 @@ import org.iq80.leveldb.util.Slices;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class SeekingIteratorAdapter implements DBIterator
+public class SeekingIteratorAdapter
+        implements DBIterator
 {
     private final SnapshotSeekingIterator seekingIterator;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -70,7 +71,7 @@ public class SeekingIteratorAdapter implements DBIterator
     {
         // This is an end user API.. he might screw up and close multiple times.
         // but we don't want the close multiple times as reference counts go bad.
-        if(closed.compareAndSet(false, true)) {
+        if (closed.compareAndSet(false, true)) {
             seekingIterator.close();
         }
     }
@@ -89,7 +90,6 @@ public class SeekingIteratorAdapter implements DBIterator
     //
     // todo Implement reverse iterator
     //
-
 
     @Override
     public void seekToLast()
@@ -115,7 +115,8 @@ public class SeekingIteratorAdapter implements DBIterator
         throw new UnsupportedOperationException();
     }
 
-    public static class DbEntry implements Entry<byte[], byte[]>
+    public static class DbEntry
+            implements Entry<byte[], byte[]>
     {
         private final Slice key;
         private final Slice value;

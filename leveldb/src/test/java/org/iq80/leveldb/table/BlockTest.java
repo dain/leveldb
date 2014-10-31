@@ -56,7 +56,6 @@ public class BlockTest
     public void testMultipleEntriesWithNonSharedKey()
             throws Exception
     {
-
         blockTest(Integer.MAX_VALUE,
                 BlockHelper.createBlockEntry("beer", "Lagunitas IPA"),
                 BlockHelper.createBlockEntry("scotch", "Highland Park"));
@@ -142,8 +141,7 @@ public class BlockTest
             BlockHelper.assertSequence(blockIterator, nextEntries.subList(1, nextEntries.size()));
         }
 
-        blockIterator.seek(Slices.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}));
+        blockIterator.seek(Slices.wrappedBuffer(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF}));
         BlockHelper.assertSequence(blockIterator, Collections.<BlockEntry>emptyList());
-
     }
 }

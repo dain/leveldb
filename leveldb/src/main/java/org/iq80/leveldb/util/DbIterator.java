@@ -29,9 +29,10 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
-public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice> implements InternalIterator
+public final class DbIterator
+        extends AbstractSeekingIterator<InternalKey, Slice>
+        implements InternalIterator
 {
-
     /*
      * NOTE: This code has been specifically tuned for performance of the DB
      * iterator methods.  Before committing changes to this code, make sure
@@ -47,7 +48,6 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
      * call-sites.  If a future version of hot spot supports inlining of truly
      * polymorphic call-sites, this code can be made much simpler.
      */
-
 
     private final MemTableIterator memTableIterator;
     private final MemTableIterator immutableMemTableIterator;
@@ -220,7 +220,8 @@ public final class DbIterator extends AbstractSeekingIterator<InternalKey, Slice
         return sb.toString();
     }
 
-    private static class ComparableIterator implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
+    private static class ComparableIterator
+            implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
     {
         private final SeekingIterator<InternalKey, Slice> iterator;
         private final Comparator<InternalKey> comparator;

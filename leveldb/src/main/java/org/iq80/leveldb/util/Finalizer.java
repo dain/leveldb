@@ -22,7 +22,11 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Finalizer<T>
@@ -86,17 +90,18 @@ public class Finalizer<T>
         // is no longer reachable (if the reference object is garbage collected we are never notified)
         references.put(reference, Boolean.TRUE);
     }
-    
+
     public synchronized void destroy()
     {
         destroyed = true;
-        if( executor!=null ) {
+        if (executor != null) {
             executor.shutdownNow();
         }
-        for(FinalizerPhantomReference<T> r: references.keySet() ) {
+        for (FinalizerPhantomReference<T> r : references.keySet()) {
             try {
                 r.cleanup();
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
             }
         }
     }
@@ -106,7 +111,8 @@ public class Finalizer<T>
         void unexpectedException(Throwable throwable);
     }
 
-    private static class FinalizerPhantomReference<T> extends PhantomReference<T>
+    private static class FinalizerPhantomReference<T>
+            extends PhantomReference<T>
     {
         private final AtomicBoolean cleaned = new AtomicBoolean(false);
         private final Callable<?> cleanup;
@@ -117,14 +123,17 @@ public class Finalizer<T>
             this.cleanup = cleanup;
         }
 
-        private void cleanup() throws Exception {
-            if(cleaned.compareAndSet(false, true)) {
+        private void cleanup()
+                throws Exception
+        {
+            if (cleaned.compareAndSet(false, true)) {
                 cleanup.call();
             }
         }
     }
 
-    private class FinalizerQueueProcessor implements Runnable
+    private class FinalizerQueueProcessor
+            implements Runnable
     {
         @Override
         public void run()

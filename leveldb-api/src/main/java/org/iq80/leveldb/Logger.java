@@ -20,8 +20,7 @@ package org.iq80.leveldb;
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public interface Logger {
-
+public interface Logger
+{
     public void log(String message);
-
 }

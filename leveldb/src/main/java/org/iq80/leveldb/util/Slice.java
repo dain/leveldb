@@ -31,12 +31,16 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
-import static org.iq80.leveldb.util.SizeOf.*;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_SHORT;
 
 /**
  * Little Endian slice of a byte array.
  */
-public final class Slice implements Comparable<Slice>
+public final class Slice
+        implements Comparable<Slice>
 {
     private final byte[] data;
     private final int offset;
@@ -106,7 +110,7 @@ public final class Slice implements Comparable<Slice>
 
     /**
      * Gets an unsigned byte at the specified absolute {@code index} in this
-     * buffer.  
+     * buffer.
      *
      * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
      * {@code index + 1} is greater than {@code this.capacity}
@@ -132,7 +136,7 @@ public final class Slice implements Comparable<Slice>
 
     /**
      * Gets a 32-bit integer at the specified absolute {@code index} in
-     * this buffer. 
+     * this buffer.
      *
      * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
      * {@code index + 4} is greater than {@code this.capacity}
@@ -149,7 +153,7 @@ public final class Slice implements Comparable<Slice>
 
     /**
      * Gets a 64-bit long integer at the specified absolute {@code index} in
-     * this buffer. 
+     * this buffer.
      *
      * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
      * {@code index + 8} is greater than {@code this.capacity}
@@ -217,7 +221,8 @@ public final class Slice implements Comparable<Slice>
         index += offset;
         if (index == 0) {
             return Arrays.copyOf(data, length);
-        } else {
+        }
+        else {
             byte[] value = new byte[length];
             System.arraycopy(data, index, value, 0, length);
             return value;
@@ -403,7 +408,7 @@ public final class Slice implements Comparable<Slice>
      *
      * @param length the number of bytes to transfer
      * @return the actual number of bytes read in from the specified channel.
-     *         {@code -1} if the specified channel is closed.
+     * {@code -1} if the specified channel is closed.
      * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
      * if {@code index + length} is greater than {@code this.capacity}
      * @throws java.io.IOException if the specified stream threw an exception during I/O
@@ -438,7 +443,7 @@ public final class Slice implements Comparable<Slice>
      *
      * @param length the maximum number of bytes to transfer
      * @return the actual number of bytes read in from the specified channel.
-     *         {@code -1} if the specified channel is closed.
+     * {@code -1} if the specified channel is closed.
      * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
      * if {@code index + length} is greater than {@code this.capacity}
      * @throws java.io.IOException if the specified channel threw an exception during I/O
@@ -539,7 +544,8 @@ public final class Slice implements Comparable<Slice>
         index += offset;
         if (index == 0) {
             return Arrays.copyOf(data, length);
-        } else {
+        }
+        else {
             byte[] value = new byte[length];
             System.arraycopy(data, index, value, 0, length);
             return value;

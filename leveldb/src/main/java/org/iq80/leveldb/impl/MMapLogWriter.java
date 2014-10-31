@@ -37,9 +37,10 @@ import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
 
-public class MMapLogWriter implements LogWriter
+public class MMapLogWriter
+        implements LogWriter
 {
-    private static final int PAGE_SIZE  = 1024 * 1024;
+    private static final int PAGE_SIZE = 1024 * 1024;
 
     private final File file;
     private final long fileNumber;

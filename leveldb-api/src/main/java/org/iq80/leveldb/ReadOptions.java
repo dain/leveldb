@@ -34,20 +34,24 @@ public class ReadOptions
         return this;
     }
 
-    public boolean fillCache() {
+    public boolean fillCache()
+    {
         return fillCache;
     }
 
-    public ReadOptions fillCache(boolean fillCache) {
+    public ReadOptions fillCache(boolean fillCache)
+    {
         this.fillCache = fillCache;
         return this;
     }
 
-    public boolean verifyChecksums() {
+    public boolean verifyChecksums()
+    {
         return verifyChecksums;
     }
 
-    public ReadOptions verifyChecksums(boolean verifyChecksums) {
+    public ReadOptions verifyChecksums(boolean verifyChecksums)
+    {
         this.verifyChecksums = verifyChecksums;
         return this;
     }

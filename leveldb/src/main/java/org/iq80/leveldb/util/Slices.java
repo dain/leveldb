@@ -19,7 +19,6 @@ package org.iq80.leveldb.util;
 
 import com.google.common.base.Preconditions;
 
-import javax.xml.transform.Source;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.CharBuffer;
@@ -236,7 +235,6 @@ public final class Slices
         return e;
     }
 
-
     /**
      * Returns a cached thread-local {@link CharsetDecoder} for the specified
      * <tt>charset</tt>.
@@ -262,5 +260,4 @@ public final class Slices
         map.put(charset, d);
         return d;
     }
-
 }

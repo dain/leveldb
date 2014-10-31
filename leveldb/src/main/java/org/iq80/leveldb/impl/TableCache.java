@@ -23,11 +23,11 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.table.FileChannelTable;
 import org.iq80.leveldb.table.MMapTable;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Finalizer;
 import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Slice;
@@ -49,15 +49,19 @@ public class TableCache
 
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
-                .removalListener(new RemovalListener<Long, TableAndFile>() {
-                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification) {
+                .removalListener(new RemovalListener<Long, TableAndFile>()
+                {
+                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
+                    {
                         Table table = notification.getValue().getTable();
                         finalizer.addCleanup(table, table.closer());
                     }
                 })
-                .build(new CacheLoader<Long, TableAndFile>() {
+                .build(new CacheLoader<Long, TableAndFile>()
+                {
                     public TableAndFile load(Long fileNumber)
-                            throws IOException {
+                            throws IOException
+                    {
                         return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
                     }
                 });
@@ -73,7 +77,8 @@ public class TableCache
         return new InternalTableIterator(getTable(number).iterator());
     }
 
-    public long getApproximateOffsetOf(FileMetaData file, Slice key) {
+    public long getApproximateOffsetOf(FileMetaData file, Slice key)
+    {
         return getTable(file.getNumber()).getApproximateOffsetOf(key);
     }
 
@@ -93,7 +98,8 @@ public class TableCache
         return table;
     }
 
-    public void close() {
+    public void close()
+    {
         cache.invalidateAll();
         finalizer.destroy();
     }
@@ -115,9 +121,10 @@ public class TableCache
             File tableFile = new File(databaseDir, tableFileName);
             fileChannel = new FileInputStream(tableFile).getChannel();
             try {
-                if( Iq80DBFactory.USE_MMAP ) {
+                if (Iq80DBFactory.USE_MMAP) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
-                } else {
+                }
+                else {
                     table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
                 }
             }
@@ -132,5 +139,4 @@ public class TableCache
             return table;
         }
     }
-
 }

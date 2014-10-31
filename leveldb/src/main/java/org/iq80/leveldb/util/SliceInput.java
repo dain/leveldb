@@ -25,7 +25,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.charset.Charset;
 
-public final class SliceInput extends InputStream implements DataInput
+public final class SliceInput
+        extends InputStream
+        implements DataInput
 {
     private final Slice slice;
     private int position;

@@ -69,7 +69,7 @@ public class Compaction
         this.levelUpInputs = levelUpInputs;
         this.grandparents = grandparents;
         this.maxOutputFileSize = VersionSet.maxFileSizeForLevel(level);
-        this.inputs = new List[]{levelInputs, levelUpInputs};
+        this.inputs = new List[] {levelInputs, levelUpInputs};
     }
 
     public int getLevel()
@@ -178,9 +178,7 @@ public class Compaction
 
         // Scan to find earliest grandparent file that contains key.
         InternalKeyComparator internalKeyComparator = inputVersion.getInternalKeyComparator();
-        while (grandparentIndex < grandparents.size() &&
-                internalKeyComparator.compare(internalKey, grandparents.get(grandparentIndex).getLargest()) > 0) {
-
+        while (grandparentIndex < grandparents.size() && internalKeyComparator.compare(internalKey, grandparents.get(grandparentIndex).getLargest()) > 0) {
             if (seenKey) {
                 overlappedBytes += grandparents.get(grandparentIndex).getFileSize();
             }
@@ -198,7 +196,8 @@ public class Compaction
         }
     }
 
-    public List<FileMetaData>[] getInputs() {
+    public List<FileMetaData>[] getInputs()
+    {
         return inputs;
     }
 }

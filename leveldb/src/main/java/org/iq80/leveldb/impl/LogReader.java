@@ -20,8 +20,8 @@ package org.iq80.leveldb.impl;
 import org.iq80.leveldb.util.DynamicSliceOutput;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;

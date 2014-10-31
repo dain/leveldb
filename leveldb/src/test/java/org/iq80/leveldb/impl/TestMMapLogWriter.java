@@ -27,7 +27,6 @@ import java.nio.channels.FileChannel;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
-
 public class TestMMapLogWriter
 {
     @Test
@@ -61,9 +60,9 @@ public class TestMMapLogWriter
         }
     }
 
-    private static class AssertNoCorruptionLogMonitor implements LogMonitor
+    private static class AssertNoCorruptionLogMonitor
+            implements LogMonitor
     {
-
         @Override
         public void corruption(long bytes, String reason)
         {
@@ -75,6 +74,5 @@ public class TestMMapLogWriter
         {
             fail("corruption at " + bytes + " reason: " + reason.toString());
         }
-
     }
 }

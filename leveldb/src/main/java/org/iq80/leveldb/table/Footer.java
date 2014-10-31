@@ -20,8 +20,8 @@ package org.iq80.leveldb.table;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 
 import static org.iq80.leveldb.table.BlockHandle.readBlockHandle;
 import static org.iq80.leveldb.table.BlockHandle.writeBlockHandleTo;
@@ -71,10 +71,10 @@ public class Footer
         return new Footer(metaindexBlockHandle, indexBlockHandle);
     }
 
-    public static Slice writeFooter(Footer Footer)
+    public static Slice writeFooter(Footer footer)
     {
         Slice slice = Slices.allocate(ENCODED_LENGTH);
-        writeFooter(Footer, slice.output());
+        writeFooter(footer, slice.output());
         return slice;
     }
 
@@ -94,5 +94,4 @@ public class Footer
         sliceOutput.writeInt((int) TableBuilder.TABLE_MAGIC_NUMBER);
         sliceOutput.writeInt((int) (TableBuilder.TABLE_MAGIC_NUMBER >>> 32));
     }
-
 }

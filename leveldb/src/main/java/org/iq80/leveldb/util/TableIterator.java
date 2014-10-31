@@ -23,7 +23,8 @@ import org.iq80.leveldb.table.Table;
 
 import java.util.Map.Entry;
 
-public final class TableIterator extends AbstractSeekingIterator<Slice, Slice>
+public final class TableIterator
+        extends AbstractSeekingIterator<Slice, Slice>
 {
     private final Table table;
     private final BlockIterator blockIterator;

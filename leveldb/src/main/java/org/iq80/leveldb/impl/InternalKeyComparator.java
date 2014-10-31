@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.collect.ComparisonChain;
 import com.google.common.primitives.Longs;
 import org.iq80.leveldb.table.UserComparator;
 
@@ -25,7 +24,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 
-public class InternalKeyComparator implements Comparator<InternalKey>
+public class InternalKeyComparator
+        implements Comparator<InternalKey>
 {
     private final UserComparator userComparator;
 
@@ -39,7 +39,8 @@ public class InternalKeyComparator implements Comparator<InternalKey>
         return userComparator;
     }
 
-    public String name() {
+    public String name()
+    {
         return this.userComparator.name();
     }
 

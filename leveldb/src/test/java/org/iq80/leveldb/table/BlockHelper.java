@@ -36,8 +36,12 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-public class BlockHelper
+public final class BlockHelper
 {
+    private BlockHelper()
+    {
+    }
+
     public static int estimateBlockSize(int blockRestartInterval, List<BlockEntry> entries)
     {
         if (entries.isEmpty()) {

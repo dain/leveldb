@@ -41,27 +41,27 @@ public class PureJavaCrc32CTest
     public Object[][] data()
     {
         return new Object[][] {
-                new Object[] { 0x8a9136aa, arrayOf(32, (byte) 0) },
-                new Object[] { 0x62a8ab43, arrayOf(32, (byte) 0xff) },
-                new Object[] { 0x46dd794e, arrayOf(32, new Function<Integer, Byte>()
+                new Object[] {0x8a9136aa, arrayOf(32, (byte) 0)},
+                new Object[] {0x62a8ab43, arrayOf(32, (byte) 0xff)},
+                new Object[] {0x46dd794e, arrayOf(32, new Function<Integer, Byte>()
                 {
                     public Byte apply(Integer position)
                     {
                         return (byte) position.intValue();
                     }
-                }) },
-                new Object[] { 0x113fdb5c, arrayOf(32, new Function<Integer, Byte>()
+                })},
+                new Object[] {0x113fdb5c, arrayOf(32, new Function<Integer, Byte>()
                 {
                     public Byte apply(Integer position)
                     {
                         return (byte) (31 - position);
                     }
-                }) },
-                new Object[] { 0xd9963a56, arrayOf(new int[] {
+                })},
+                new Object[] {0xd9963a56, arrayOf(new int[] {
                         0x01, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
                         0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x18, 0x28, 0x00, 0x00, 0x00,
-                        0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }) }
+                        0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})}
         };
     }
 
@@ -130,5 +130,4 @@ public class PureJavaCrc32CTest
 
         return result;
     }
-
 }

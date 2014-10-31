@@ -23,7 +23,11 @@ import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import org.iq80.leveldb.util.*;
+import org.iq80.leveldb.util.InternalIterator;
+import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.LevelIterator;
+import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.Slice;
 
 import java.util.Collection;
 import java.util.List;
@@ -37,7 +41,8 @@ import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
 // todo this class should be immutable
-public class Version implements SeekingIterable<InternalKey, Slice>
+public class Version
+        implements SeekingIterable<InternalKey, Slice>
 {
     private final AtomicInteger retained = new AtomicInteger(1);
     private final VersionSet versionSet;
@@ -95,7 +100,8 @@ public class Version implements SeekingIterable<InternalKey, Slice>
         }
     }
 
-    private TableCache getTableCache() {
+    private TableCache getTableCache()
+    {
         return versionSet.getTableCache();
     }
 
@@ -125,7 +131,8 @@ public class Version implements SeekingIterable<InternalKey, Slice>
     }
 
     @Override
-    public MergingIterator iterator() {
+    public MergingIterator iterator()
+    {
         Builder<InternalIterator> builder = ImmutableList.builder();
         builder.add(level0.iterator());
         builder.addAll(getLevelIterators());
@@ -199,7 +206,7 @@ public class Version implements SeekingIterable<InternalKey, Slice>
         Preconditions.checkNotNull(smallestUserKey, "smallestUserKey is null");
         Preconditions.checkNotNull(largestUserKey, "largestUserKey is null");
 
-        if  (level == 0) {
+        if (level == 0) {
             return level0.someFileOverlapsRange(smallestUserKey, largestUserKey);
         }
         return levels.get(level - 1).someFileOverlapsRange(smallestUserKey, largestUserKey);
@@ -214,7 +221,8 @@ public class Version implements SeekingIterable<InternalKey, Slice>
     {
         if (level == 0) {
             return level0.getFiles().size();
-        } else {
+        }
+        else {
             return levels.get(level - 1).getFiles().size();
         }
     }
@@ -236,7 +244,8 @@ public class Version implements SeekingIterable<InternalKey, Slice>
     {
         if (level == 0) {
             return level0.getFiles();
-        } else {
+        }
+        else {
             return levels.get(level - 1).getFiles();
         }
     }
@@ -245,7 +254,8 @@ public class Version implements SeekingIterable<InternalKey, Slice>
     {
         if (level == 0) {
             level0.addFile(fileMetaData);
-        } else {
+        }
+        else {
             levels.get(level - 1).addFile(fileMetaData);
         }
     }
@@ -303,23 +313,24 @@ public class Version implements SeekingIterable<InternalKey, Slice>
         return result;
     }
 
-    public void retain() {
+    public void retain()
+    {
         int was = retained.getAndIncrement();
-        assert was>0 : "Version was retain after it was disposed.";
+        assert was > 0 : "Version was retain after it was disposed.";
     }
 
-    public void release() {
+    public void release()
+    {
         int now = retained.decrementAndGet();
         assert now >= 0 : "Version was released after it was disposed.";
-        if( now == 0 ) {
+        if (now == 0) {
             // The version is now disposed.
             versionSet.removeVersion(this);
         }
     }
-    
-    public boolean isDisposed() {
+
+    public boolean isDisposed()
+    {
         return retained.get() <= 0;
     }
-    
-
 }

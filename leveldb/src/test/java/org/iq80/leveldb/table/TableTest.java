@@ -39,14 +39,15 @@ import java.util.List;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertTrue;
 
-abstract public class TableTest
+public abstract class TableTest
 {
     private File file;
     private RandomAccessFile randomAccessFile;
     private FileChannel fileChannel;
 
-    abstract protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums) throws IOException;
-    
+    protected abstract Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+            throws IOException;
+
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testEmptyFile()
             throws Exception
@@ -60,7 +61,6 @@ abstract public class TableTest
     {
         tableTest(Integer.MAX_VALUE, Integer.MAX_VALUE);
     }
-
 
     @Test
     public void testSingleEntrySingleBlock()
@@ -149,7 +149,7 @@ abstract public class TableTest
             lastApproximateOffset = approximateOffset;
         }
 
-        Slice endKey = Slices.wrappedBuffer(new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+        Slice endKey = Slices.wrappedBuffer(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey);
         BlockHelper.assertSequence(seekingIterator, Collections.<BlockEntry>emptyList());
 

@@ -20,8 +20,8 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
@@ -108,6 +108,7 @@ public class InternalKey
     }
 
     private int hash = 0;
+
     @Override
     public int hashCode()
     {
@@ -148,8 +149,8 @@ public class InternalKey
         return new UserKeyInternalKeyFunction(sequenceNumber);
     }
 
-
-    private static class InternalKeyToSliceFunction implements Function<InternalKey, Slice>
+    private static class InternalKeyToSliceFunction
+            implements Function<InternalKey, Slice>
     {
         @Override
         public Slice apply(InternalKey internalKey)
@@ -158,7 +159,8 @@ public class InternalKey
         }
     }
 
-    private static class InternalKeyToUserKeyFunction implements Function<InternalKey, Slice>
+    private static class InternalKeyToUserKeyFunction
+            implements Function<InternalKey, Slice>
     {
         @Override
         public Slice apply(InternalKey internalKey)
@@ -167,7 +169,8 @@ public class InternalKey
         }
     }
 
-    private static class SliceToInternalKeyFunction implements Function<Slice, InternalKey>
+    private static class SliceToInternalKeyFunction
+            implements Function<Slice, InternalKey>
     {
         @Override
         public InternalKey apply(Slice bytes)
@@ -176,7 +179,8 @@ public class InternalKey
         }
     }
 
-    private static class UserKeyInternalKeyFunction implements Function<Slice, InternalKey>
+    private static class UserKeyInternalKeyFunction
+            implements Function<Slice, InternalKey>
     {
         private final long sequenceNumber;
 
@@ -206,6 +210,4 @@ public class InternalKey
     {
         return SequenceNumber.unpackValueType(data.getLong(data.length() - SIZE_OF_LONG));
     }
-
-
 }

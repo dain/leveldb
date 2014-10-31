@@ -29,7 +29,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
-public class MemTable implements SeekingIterable<InternalKey, Slice>
+public class MemTable
+        implements SeekingIterable<InternalKey, Slice>
 {
     private final ConcurrentSkipListMap<InternalKey, Slice> table;
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
@@ -75,7 +76,8 @@ public class MemTable implements SeekingIterable<InternalKey, Slice>
         if (entryKey.getUserKey().equals(key.getUserKey())) {
             if (entryKey.getValueType() == ValueType.DELETION) {
                 return LookupResult.deleted(key);
-            } else {
+            }
+            else {
                 return LookupResult.ok(key, entry.getValue());
             }
         }
@@ -88,9 +90,9 @@ public class MemTable implements SeekingIterable<InternalKey, Slice>
         return new MemTableIterator();
     }
 
-    public class MemTableIterator implements InternalIterator
+    public class MemTableIterator
+            implements InternalIterator
     {
-
         private PeekingIterator<Entry<InternalKey, Slice>> iterator;
 
         public MemTableIterator()

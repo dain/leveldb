@@ -36,7 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.iq80.leveldb.CompressionType.SNAPPY;
 
-public class MMapTable extends Table
+public class MMapTable
+        extends Table
 {
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private MappedByteBuffer data;
@@ -48,7 +49,9 @@ public class MMapTable extends Table
     }
 
     @Override
-    protected Footer init() throws IOException {
+    protected Footer init()
+            throws IOException
+    {
         long size = fileChannel.size();
         data = fileChannel.map(MapMode.READ_ONLY, 0, size);
         Slice footerSlice = Slices.copiedBuffer(data, (int) size - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
@@ -56,11 +59,13 @@ public class MMapTable extends Table
     }
 
     @Override
-    public Callable<?> closer() {
+    public Callable<?> closer()
+    {
         return new Closer(name, fileChannel, data);
     }
 
-    private static class Closer implements Callable<Void>
+    private static class Closer
+            implements Callable<Void>
     {
         private final String name;
         private final Closeable closeable;
@@ -80,7 +85,6 @@ public class MMapTable extends Table
             return null;
         }
     }
-
 
     @Override
     protected Block readBlock(BlockHandle blockHandle)
@@ -131,5 +135,4 @@ public class MMapTable extends Table
         ByteBuffer block = (ByteBuffer) data.duplicate().order(ByteOrder.LITTLE_ENDIAN).clear().limit(newPosition + length).position(newPosition);
         return block;
     }
-
 }

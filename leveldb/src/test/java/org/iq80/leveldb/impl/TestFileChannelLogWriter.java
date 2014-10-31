@@ -27,7 +27,6 @@ import java.nio.channels.FileChannel;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
-
 public class TestFileChannelLogWriter
 {
     @Test
@@ -61,9 +60,9 @@ public class TestFileChannelLogWriter
         }
     }
 
-    private static class AssertNoCorruptionLogMonitor implements LogMonitor
+    private static class AssertNoCorruptionLogMonitor
+            implements LogMonitor
     {
-
         @Override
         public void corruption(long bytes, String reason)
         {

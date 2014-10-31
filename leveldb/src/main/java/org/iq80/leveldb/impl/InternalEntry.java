@@ -25,7 +25,8 @@ import java.util.Map.Entry;
 
 import static com.google.common.base.Charsets.UTF_8;
 
-public class InternalEntry implements Entry<InternalKey, Slice>
+public class InternalEntry
+        implements Entry<InternalKey, Slice>
 {
     public static final Function<InternalEntry, InternalKey> GET_KEY = new Function<InternalEntry, InternalKey>()
     {
@@ -58,7 +59,6 @@ public class InternalEntry implements Entry<InternalKey, Slice>
     {
         return value;
     }
-
 
     /**
      * @throws UnsupportedOperationException always
@@ -110,4 +110,3 @@ public class InternalEntry implements Entry<InternalKey, Slice>
         return sb.toString();
     }
 }
-

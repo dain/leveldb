@@ -42,7 +42,8 @@ public class LookupResult
         this.key = key;
         if (value != null) {
             this.value = value.slice();
-        } else {
+        }
+        else {
             this.value = null;
         }
         this.deleted = deleted;

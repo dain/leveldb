@@ -21,7 +21,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 
-import java.util.Arrays;
 import java.util.Map.Entry;
 
 import static com.google.common.base.Charsets.UTF_8;
@@ -72,7 +71,8 @@ import static com.google.common.base.Charsets.UTF_8;
  * </tbody>
  * </table>
  */
-public class BlockEntry implements Entry<Slice, Slice>
+public class BlockEntry
+        implements Entry<Slice, Slice>
 {
     public static final Function<BlockEntry, Slice> GET_KEY = new Function<BlockEntry, Slice>()
     {
@@ -103,7 +103,6 @@ public class BlockEntry implements Entry<Slice, Slice>
     {
         return value;
     }
-
 
     /**
      * @throws UnsupportedOperationException always
