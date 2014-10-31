@@ -14,4 +14,8 @@
 
     <name>${project.artifactId}</name>
     <description>High level Java API for LevelDB</description>
+
+    <properties>
+        <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+    </properties>
 </project>

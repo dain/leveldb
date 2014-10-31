@@ -31,10 +31,6 @@
 
   <description>Port of LevelDB Benchmarks to Java</description>
 
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-
   <repositories>
     <repository>
       <id>fusesource.nexus.snapshot</id>
@@ -42,6 +38,10 @@
       <url>http://repo.fusesource.com/nexus/content/groups/public-snapshots</url>
     </repository>
   </repositories>
+
+  <properties>
+    <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -53,10 +53,8 @@
       <artifactId>leveldb</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.xerial.snappy</groupId>
-      <artifactId>snappy-java</artifactId>
-      <version>1.0.4.1</version>
-      <optional>true</optional>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -69,14 +67,6 @@
   <build>
     <pluginManagement>
       <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-surefire-plugin</artifactId>
-          <configuration>
-            <excludes>
-            </excludes>
-          </configuration>
-        </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
@@ -95,5 +85,4 @@
       </plugins>
     </pluginManagement>
   </build>
-
 </project>
