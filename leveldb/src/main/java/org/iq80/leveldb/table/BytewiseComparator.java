@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2011 the original author or authors.
  * See the notice.md file distributed with this work for additional
  * information regarding copyright ownership.
