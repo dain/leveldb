@@ -17,19 +17,30 @@
  */
 package org.iq80.leveldb.impl;
 
-import junit.framework.TestCase;
-import org.iq80.leveldb.*;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBException;
+import org.iq80.leveldb.DBFactory;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.ReadOptions;
+import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.util.FileUtils;
+import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
-public class NativeInteropTest extends TestCase {
+public class NativeInteropTest {
+
+    private static AtomicInteger NEXT_ID = new AtomicInteger();
 
     File databaseDir = FileUtils.createTempDir("leveldb");
     
@@ -56,7 +67,7 @@ public class NativeInteropTest extends TestCase {
     }
 
     public void assertEquals(byte[] arg1, byte[] arg2) {
-        assertTrue(asString(arg1)+" != "+asString(arg2), Arrays.equals(arg1, arg2));
+        assertTrue(Arrays.equals(arg1, arg2), asString(arg1)+" != "+asString(arg2));
     }
 
     DBFactory iq80factory = Iq80DBFactory.factory;
@@ -79,18 +90,22 @@ public class NativeInteropTest extends TestCase {
         return rc;
     }
 
+    @Test
     public void testCRUDviaIQ80() throws IOException, DBException {
         crud(iq80factory, iq80factory);
     }
 
+    @Test
     public void testCRUDviaJNI() throws IOException, DBException {
         crud(jnifactory, jnifactory);
     }
 
+    @Test
     public void testCRUDviaIQ80thenJNI() throws IOException, DBException {
         crud(iq80factory, jnifactory);
     }
 
+    @Test
     public void testCRUDviaJNIthenIQ80() throws IOException, DBException {
         crud(jnifactory, iq80factory);
     }
@@ -99,7 +114,7 @@ public class NativeInteropTest extends TestCase {
 
         Options options = new Options().createIfMissing(true);
 
-        File path = getTestDirectory(getName());
+        File path = getTestDirectory(getClass().getName() + "_" + NEXT_ID.incrementAndGet());
         DB db = firstFactory.open(path, options);
 
         WriteOptions wo = new WriteOptions().sync(false);
