@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>org.iq80.leveldb</groupId>
         <artifactId>leveldb-project</artifactId>
@@ -9,19 +9,8 @@
     </parent>
 
     <artifactId>leveldb</artifactId>
-    <version>0.8-SNAPSHOT</version>
-    <packaging>jar</packaging>
-
     <name>${project.artifactId}</name>
     <description>Port of LevelDB to Java</description>
-
-    <repositories>
-        <repository>
-            <id>fusesource.nexus.snapshot</id>
-            <name>FuseSource Community Snapshot Repository</name>
-            <url>http://repo.fusesource.com/nexus/content/groups/public-snapshots</url>
-        </repository>
-    </repositories>
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
@@ -109,73 +98,73 @@
                 </configuration>
             </plugin>
             <plugin>
-              <groupId>com.github.wvengen</groupId>
-              <artifactId>proguard-maven-plugin</artifactId>
-              <version>2.0.5</version>
-              <executions>
-                <execution>
-                  <phase>package</phase>
-                  <goals>
-                    <goal>proguard</goal>
-                  </goals>
-                </execution>
-              </executions>
-              <configuration>
-                <proguardVersion>4.8</proguardVersion>
-                <injar>${project.build.finalName}.jar</injar>
-                <outjar>${project.build.finalName}-slim.jar</outjar>          
-                <attach>true</attach>
-                <attachArtifactClassifier>min</attachArtifactClassifier>
-                <libs>
-                  <lib>${rt.jar.path}</lib>
-                  <lib>${jsse.jar.path}</lib>
-                </libs>
-                <assembly>
-                  <inclusions>
-                    <inclusion>
-                      <groupId>org.iq80.leveldb</groupId>
-                      <artifactId>leveldb-api</artifactId>
-                    </inclusion>
-                    <inclusion>
-                      <groupId>org.iq80.snappy</groupId>
-                      <artifactId>snappy</artifactId>
-                    </inclusion> 
-                    <inclusion>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                    </inclusion> 
-                  </inclusions>
-                </assembly>
-                 
-                <obfuscate>false</obfuscate>
-                <options>
-                  <option>-keep class org.iq80.leveldb.*{*;}</option>
-                  <option>-keep class org.iq80.leveldb.impl.*{*;}</option>
-                  <option>-keep class org.iq80.leveldb.util.*{*;}</option>
+                <groupId>com.github.wvengen</groupId>
+                <artifactId>proguard-maven-plugin</artifactId>
+                <version>2.0.5</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>proguard</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <proguardVersion>4.8</proguardVersion>
+                    <injar>${project.build.finalName}.jar</injar>
+                    <outjar>${project.build.finalName}-slim.jar</outjar>
+                    <attach>true</attach>
+                    <attachArtifactClassifier>min</attachArtifactClassifier>
+                    <libs>
+                        <lib>${rt.jar.path}</lib>
+                        <lib>${jsse.jar.path}</lib>
+                    </libs>
+                    <assembly>
+                        <inclusions>
+                            <inclusion>
+                                <groupId>org.iq80.leveldb</groupId>
+                                <artifactId>leveldb-api</artifactId>
+                            </inclusion>
+                            <inclusion>
+                                <groupId>org.iq80.snappy</groupId>
+                                <artifactId>snappy</artifactId>
+                            </inclusion>
+                            <inclusion>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                            </inclusion>
+                        </inclusions>
+                    </assembly>
 
-                  <option>-keep class com.google.common.collect.ImmutableList{*;}</option>
-                  <option>-keep class com.google.common.base.Preconditions{*;}</option>
+                    <obfuscate>false</obfuscate>
+                    <options>
+                        <option>-keep class org.iq80.leveldb.*{*;}</option>
+                        <option>-keep class org.iq80.leveldb.impl.*{*;}</option>
+                        <option>-keep class org.iq80.leveldb.util.*{*;}</option>
 
-                  <option>-keep class org.iq80.snappy.*{*;}</option>
-                  <!-- <option>-keep class org.xerial.snappy.Snappy{*;}</option> -->
-                  <option>-dontnote com.google.common.cache.Striped64</option>
-                  <option>-dontnote com.google.common.cache.Striped64$*</option>
-                  <option>-dontnote com.google.common.util.concurrent.MoreExecutors</option>
-                  <option>-dontwarn com.google.common.collect.MinMaxPriorityQueue</option>
-                  <option>-dontwarn org.xerial.snappy.SnappyLoader</option>
-                  <option>-dontwarn org.xerial.snappy.SnappyBundleActivator</option>
-                  <option>-dontwarn org.iq80.snappy.HadoopSnappyCodec**</option>
-                  <option>-dontoptimize</option>
-                </options>
-              </configuration>
-              <dependencies>
-                <dependency>
-                  <groupId>net.sf.proguard</groupId>
-                  <artifactId>proguard-base</artifactId>
-                  <version>4.8</version>
-                  <scope>runtime</scope>
-                </dependency>
-              </dependencies>        
+                        <option>-keep class com.google.common.collect.ImmutableList{*;}</option>
+                        <option>-keep class com.google.common.base.Preconditions{*;}</option>
+
+                        <option>-keep class org.iq80.snappy.*{*;}</option>
+                        <!-- <option>-keep class org.xerial.snappy.Snappy{*;}</option> -->
+                        <option>-dontnote com.google.common.cache.Striped64</option>
+                        <option>-dontnote com.google.common.cache.Striped64$*</option>
+                        <option>-dontnote com.google.common.util.concurrent.MoreExecutors</option>
+                        <option>-dontwarn com.google.common.collect.MinMaxPriorityQueue</option>
+                        <option>-dontwarn org.xerial.snappy.SnappyLoader</option>
+                        <option>-dontwarn org.xerial.snappy.SnappyBundleActivator</option>
+                        <option>-dontwarn org.iq80.snappy.HadoopSnappyCodec**</option>
+                        <option>-dontoptimize</option>
+                    </options>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>net.sf.proguard</groupId>
+                        <artifactId>proguard-base</artifactId>
+                        <version>4.8</version>
+                        <scope>runtime</scope>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
 
@@ -201,32 +190,43 @@
             </plugins>
         </pluginManagement>
     </build>
-    
+
     <profiles>
-      <profile>
-        <id>lib/rt.jar</id>
-        <activation><file><exists>${java.home}/lib/rt.jar</exists></file></activation>
-        <properties>
-          <rt.jar.path>${java.home}/lib/rt.jar</rt.jar.path>
-          <jsse.jar.path>${java.home}/lib/jsse.jar</jsse.jar.path>
-        </properties>
-      </profile>
-      <profile>
-        <id>Classes/classes.jar</id>
-        <activation><file><exists>${java.home}/../Classes/classes.jar</exists></file></activation>
-        <properties>
-          <rt.jar.path>${java.home}/../Classes/classes.jar</rt.jar.path>
-          <jsse.jar.path>${java.home}/../Classes/jsse.jar</jsse.jar.path>
-        </properties>
-      </profile>
-      <profile>
-        <id>jre/lib/rt.jar</id>
-        <activation><file><exists>${java.home}/jre/lib/rt.jar</exists></file></activation>
-        <properties>
-          <rt.jar.path>${java.home}/jre/lib/rt.jar</rt.jar.path>
-          <jsse.jar.path>${java.home}/jre/lib/jsse.jar</jsse.jar.path>
-        </properties>
-      </profile>
+        <profile>
+            <id>lib/rt.jar</id>
+            <activation>
+                <file>
+                    <exists>${java.home}/lib/rt.jar</exists>
+                </file>
+            </activation>
+            <properties>
+                <rt.jar.path>${java.home}/lib/rt.jar</rt.jar.path>
+                <jsse.jar.path>${java.home}/lib/jsse.jar</jsse.jar.path>
+            </properties>
+        </profile>
+        <profile>
+            <id>Classes/classes.jar</id>
+            <activation>
+                <file>
+                    <exists>${java.home}/../Classes/classes.jar</exists>
+                </file>
+            </activation>
+            <properties>
+                <rt.jar.path>${java.home}/../Classes/classes.jar</rt.jar.path>
+                <jsse.jar.path>${java.home}/../Classes/jsse.jar</jsse.jar.path>
+            </properties>
+        </profile>
+        <profile>
+            <id>jre/lib/rt.jar</id>
+            <activation>
+                <file>
+                    <exists>${java.home}/jre/lib/rt.jar</exists>
+                </file>
+            </activation>
+            <properties>
+                <rt.jar.path>${java.home}/jre/lib/rt.jar</rt.jar.path>
+                <jsse.jar.path>${java.home}/jre/lib/jsse.jar</jsse.jar.path>
+            </properties>
+        </profile>
     </profiles>
-      
 </project>

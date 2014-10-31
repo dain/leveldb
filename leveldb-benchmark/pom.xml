@@ -16,73 +16,62 @@
   limitations under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <artifactId>leveldb-project</artifactId>
-    <groupId>org.iq80.leveldb</groupId>
-    <version>0.8-SNAPSHOT</version>
-  </parent>
+    <parent>
+        <artifactId>leveldb-project</artifactId>
+        <groupId>org.iq80.leveldb</groupId>
+        <version>0.8-SNAPSHOT</version>
+    </parent>
 
-  <artifactId>leveldb-benchmark</artifactId>
-  <name>leveldb-benchmark</name>
-  <url>http://maven.apache.org</url>
-  <packaging>jar</packaging>
+    <artifactId>leveldb-benchmark</artifactId>
+    <name>leveldb-benchmark</name>
+    <description>Port of LevelDB Benchmarks to Java</description>
 
-  <description>Port of LevelDB Benchmarks to Java</description>
+    <properties>
+        <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+    </properties>
 
-  <repositories>
-    <repository>
-      <id>fusesource.nexus.snapshot</id>
-      <name>FuseSource Community Snapshot Repository</name>
-      <url>http://repo.fusesource.com/nexus/content/groups/public-snapshots</url>
-    </repository>
-  </repositories>
+    <dependencies>
+        <dependency>
+            <groupId>org.iq80.leveldb</groupId>
+            <artifactId>leveldb-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.iq80.leveldb</groupId>
+            <artifactId>leveldb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.11</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
-  <properties>
-    <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-  </properties>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.iq80.leveldb</groupId>
-      <artifactId>leveldb-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.iq80.leveldb</groupId>
-      <artifactId>leveldb</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.11</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-
-  <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>exec-maven-plugin</artifactId>
-          <version>1.2.1</version>
-          <executions>
-            <execution>
-              <goals>
-                <goal>java</goal>
-              </goals>
-            </execution>
-          </executions>
-          <configuration>
-            <mainClass>org.iq80.leveldb.benchmark.DbBenchmark</mainClass>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
-  </build>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>1.2.1</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>java</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <mainClass>org.iq80.leveldb.benchmark.DbBenchmark</mainClass>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>
