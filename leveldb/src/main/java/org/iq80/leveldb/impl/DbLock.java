@@ -77,7 +77,7 @@ public class DbLock
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("DbLock");
         sb.append("{lockFile=").append(lockFile);
         sb.append(", lock=").append(lock);

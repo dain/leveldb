@@ -33,6 +33,7 @@ public class Finalizer<T>
 {
     public static final FinalizerMonitor IGNORE_FINALIZER_MONITOR = new FinalizerMonitor()
     {
+        @Override
         public void unexpectedException(Throwable throwable)
         {
         }
@@ -41,9 +42,9 @@ public class Finalizer<T>
     private final int threads;
     private final FinalizerMonitor monitor;
 
-    private final ConcurrentHashMap<FinalizerPhantomReference<T>, Object> references = new ConcurrentHashMap<FinalizerPhantomReference<T>, Object>();
-    private final ReferenceQueue<T> referenceQueue = new ReferenceQueue<T>();
-    private boolean destroyed;
+    private final ConcurrentHashMap<FinalizerPhantomReference<T>, Object> references = new ConcurrentHashMap<>();
+    private final ReferenceQueue<T> referenceQueue = new ReferenceQueue<>();
+    private final AtomicBoolean destroyed = new AtomicBoolean();
     private ExecutorService executor;
 
     public Finalizer()
@@ -67,7 +68,7 @@ public class Finalizer<T>
     {
         Preconditions.checkNotNull(item, "item is null");
         Preconditions.checkNotNull(cleanup, "cleanup is null");
-        Preconditions.checkState(!destroyed, "%s is destroyed", getClass().getName());
+        Preconditions.checkState(!destroyed.get(), "%s is destroyed", getClass().getName());
 
         if (executor == null) {
             // create executor
@@ -84,7 +85,7 @@ public class Finalizer<T>
         }
 
         // create a reference to the item so we are notified when it is garbage collected
-        FinalizerPhantomReference<T> reference = new FinalizerPhantomReference<T>(item, referenceQueue, cleanup);
+        FinalizerPhantomReference<T> reference = new FinalizerPhantomReference<>(item, referenceQueue, cleanup);
 
         // we must keep a strong reference to the reference object so we are notified when the item
         // is no longer reachable (if the reference object is garbage collected we are never notified)
@@ -93,7 +94,7 @@ public class Finalizer<T>
 
     public synchronized void destroy()
     {
-        destroyed = true;
+        destroyed.set(true);
         if (executor != null) {
             executor.shutdownNow();
         }
@@ -138,7 +139,7 @@ public class Finalizer<T>
         @Override
         public void run()
         {
-            while (!destroyed) {
+            while (!destroyed.get()) {
                 // get the next reference to cleanup
                 FinalizerPhantomReference<T> reference;
                 try {
@@ -176,7 +177,7 @@ public class Finalizer<T>
 
                 if (rescheduleAndReturn) {
                     synchronized (Finalizer.this) {
-                        if (!destroyed) {
+                        if (!destroyed.get()) {
                             executor.submit(new FinalizerQueueProcessor());
                         }
                     }

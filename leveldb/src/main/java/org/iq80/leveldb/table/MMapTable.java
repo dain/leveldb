@@ -32,14 +32,12 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 public class MMapTable
         extends Table
 {
-    private final AtomicBoolean closed = new AtomicBoolean(false);
     private MappedByteBuffer data;
 
     public MMapTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
@@ -86,6 +84,7 @@ public class MMapTable
         }
     }
 
+    @SuppressWarnings({"NonPrivateFieldAccessedInSynchronizedContext", "AssignmentToStaticFieldFromInstanceMethod"})
     @Override
     protected Block readBlock(BlockHandle blockHandle)
             throws IOException

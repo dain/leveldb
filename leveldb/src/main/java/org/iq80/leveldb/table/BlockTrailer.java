@@ -82,7 +82,7 @@ public class BlockTrailer
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("BlockTrailer");
         sb.append("{compressionType=").append(compressionType);
         sb.append(", crc32c=0x").append(Integer.toHexString(crc32c));

@@ -39,7 +39,7 @@ public final class MergingIterator
         this.levels = levels;
         this.comparator = comparator;
 
-        this.priorityQueue = new PriorityQueue<ComparableIterator>(levels.size() + 1);
+        this.priorityQueue = new PriorityQueue<>(levels.size() + 1);
         resetPriorityQueue(comparator);
     }
 
@@ -88,7 +88,7 @@ public final class MergingIterator
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("MergingIterator");
         sb.append("{levels=").append(levels);
         sb.append(", comparator=").append(comparator);
@@ -118,6 +118,7 @@ public final class MergingIterator
             return nextElement != null;
         }
 
+        @Override
         public Entry<InternalKey, Slice> next()
         {
             if (nextElement == null) {

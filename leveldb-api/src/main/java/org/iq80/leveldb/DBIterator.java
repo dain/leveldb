@@ -31,17 +31,17 @@ public interface DBIterator
      * Repositions the iterator so the key of the next BlockElement
      * returned greater than or equal to the specified targetKey.
      */
-    public void seek(byte[] key);
+    void seek(byte[] key);
 
     /**
      * Repositions the iterator so is is at the beginning of the Database.
      */
-    public void seekToFirst();
+    void seekToFirst();
 
     /**
      * Returns the next element in the iteration, without advancing the iteration.
      */
-    public Map.Entry<byte[], byte[]> peekNext();
+    Map.Entry<byte[], byte[]> peekNext();
 
     /**
      * @return true if there is a previous entry in the iteration.
@@ -56,10 +56,10 @@ public interface DBIterator
     /**
      * @return the previous element in the iteration, without rewinding the iteration.
      */
-    public Map.Entry<byte[], byte[]> peekPrev();
+    Map.Entry<byte[], byte[]> peekPrev();
 
     /**
      * Repositions the iterator so it is at the end of of the Database.
      */
-    public void seekToLast();
+    void seekToLast();
 }

@@ -39,7 +39,7 @@ import static org.testng.Assert.assertTrue;
  */
 public class ApiTest
 {
-    File databaseDir = FileUtils.createTempDir("leveldb");
+    private final File databaseDir = FileUtils.createTempDir("leveldb");
 
     public static byte[] bytes(String value)
     {
@@ -72,7 +72,7 @@ public class ApiTest
         assertTrue(Arrays.equals(arg1, arg2), asString(arg1) + " != " + asString(arg2));
     }
 
-    DBFactory factory = Iq80DBFactory.factory;
+    private final DBFactory factory = Iq80DBFactory.factory;
 
     File getTestDirectory(String name)
             throws IOException

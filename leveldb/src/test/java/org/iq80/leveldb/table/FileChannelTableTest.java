@@ -26,6 +26,7 @@ import java.util.Comparator;
 public class FileChannelTableTest
         extends TableTest
 {
+    @Override
     protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
             throws IOException
     {

@@ -57,7 +57,7 @@ public final class DbIterator
     private final Comparator<InternalKey> comparator;
 
     private final ComparableIterator[] heap;
-    private int heapSize = 0;
+    private int heapSize;
 
     public DbIterator(MemTableIterator memTableIterator,
             MemTableIterator immutableMemTableIterator,
@@ -209,7 +209,7 @@ public final class DbIterator
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("DbIterator");
         sb.append("{memTableIterator=").append(memTableIterator);
         sb.append(", immutableMemTableIterator=").append(immutableMemTableIterator);
@@ -242,6 +242,7 @@ public final class DbIterator
             return nextElement != null;
         }
 
+        @Override
         public Entry<InternalKey, Slice> next()
         {
             if (nextElement == null) {

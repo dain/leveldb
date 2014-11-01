@@ -70,7 +70,7 @@ public class NativeInteropTest
         }
     }
 
-    public void assertEquals(byte[] arg1, byte[] arg2)
+    public static void assertEquals(byte[] arg1, byte[] arg2)
     {
         assertTrue(Arrays.equals(arg1, arg2), asString(arg1) + " != " + asString(arg2));
     }

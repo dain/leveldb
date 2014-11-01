@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 
@@ -28,15 +27,6 @@ import static com.google.common.base.Charsets.UTF_8;
 public class InternalEntry
         implements Entry<InternalKey, Slice>
 {
-    public static final Function<InternalEntry, InternalKey> GET_KEY = new Function<InternalEntry, InternalKey>()
-    {
-        @Override
-        public InternalKey apply(InternalEntry internalEntry)
-        {
-            return internalEntry.getKey();
-        }
-    };
-
     private final InternalKey key;
     private final Slice value;
 
@@ -102,7 +92,7 @@ public class InternalEntry
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("InternalEntry");
         sb.append("{key=").append(key);      // todo don't print the real value
         sb.append(", value=").append(value.toString(UTF_8));

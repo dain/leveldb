@@ -203,7 +203,7 @@ public class TableBuilder
         return blockHandle;
     }
 
-    private int maxCompressedLength(int length)
+    private static int maxCompressedLength(int length)
     {
         // Compressed data can be defined as:
         //    compressed := item* literal*

@@ -105,7 +105,7 @@ public class Version
         return versionSet.getTableCache();
     }
 
-    public InternalKeyComparator getInternalKeyComparator()
+    public final InternalKeyComparator getInternalKeyComparator()
     {
         return versionSet.getInternalKeyComparator();
     }
@@ -152,7 +152,7 @@ public class Version
     {
         Builder<LevelIterator> builder = ImmutableList.builder();
         for (Level level : levels) {
-            if (level.getFiles().size() > 0) {
+            if (!level.getFiles().isEmpty()) {
                 builder.add(level.iterator());
             }
         }

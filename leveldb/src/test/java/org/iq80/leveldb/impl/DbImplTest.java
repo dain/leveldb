@@ -17,9 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.UnsignedBytes;
 import org.iq80.leveldb.DB;
@@ -778,7 +776,7 @@ public class DbImplTest
     {
         DbStringWrapper db = new DbStringWrapper(new Options(), databaseDir);
 
-        List<Entry<String, String>> entries = Arrays.asList(
+        List<Entry<String, String>> entries = asList(
                 immutableEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
                 immutableEntry("beer/ipa", "Lagunitas IPA"),
                 immutableEntry("beer/stout", "Lagunitas Imperial Stout"),
@@ -795,7 +793,7 @@ public class DbImplTest
     {
         DbStringWrapper db = new DbStringWrapper(new Options(), databaseDir);
 
-        List<Entry<String, String>> entries = Arrays.asList(
+        List<Entry<String, String>> entries = asList(
                 immutableEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
                 immutableEntry("beer/ipa", "Lagunitas IPA"),
                 immutableEntry("beer/stout", "Lagunitas Imperial Stout"),
@@ -842,7 +840,7 @@ public class DbImplTest
     {
         DbStringWrapper db = new DbStringWrapper(new Options().comparator(new ReverseDBComparator()), databaseDir);
 
-        List<Entry<String, String>> entries = Arrays.asList(
+        List<Entry<String, String>> entries = asList(
                 immutableEntry("scotch/strong", "Lagavulin"),
                 immutableEntry("scotch/medium", "Highland Park"),
                 immutableEntry("scotch/light", "Oban 14"),
@@ -865,7 +863,8 @@ public class DbImplTest
         assertFalse(seekingIterator.hasNext());
     }
 
-    private void testDb(DbStringWrapper db, Entry<String, String>... entries)
+    @SafeVarargs
+    private final void testDb(DbStringWrapper db, Entry<String, String>... entries)
             throws IOException
     {
         testDb(db, asList(entries));
@@ -902,7 +901,7 @@ public class DbImplTest
         }
 
         Slice endKey = Slices.wrappedBuffer(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
-        seekingIterator.seek(endKey.toString(Charsets.UTF_8));
+        seekingIterator.seek(endKey.toString(UTF_8));
         assertSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
     }
 
@@ -957,7 +956,7 @@ public class DbImplTest
     {
         char[] chars = new char[length];
         for (int i = 0; i < chars.length; i++) {
-            chars[i] = (char) (' ' + random.nextInt(95));
+            chars[i] = (char) ((int) ' ' + random.nextInt(95));
         }
         return new String(chars);
 
@@ -989,7 +988,7 @@ public class DbImplTest
         }
     }
 
-    ArrayList<DbStringWrapper> opened = new ArrayList<DbStringWrapper>();
+    private final ArrayList<DbStringWrapper> opened = new ArrayList<>();
 
     private static class ReverseDBComparator
             implements DBComparator
@@ -1090,7 +1089,7 @@ public class DbImplTest
             if (slice == null) {
                 return null;
             }
-            return new String(slice, Charsets.UTF_8);
+            return new String(slice, UTF_8);
         }
 
         public void put(String key, String value)
@@ -1202,7 +1201,7 @@ public class DbImplTest
     private static class StringDbIterator
             implements SeekingIterator<String, String>
     {
-        private DBIterator iterator;
+        private final DBIterator iterator;
 
         private StringDbIterator(DBIterator iterator)
         {
@@ -1247,7 +1246,7 @@ public class DbImplTest
 
         private Entry<String, String> adapt(Entry<byte[], byte[]> next)
         {
-            return Maps.immutableEntry(new String(next.getKey(), UTF_8), new String(next.getValue(), UTF_8));
+            return immutableEntry(new String(next.getKey(), UTF_8), new String(next.getValue(), UTF_8));
         }
     }
 }

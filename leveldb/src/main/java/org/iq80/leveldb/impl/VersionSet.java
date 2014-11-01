@@ -342,8 +342,7 @@ public class VersionSet
         currentName = currentName.substring(0, currentName.length() - 1);
 
         // open file channel
-        FileChannel fileChannel = new FileInputStream(new File(databaseDir, currentName)).getChannel();
-        try {
+        try (FileChannel fileChannel = new FileInputStream(new File(databaseDir, currentName)).getChannel()) {
             // read log edit log
             Long nextFileNumber = null;
             Long lastSequence = null;
@@ -403,9 +402,6 @@ public class VersionSet
             this.lastSequence = lastSequence;
             this.logNumber = logNumber;
             this.prevLogNumber = prevLogNumber;
-        }
-        finally {
-            fileChannel.close();
         }
     }
 

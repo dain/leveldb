@@ -21,7 +21,6 @@ import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.testng.annotations.Test;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -75,7 +74,7 @@ public class BlockTest
     public void testMultipleEntriesWithNonSharedKeyAndRestartPositions()
             throws Exception
     {
-        List<BlockEntry> entries = Arrays.asList(
+        List<BlockEntry> entries = asList(
                 BlockHelper.createBlockEntry("ale", "Lagunitas  Little Sumpin’ Sumpin’"),
                 BlockHelper.createBlockEntry("ipa", "Lagunitas IPA"),
                 BlockHelper.createBlockEntry("stout", "Lagunitas Imperial Stout"),
@@ -90,7 +89,7 @@ public class BlockTest
     public void testMultipleEntriesWithSharedKeyAndRestartPositions()
             throws Exception
     {
-        List<BlockEntry> entries = Arrays.asList(
+        List<BlockEntry> entries = asList(
                 BlockHelper.createBlockEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
                 BlockHelper.createBlockEntry("beer/ipa", "Lagunitas IPA"),
                 BlockHelper.createBlockEntry("beer/stout", "Lagunitas Imperial Stout"),
@@ -103,12 +102,12 @@ public class BlockTest
         }
     }
 
-    private void blockTest(int blockRestartInterval, BlockEntry... entries)
+    private static void blockTest(int blockRestartInterval, BlockEntry... entries)
     {
         blockTest(blockRestartInterval, asList(entries));
     }
 
-    private void blockTest(int blockRestartInterval, List<BlockEntry> entries)
+    private static void blockTest(int blockRestartInterval, List<BlockEntry> entries)
     {
         BlockBuilder builder = new BlockBuilder(256, blockRestartInterval, new BytewiseComparator());
 

@@ -106,7 +106,7 @@ public final class TableIterator
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("ConcatenatingIterator");
         sb.append("{blockIterator=").append(blockIterator);
         sb.append(", current=").append(current);

@@ -141,7 +141,7 @@ public class Level0
 
     private int findFile(InternalKey targetKey)
     {
-        if (files.size() == 0) {
+        if (files.isEmpty()) {
             return files.size();
         }
 

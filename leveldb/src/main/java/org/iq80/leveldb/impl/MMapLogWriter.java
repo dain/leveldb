@@ -64,11 +64,13 @@ public class MMapLogWriter
         mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, 0, PAGE_SIZE);
     }
 
+    @Override
     public boolean isClosed()
     {
         return closed.get();
     }
 
+    @Override
     public synchronized void close()
             throws IOException
     {
@@ -84,6 +86,7 @@ public class MMapLogWriter
         Closeables.closeQuietly(fileChannel);
     }
 
+    @Override
     public synchronized void delete()
             throws IOException
     {
@@ -102,17 +105,20 @@ public class MMapLogWriter
         mappedByteBuffer = null;
     }
 
+    @Override
     public File getFile()
     {
         return file;
     }
 
+    @Override
     public long getFileNumber()
     {
         return fileNumber;
     }
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
+    @Override
     public synchronized void addRecord(Slice record, boolean force)
             throws IOException
     {
@@ -220,7 +226,7 @@ public class MMapLogWriter
         ByteBufferSupport.unmap(mappedByteBuffer);
     }
 
-    private Slice newLogRecordHeader(LogChunkType type, Slice slice)
+    private static Slice newLogRecordHeader(LogChunkType type, Slice slice)
     {
         int crc = getChunkChecksum(type.getPersistentId(), slice.getRawArray(), slice.getRawOffset(), slice.length());
 

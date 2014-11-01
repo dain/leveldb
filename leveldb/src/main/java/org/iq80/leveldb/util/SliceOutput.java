@@ -72,6 +72,7 @@ public abstract class SliceOutput
      *
      * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 1}
      */
+    @Override
     public abstract void writeByte(int value);
 
     /**
@@ -81,6 +82,7 @@ public abstract class SliceOutput
      *
      * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 2}
      */
+    @Override
     public abstract void writeShort(int value);
 
     /**
@@ -89,6 +91,7 @@ public abstract class SliceOutput
      *
      * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 4}
      */
+    @Override
     public abstract void writeInt(int value);
 
     /**
@@ -98,6 +101,7 @@ public abstract class SliceOutput
      *
      * @throws IndexOutOfBoundsException if {@code this.writableBytes} is less than {@code 8}
      */
+    @Override
     public abstract void writeLong(long value);
 
     /**

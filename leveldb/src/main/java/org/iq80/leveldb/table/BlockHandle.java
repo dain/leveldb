@@ -63,10 +63,10 @@ public class BlockHandle
 
         BlockHandle that = (BlockHandle) o;
 
-        if (offset != that.offset) {
+        if (dataSize != that.dataSize) {
             return false;
         }
-        if (dataSize != that.dataSize) {
+        if (offset != that.offset) {
             return false;
         }
 
@@ -77,14 +77,14 @@ public class BlockHandle
     public int hashCode()
     {
         int result = (int) (offset ^ (offset >>> 32));
-        result = 31 * result + (int) (dataSize ^ (dataSize >>> 32));
+        result = 31 * result + dataSize;
         return result;
     }
 
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("BlockHandle");
         sb.append("{offset=").append(offset);
         sb.append(", dataSize=").append(dataSize);

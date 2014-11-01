@@ -54,7 +54,7 @@ public final class LevelIterator
     protected void seekInternal(InternalKey targetKey)
     {
         // seek the index to the block containing the key
-        if (files.size() == 0) {
+        if (files.isEmpty()) {
             return;
         }
 
@@ -140,7 +140,7 @@ public final class LevelIterator
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("ConcatenatingIterator");
         sb.append("{index=").append(index);
         sb.append(", files=").append(files);

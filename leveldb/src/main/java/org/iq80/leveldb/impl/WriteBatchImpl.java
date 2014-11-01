@@ -31,7 +31,7 @@ import static com.google.common.collect.Lists.newArrayList;
 public class WriteBatchImpl
         implements WriteBatch
 {
-    private List<Entry<Slice, Slice>> batch = newArrayList();
+    private final List<Entry<Slice, Slice>> batch = newArrayList();
     private int approximateSize;
 
     public int getApproximateSize()
@@ -99,7 +99,7 @@ public class WriteBatchImpl
         }
     }
 
-    public static interface Handler
+    public interface Handler
     {
         void put(Slice key, Slice value);
 

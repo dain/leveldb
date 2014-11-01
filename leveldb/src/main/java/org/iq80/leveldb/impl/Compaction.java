@@ -118,7 +118,7 @@ public class Compaction
         // Otherwise, the move could create a parent file that will require
         // a very expensive merge later on.
         return (levelInputs.size() == 1 &&
-                levelUpInputs.size() == 0 &&
+                levelUpInputs.isEmpty() &&
                 totalFileSize(grandparents) <= MAX_GRAND_PARENT_OVERLAP_BYTES);
 
     }

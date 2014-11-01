@@ -76,17 +76,20 @@ public class PureJavaCrc32C
         return ~crc;
     }
 
+    @Override
     public long getValue()
     {
         long ret = crc;
         return (~ret) & 0xffffffffL;
     }
 
-    public void reset()
+    @Override
+    public final void reset()
     {
         crc = 0xffffffff;
     }
 
+    @Override
     public void update(byte[] b, int off, int len)
     {
         int localCrc = crc;
@@ -115,6 +118,7 @@ public class PureJavaCrc32C
         crc = localCrc;
     }
 
+    @Override
     public void update(int b)
     {
         crc = (crc >>> 8) ^ T8_0[(crc ^ b) & 0xff];

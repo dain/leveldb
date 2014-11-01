@@ -72,8 +72,7 @@ public class TestFileChannelLogWriter
         @Override
         public void corruption(long bytes, Throwable reason)
         {
-            fail("corruption at " + bytes + " reason: " + reason.toString());
+            fail("corruption at " + bytes + " reason: " + reason);
         }
-
     }
 }

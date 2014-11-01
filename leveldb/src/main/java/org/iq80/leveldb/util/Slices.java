@@ -76,7 +76,7 @@ public final class Slices
             newCapacity <<= 1;
         }
 
-        Slice newSlice = Slices.allocate(newCapacity);
+        Slice newSlice = allocate(newCapacity);
         newSlice.setBytes(0, existingSlice, 0, existingSlice.length());
         return newSlice;
     }
@@ -122,8 +122,8 @@ public final class Slices
 
     public static ByteBuffer encodeString(CharBuffer src, Charset charset)
     {
-        final CharsetEncoder encoder = getEncoder(charset);
-        final ByteBuffer dst = ByteBuffer.allocate(
+        CharsetEncoder encoder = getEncoder(charset);
+        ByteBuffer dst = ByteBuffer.allocate(
                 (int) ((double) src.remaining() * encoder.maxBytesPerChar()));
         try {
             CoderResult cr = encoder.encode(src, dst, true);
@@ -144,8 +144,8 @@ public final class Slices
 
     public static String decodeString(ByteBuffer src, Charset charset)
     {
-        final CharsetDecoder decoder = getDecoder(charset);
-        final CharBuffer dst = CharBuffer.allocate(
+        CharsetDecoder decoder = getDecoder(charset);
+        CharBuffer dst = CharBuffer.allocate(
                 (int) ((double) src.remaining() * decoder.maxCharsPerByte()));
         try {
             CoderResult cr = decoder.decode(src, dst, true);
@@ -163,39 +163,13 @@ public final class Slices
         return dst.flip().toString();
     }
 
-    /**
-     * Toggles the endianness of the specified 16-bit short integer.
-     */
-    public static short swapShort(short value)
-    {
-        return (short) (value << 8 | value >>> 8 & 0xff);
-    }
-
-    /**
-     * Toggles the endianness of the specified 32-bit integer.
-     */
-    public static int swapInt(int value)
-    {
-        return swapShort((short) value) << 16 |
-                swapShort((short) (value >>> 16)) & 0xffff;
-    }
-
-    /**
-     * Toggles the endianness of the specified 64-bit long integer.
-     */
-    public static long swapLong(long value)
-    {
-        return (long) swapInt((int) value) << 32 |
-                swapInt((int) (value >>> 32)) & 0xffffffffL;
-    }
-
     private static final ThreadLocal<Map<Charset, CharsetEncoder>> encoders =
             new ThreadLocal<Map<Charset, CharsetEncoder>>()
             {
                 @Override
                 protected Map<Charset, CharsetEncoder> initialValue()
                 {
-                    return new IdentityHashMap<Charset, CharsetEncoder>();
+                    return new IdentityHashMap<>();
                 }
             };
 
@@ -205,7 +179,7 @@ public final class Slices
                 @Override
                 protected Map<Charset, CharsetDecoder> initialValue()
                 {
-                    return new IdentityHashMap<Charset, CharsetDecoder>();
+                    return new IdentityHashMap<>();
                 }
             };
 

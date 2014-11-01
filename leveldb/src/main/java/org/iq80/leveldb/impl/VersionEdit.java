@@ -169,7 +169,7 @@ public class VersionEdit
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("VersionEdit");
         sb.append("{comparatorName='").append(comparatorName).append('\'');
         sb.append(", logNumber=").append(logNumber);

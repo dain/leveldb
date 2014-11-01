@@ -122,7 +122,7 @@ public abstract class Table
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("Table");
         sb.append("{name='").append(name).append('\'');
         sb.append(", comparator=").append(comparator);
@@ -146,6 +146,7 @@ public abstract class Table
             this.closeable = closeable;
         }
 
+        @Override
         public Void call()
         {
             Closeables.closeQuietly(closeable);

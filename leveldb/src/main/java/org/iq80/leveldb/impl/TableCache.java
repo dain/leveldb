@@ -41,7 +41,7 @@ import java.util.concurrent.ExecutionException;
 public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
-    private final Finalizer<Table> finalizer = new Finalizer<Table>(1);
+    private final Finalizer<Table> finalizer = new Finalizer<>(1);
 
     public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
     {
@@ -51,6 +51,7 @@ public class TableCache
                 .maximumSize(tableCacheSize)
                 .removalListener(new RemovalListener<Long, TableAndFile>()
                 {
+                    @Override
                     public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
                     {
                         Table table = notification.getValue().getTable();
@@ -59,6 +60,7 @@ public class TableCache
                 })
                 .build(new CacheLoader<Long, TableAndFile>()
                 {
+                    @Override
                     public TableAndFile load(Long fileNumber)
                             throws IOException
                     {

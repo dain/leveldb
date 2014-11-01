@@ -205,8 +205,8 @@ public final class Filename
 
     public static class FileInfo
     {
-        private FileType fileType;
-        private long fileNumber;
+        private final FileType fileType;
+        private final long fileNumber;
 
         public FileInfo(FileType fileType)
         {
@@ -263,7 +263,7 @@ public final class Filename
         @Override
         public String toString()
         {
-            final StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder();
             sb.append("FileInfo");
             sb.append("{fileType=").append(fileType);
             sb.append(", fileNumber=").append(fileNumber);

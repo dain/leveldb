@@ -19,7 +19,7 @@ package org.iq80.leveldb;
 
 public class ReadOptions
 {
-    private boolean verifyChecksums = false;
+    private boolean verifyChecksums;
     private boolean fillCache = true;
     private Snapshot snapshot;
 

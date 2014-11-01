@@ -58,7 +58,7 @@ public class InternalTableIterator
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("InternalTableIterator");
         sb.append("{fromIterator=").append(tableIterator);
         sb.append('}');

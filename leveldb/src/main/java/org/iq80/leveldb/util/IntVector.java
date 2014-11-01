@@ -82,7 +82,7 @@ public class IntVector
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("IntVector");
         sb.append("{size=").append(size);
         sb.append(", values=").append(Arrays.toString(values));

@@ -29,9 +29,9 @@ public class Options
     private int blockSize = 4 * 1024;
     private CompressionType compressionType = CompressionType.SNAPPY;
     private boolean verifyChecksums = true;
-    private boolean paranoidChecks = false;
+    private boolean paranoidChecks;
     private DBComparator comparator;
-    private Logger logger = null;
+    private Logger logger;
     private long cacheSize;
 
     static void checkArgNotNull(Object value, String name)

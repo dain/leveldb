@@ -74,6 +74,7 @@ public final class SliceInput
      * Returns the number of readable bytes which is equal to
      * {@code (this.slice.length() - this.position)}.
      */
+    @Override
     public int available()
     {
         return slice.length() - position;
@@ -98,6 +99,7 @@ public final class SliceInput
      *
      * @throws IndexOutOfBoundsException if {@code this.available()} is less than {@code 1}
      */
+    @Override
     public byte readByte()
     {
         if (position == slice.length()) {
@@ -112,6 +114,7 @@ public final class SliceInput
      *
      * @throws IndexOutOfBoundsException if {@code this.available()} is less than {@code 1}
      */
+    @Override
     public int readUnsignedByte()
     {
         return (short) (readByte() & 0xFF);
@@ -123,6 +126,7 @@ public final class SliceInput
      *
      * @throws IndexOutOfBoundsException if {@code this.available()} is less than {@code 2}
      */
+    @Override
     public short readShort()
     {
         short v = slice.getShort(position);
@@ -143,6 +147,7 @@ public final class SliceInput
      *
      * @throws IndexOutOfBoundsException if {@code this.available()} is less than {@code 4}
      */
+    @Override
     public int readInt()
     {
         int v = slice.getInt(position);
@@ -167,6 +172,7 @@ public final class SliceInput
      *
      * @throws IndexOutOfBoundsException if {@code this.available()} is less than {@code 8}
      */
+    @Override
     public long readLong()
     {
         long v = slice.getLong(position);

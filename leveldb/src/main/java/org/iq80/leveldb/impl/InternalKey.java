@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
@@ -107,7 +106,7 @@ public class InternalKey
         return true;
     }
 
-    private int hash = 0;
+    private int hash;
 
     @Override
     public int hashCode()
@@ -127,7 +126,7 @@ public class InternalKey
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("InternalKey");
         sb.append("{key=").append(getUserKey().toString(UTF_8));      // todo don't print the real value
         sb.append(", sequenceNumber=").append(getSequenceNumber());
@@ -136,78 +135,8 @@ public class InternalKey
         return sb.toString();
     }
 
-    // todo find new home for these
-
-    public static final Function<InternalKey, Slice> INTERNAL_KEY_TO_SLICE = new InternalKeyToSliceFunction();
-
-    public static final Function<Slice, InternalKey> SLICE_TO_INTERNAL_KEY = new SliceToInternalKeyFunction();
-
-    public static final Function<InternalKey, Slice> INTERNAL_KEY_TO_USER_KEY = new InternalKeyToUserKeyFunction();
-
-    public static Function<Slice, InternalKey> createUserKeyToInternalKeyFunction(final long sequenceNumber)
-    {
-        return new UserKeyInternalKeyFunction(sequenceNumber);
-    }
-
-    private static class InternalKeyToSliceFunction
-            implements Function<InternalKey, Slice>
-    {
-        @Override
-        public Slice apply(InternalKey internalKey)
-        {
-            return internalKey.encode();
-        }
-    }
-
-    private static class InternalKeyToUserKeyFunction
-            implements Function<InternalKey, Slice>
-    {
-        @Override
-        public Slice apply(InternalKey internalKey)
-        {
-            return internalKey.getUserKey();
-        }
-    }
-
-    private static class SliceToInternalKeyFunction
-            implements Function<Slice, InternalKey>
-    {
-        @Override
-        public InternalKey apply(Slice bytes)
-        {
-            return new InternalKey(bytes);
-        }
-    }
-
-    private static class UserKeyInternalKeyFunction
-            implements Function<Slice, InternalKey>
-    {
-        private final long sequenceNumber;
-
-        public UserKeyInternalKeyFunction(long sequenceNumber)
-        {
-            this.sequenceNumber = sequenceNumber;
-        }
-
-        @Override
-        public InternalKey apply(Slice userKey)
-        {
-            return new InternalKey(userKey, sequenceNumber, ValueType.VALUE);
-        }
-    }
-
     private static Slice getUserKey(Slice data)
     {
         return data.slice(0, data.length() - SIZE_OF_LONG);
-    }
-
-    private static long getSequenceNumber(Slice data)
-    {
-        return SequenceNumber.unpackSequenceNumber(data.getLong(data.length() - SIZE_OF_LONG));
-    }
-
-    private static ValueType getValueType(Slice data)
-    {
-        return SequenceNumber.unpackValueType(data.getLong(data.length() - SIZE_OF_LONG));
     }
 }

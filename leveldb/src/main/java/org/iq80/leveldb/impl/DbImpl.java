@@ -19,7 +19,6 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
@@ -80,6 +79,7 @@ import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
 import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
 // todo make thread safe and concurrent
+@SuppressWarnings("AccessingNonPublicFieldOfAnotherObject")
 public class DbImpl
         implements DB
 {
@@ -103,7 +103,7 @@ public class DbImpl
     private final InternalKeyComparator internalKeyComparator;
 
     private volatile Throwable backgroundException;
-    private ExecutorService compactionExecutor;
+    private final ExecutorService compactionExecutor;
     private Future<?> backgroundCompaction;
 
     private ManualCompaction manualCompaction;
@@ -191,7 +191,7 @@ public class DbImpl
             long previousLogNumber = versions.getPrevLogNumber();
             List<File> filenames = Filename.listFiles(databaseDir);
 
-            List<Long> logs = Lists.newArrayList();
+            List<Long> logs = newArrayList();
             for (File filename : filenames) {
                 FileInfo fileInfo = Filename.parseFileName(filename);
 
@@ -231,6 +231,7 @@ public class DbImpl
         }
     }
 
+    @Override
     public void close()
     {
         if (shuttingDown.getAndSet(true)) {
@@ -464,8 +465,8 @@ public class DbImpl
         Compaction compaction;
         if (manualCompaction != null) {
             compaction = versions.compactRange(manualCompaction.level,
-                    new InternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, ValueType.VALUE),
-                    new InternalKey(manualCompaction.end, 0, ValueType.DELETION));
+                    new InternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, VALUE),
+                    new InternalKey(manualCompaction.end, 0, DELETION));
         }
         else {
             compaction = versions.pickCompaction();
@@ -516,8 +517,7 @@ public class DbImpl
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
         File file = new File(databaseDir, Filename.logFileName(fileNumber));
-        FileChannel channel = new FileInputStream(file).getChannel();
-        try {
+        try (FileChannel channel = new FileInputStream(file).getChannel()) {
             LogMonitor logMonitor = LogMonitors.logMonitor();
             LogReader logReader = new LogReader(channel, logMonitor, true, 0);
 
@@ -564,9 +564,6 @@ public class DbImpl
             }
 
             return maxSequence;
-        }
-        finally {
-            channel.close();
         }
     }
 
@@ -688,7 +685,7 @@ public class DbImpl
                 makeRoomForWrite(false);
 
                 // Get sequence numbers for this change set
-                final long sequenceBegin = versions.getLastSequence() + 1;
+                long sequenceBegin = versions.getLastSequence() + 1;
                 sequenceEnd = sequenceBegin + updates.size() - 1;
 
                 // Reserve this sequence in the version set
@@ -735,6 +732,7 @@ public class DbImpl
         return iterator(new ReadOptions());
     }
 
+    @Override
     public SeekingIteratorAdapter iterator(ReadOptions options)
     {
         checkBackgroundException();
@@ -781,6 +779,7 @@ public class DbImpl
         }
     }
 
+    @Override
     public Snapshot getSnapshot()
     {
         checkBackgroundException();
@@ -1077,7 +1076,7 @@ public class DbImpl
                         // Hidden by an newer entry for same user key
                         drop = true; // (A)
                     }
-                    else if (key.getValueType() == ValueType.DELETION &&
+                    else if (key.getValueType() == DELETION &&
                             key.getSequenceNumber() <= compactionState.smallestSnapshot &&
                             compactionState.compaction.isBaseLevelForKey(key.getUserKey())) {
                         // For this user key:
@@ -1238,8 +1237,8 @@ public class DbImpl
     {
         Version v = versions.getCurrent();
 
-        InternalKey startKey = new InternalKey(Slices.wrappedBuffer(range.start()), SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-        InternalKey limitKey = new InternalKey(Slices.wrappedBuffer(range.limit()), SequenceNumber.MAX_SEQUENCE_NUMBER, ValueType.VALUE);
+        InternalKey startKey = new InternalKey(Slices.wrappedBuffer(range.start()), MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey limitKey = new InternalKey(Slices.wrappedBuffer(range.limit()), MAX_SEQUENCE_NUMBER, VALUE);
         long startOffset = v.getApproximateOffsetOf(startKey);
         long limitOffset = v.getApproximateOffsetOf(limitKey);
 
@@ -1399,7 +1398,7 @@ public class DbImpl
     }
 
     private final Object suspensionMutex = new Object();
-    private int suspensionCounter = 0;
+    private int suspensionCounter;
 
     @Override
     public void suspendCompactions()

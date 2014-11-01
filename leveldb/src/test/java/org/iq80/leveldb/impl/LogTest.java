@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.List;
 
 import static com.google.common.base.Charsets.UTF_8;
@@ -76,7 +75,7 @@ public class LogTest
     public void testMultipleSmallRecords()
             throws Exception
     {
-        List<Slice> records = Arrays.asList(
+        List<Slice> records = asList(
                 toSlice("Lagunitas  Little Sumpin’ Sumpin’"),
                 toSlice("Lagunitas IPA"),
                 toSlice("Lagunitas Imperial Stout"),
@@ -98,7 +97,7 @@ public class LogTest
     public void testMultipleLargeRecords()
             throws Exception
     {
-        List<Slice> records = Arrays.asList(
+        List<Slice> records = asList(
                 toSlice("Lagunitas  Little Sumpin’ Sumpin’", 4000),
                 toSlice("Lagunitas IPA", 4000),
                 toSlice("Lagunitas Imperial Stout", 4000),

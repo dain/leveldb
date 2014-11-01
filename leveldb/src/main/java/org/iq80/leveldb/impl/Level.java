@@ -174,7 +174,7 @@ public class Level
 
     private int findFile(InternalKey targetKey)
     {
-        if (files.size() == 0) {
+        if (files.isEmpty()) {
             return files.size();
         }
 
@@ -209,7 +209,7 @@ public class Level
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("Level");
         sb.append("{levelNumber=").append(levelNumber);
         sb.append(", files=").append(files);

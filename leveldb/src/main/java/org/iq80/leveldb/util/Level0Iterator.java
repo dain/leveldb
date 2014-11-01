@@ -50,7 +50,7 @@ public final class Level0Iterator
         this.inputs = builder.build();
         this.comparator = comparator;
 
-        this.priorityQueue = new PriorityQueue<ComparableIterator>(Iterables.size(inputs) + 1);
+        this.priorityQueue = new PriorityQueue<>(Iterables.size(inputs) + 1);
         resetPriorityQueue(comparator);
     }
 
@@ -59,7 +59,7 @@ public final class Level0Iterator
         this.inputs = inputs;
         this.comparator = comparator;
 
-        this.priorityQueue = new PriorityQueue<ComparableIterator>(Iterables.size(inputs));
+        this.priorityQueue = new PriorityQueue<>(Iterables.size(inputs));
         resetPriorityQueue(comparator);
     }
 
@@ -108,7 +108,7 @@ public final class Level0Iterator
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         sb.append("MergingIterator");
         sb.append("{inputs=").append(Iterables.toString(inputs));
         sb.append(", comparator=").append(comparator);
@@ -138,6 +138,7 @@ public final class Level0Iterator
             return nextElement != null;
         }
 
+        @Override
         public Entry<InternalKey, Slice> next()
         {
             if (nextElement == null) {

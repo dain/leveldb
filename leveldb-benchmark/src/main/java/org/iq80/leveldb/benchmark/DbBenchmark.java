@@ -57,10 +57,10 @@ import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
 public class DbBenchmark
 {
-    private boolean useExisting;
-    private Integer writeBufferSize;
-    private File databaseDir;
-    private double compressionRatio;
+    private final boolean useExisting;
+    private final Integer writeBufferSize;
+    private final File databaseDir;
+    private final double compressionRatio;
     private long startTime;
 
     enum Order
@@ -87,14 +87,14 @@ public class DbBenchmark
     private String message;
     private String postMessage;
     //    private Histogram hist_;
-    private RandomGenerator generator;
+    private final RandomGenerator generator;
     private final Random random;
 
     // State kept for progress messages
-    int done;
-    int nextReport;     // When to report next
+    private int done;
+    private int nextReport;     // When to report next
 
-    final DBFactory factory;
+    private final DBFactory factory;
 
     public DbBenchmark(Map<Flag, Object> flags)
             throws Exception
@@ -240,7 +240,7 @@ public class DbBenchmark
         System.out.printf("------------------------------------------------\n");
     }
 
-    void printWarnings()
+    static void printWarnings()
     {
         boolean assertsEnabled = true;
         assert assertsEnabled; // Intentional side effect!!!
@@ -346,7 +346,7 @@ public class DbBenchmark
 
         System.out.printf("%-12s : %11.5f micros/op;%s%s\n",
                 benchmark,
-                elapsedSeconds * 1e6 / done,
+                elapsedSeconds * 1.0e6 / done,
                 (message == null ? "" : " "),
                 message);
 //        if (FLAGS_histogram) {
@@ -401,7 +401,7 @@ public class DbBenchmark
 
         int i = 15;
         while (n > 0) {
-            slice[i--] = (byte) ('0' + (n % 10));
+            slice[i--] = (byte) ((long) '0' + (n % 10));
             n /= 10;
         }
         while (i >= 0) {
@@ -628,7 +628,7 @@ public class DbBenchmark
     public static void main(String[] args)
             throws Exception
     {
-        Map<Flag, Object> flags = new EnumMap<Flag, Object>(Flag.class);
+        Map<Flag, Object> flags = new EnumMap<>(Flag.class);
         for (Flag flag : Flag.values()) {
             flags.put(flag, flag.getDefaultValue());
         }
@@ -674,7 +674,7 @@ public class DbBenchmark
         //      compact     -- Compact the entire DB
         //      stats       -- Print DB stats
         //      heapprofile -- Dump a heap profile (if supported by this port)
-        benchmarks(ImmutableList.<String>of(
+        benchmarks(ImmutableList.of(
                 "fillseq",
                 "fillseq",
                 "fillseq",
@@ -879,7 +879,7 @@ public class DbBenchmark
         Slice rawData = Slices.allocate(length);
         SliceOutput sliceOutput = rawData.output();
         while (sliceOutput.isWritable()) {
-            sliceOutput.writeByte((byte) (' ' + random.nextInt(95)));
+            sliceOutput.writeByte((byte) ((int) ' ' + random.nextInt(95)));
         }
         return rawData;
     }

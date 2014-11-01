@@ -31,7 +31,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -74,7 +73,7 @@ public abstract class TableTest
     public void testMultipleEntriesWithSingleBlock()
             throws Exception
     {
-        List<BlockEntry> entries = Arrays.asList(
+        List<BlockEntry> entries = asList(
                 BlockHelper.createBlockEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
                 BlockHelper.createBlockEntry("beer/ipa", "Lagunitas IPA"),
                 BlockHelper.createBlockEntry("beer/stout", "Lagunitas Imperial Stout"),
@@ -91,7 +90,7 @@ public abstract class TableTest
     public void testMultipleEntriesWithMultipleBlock()
             throws Exception
     {
-        List<BlockEntry> entries = Arrays.asList(
+        List<BlockEntry> entries = asList(
                 BlockHelper.createBlockEntry("beer/ale", "Lagunitas  Little Sumpin’ Sumpin’"),
                 BlockHelper.createBlockEntry("beer/ipa", "Lagunitas IPA"),
                 BlockHelper.createBlockEntry("beer/stout", "Lagunitas Imperial Stout"),

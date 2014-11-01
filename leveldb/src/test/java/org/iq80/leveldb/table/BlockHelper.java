@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Charsets;
 import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -53,6 +52,7 @@ public final class BlockHelper
                 SIZE_OF_INT;
     }
 
+    @SafeVarargs
     public static <K, V> void assertSequence(SeekingIterator<K, V> seekingIterator, Entry<K, V>... entries)
     {
         assertSequence(seekingIterator, Arrays.asList(entries));
@@ -94,7 +94,7 @@ public final class BlockHelper
 
     public static void assertSliceEquals(Slice actual, Slice expected)
     {
-        assertEquals(actual.toString(Charsets.UTF_8), expected.toString(Charsets.UTF_8));
+        assertEquals(actual.toString(UTF_8), expected.toString(UTF_8));
     }
 
     public static String beforeString(Entry<String, ?> expectedEntry)
