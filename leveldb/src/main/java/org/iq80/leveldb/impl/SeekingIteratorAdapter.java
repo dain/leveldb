@@ -87,32 +87,29 @@ public class SeekingIteratorAdapter
         return new DbEntry(entry.getKey(), entry.getValue());
     }
 
-    //
-    // todo Implement reverse iterator
-    //
-
     @Override
+
     public void seekToLast()
     {
-        throw new UnsupportedOperationException();
+        seekingIterator.seekToLast();
     }
 
     @Override
     public boolean hasPrev()
     {
-        throw new UnsupportedOperationException();
+        return seekingIterator.hasPrev();
     }
 
     @Override
     public DbEntry prev()
     {
-        throw new UnsupportedOperationException();
+        return adapt(seekingIterator.prev());
     }
 
     @Override
     public DbEntry peekPrev()
     {
-        throw new UnsupportedOperationException();
+        return adapt(seekingIterator.peekPrev());
     }
 
     public static class DbEntry

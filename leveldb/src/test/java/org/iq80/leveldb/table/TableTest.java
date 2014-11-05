@@ -18,8 +18,9 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
+
 import org.iq80.leveldb.Options;
-import org.iq80.leveldb.impl.SeekingIterator;
+import org.iq80.leveldb.impl.ReverseSeekingIterator;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -31,9 +32,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map.Entry;
 
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertTrue;
@@ -114,6 +117,10 @@ public abstract class TableTest
     private void tableTest(int blockSize, int blockRestartInterval, List<BlockEntry> entries)
             throws IOException
     {
+        List<BlockEntry> reverseEntries = Arrays.asList(new BlockEntry[entries.size()]);
+        Collections.copy(reverseEntries, entries);
+        Collections.reverse(reverseEntries);
+
         reopenFile();
         Options options = new Options().blockSize(blockSize).blockRestartInterval(blockRestartInterval);
         TableBuilder builder = new TableBuilder(options, fileChannel, new BytewiseComparator());
@@ -125,10 +132,22 @@ public abstract class TableTest
 
         Table table = createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
 
-        SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
+        ReverseSeekingIterator<Slice, Slice> seekingIterator = table.iterator();
+        BlockHelper.assertReverseSequence(seekingIterator, Collections.<Entry<Slice, Slice>>emptyList());
         BlockHelper.assertSequence(seekingIterator, entries);
+        BlockHelper.assertReverseSequence(seekingIterator, reverseEntries);
 
         seekingIterator.seekToFirst();
+        BlockHelper.assertReverseSequence(seekingIterator, Collections.<Entry<Slice, Slice>>emptyList());
+        BlockHelper.assertSequence(seekingIterator, entries);
+        BlockHelper.assertReverseSequence(seekingIterator, reverseEntries);
+
+        seekingIterator.seekToLast();
+        if (reverseEntries.size() > 0) {
+            BlockHelper.assertSequence(seekingIterator, reverseEntries.get(0));
+            seekingIterator.seekToLast();
+            BlockHelper.assertReverseSequence(seekingIterator, reverseEntries.subList(1, reverseEntries.size()));
+        }
         BlockHelper.assertSequence(seekingIterator, entries);
 
         long lastApproximateOffset = 0;
@@ -151,10 +170,10 @@ public abstract class TableTest
         Slice endKey = Slices.wrappedBuffer(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey);
         BlockHelper.assertSequence(seekingIterator, Collections.<BlockEntry>emptyList());
+        BlockHelper.assertReverseSequence(seekingIterator, reverseEntries);
 
         long approximateOffset = table.getApproximateOffsetOf(endKey);
         assertTrue(approximateOffset >= lastApproximateOffset);
-
     }
 
     @BeforeMethod

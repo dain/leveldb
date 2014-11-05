@@ -15,294 +15,295 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
-import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
-import org.iq80.leveldb.impl.SeekingIterator;
+import org.iq80.leveldb.impl.ReverseSeekingIterator;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
 
 public final class DbIterator
-        extends AbstractSeekingIterator<InternalKey, Slice>
-        implements InternalIterator
+        extends AbstractReverseSeekingIterator<InternalKey, Slice>
+        implements
+        InternalIterator
 {
-    /*
-     * NOTE: This code has been specifically tuned for performance of the DB
-     * iterator methods.  Before committing changes to this code, make sure
-     * that the performance of the DB benchmark with the following parameters
-     * has not regressed:
-     *
-     *    --num=10000000 --benchmarks=fillseq,readrandom,readseq,readseq,readseq
-     *
-     * The code in this class purposely does not use the SeekingIterator
-     * interface, but instead used the concrete implementations.  This is
-     * because we want the hot spot compiler to inline the code from the
-     * concrete iterators, and this can not happen with truly polymorphic
-     * call-sites.  If a future version of hot spot supports inlining of truly
-     * polymorphic call-sites, this code can be made much simpler.
-     */
 
-    private final MemTableIterator memTableIterator;
-    private final MemTableIterator immutableMemTableIterator;
-    private final List<InternalTableIterator> level0Files;
-    private final List<LevelIterator> levels;
+    private final OrdinalIterator[] heap;
+    private final Comparator<OrdinalIterator> smallerNext, largerPrev;
 
-    private final Comparator<InternalKey> comparator;
-
-    private final ComparableIterator[] heap;
-    private int heapSize;
+    private final Comparator<InternalKey> userComparator;
 
     public DbIterator(MemTableIterator memTableIterator,
             MemTableIterator immutableMemTableIterator,
             List<InternalTableIterator> level0Files,
             List<LevelIterator> levels,
-            Comparator<InternalKey> comparator)
+            Comparator<InternalKey> userComparator)
     {
-        this.memTableIterator = memTableIterator;
-        this.immutableMemTableIterator = immutableMemTableIterator;
-        this.level0Files = level0Files;
-        this.levels = levels;
-        this.comparator = comparator;
+        this.userComparator = userComparator;
 
-        this.heap = new ComparableIterator[3 + level0Files.size() + levels.size()];
-        resetPriorityQueue();
+        ArrayList<OrdinalIterator> ordinalIterators = new ArrayList<OrdinalIterator>();
+        int ordinal = 0;
+        if (memTableIterator != null) {
+            ordinalIterators.add(new OrdinalIterator(ordinal++, memTableIterator));
+        }
+
+        if (immutableMemTableIterator != null) {
+            ordinalIterators.add(new OrdinalIterator(ordinal++, immutableMemTableIterator));
+        }
+        for (InternalTableIterator level0File : level0Files) {
+            ordinalIterators.add(new OrdinalIterator(ordinal++, level0File));
+        }
+        for (LevelIterator level : levels) {
+            ordinalIterators.add(new OrdinalIterator(ordinal++, level));
+        }
+
+        smallerNext = new SmallerNextElementComparator();
+        largerPrev = new LargerPrevElementComparator();
+
+        heap = ordinalIterators.toArray(new OrdinalIterator[ordinalIterators.size()]);
+        resetHeap();
     }
 
     @Override
     protected void seekToFirstInternal()
     {
-        if (memTableIterator != null) {
-            memTableIterator.seekToFirst();
+        for (OrdinalIterator ord : heap) {
+            ord.iterator.seekToFirst();
         }
-        if (immutableMemTableIterator != null) {
-            immutableMemTableIterator.seekToFirst();
+        resetHeap();
+    }
+
+    @Override
+    protected void seekToLastInternal()
+    {
+        seekToEndInternal();
+        getPrevElement();
+    }
+
+    @Override
+    public void seekToEndInternal()
+    {
+        for (OrdinalIterator ord : heap) {
+            ord.iterator.seekToEnd();
         }
-        for (InternalTableIterator level0File : level0Files) {
-            level0File.seekToFirst();
-        }
-        for (LevelIterator level : levels) {
-            level.seekToFirst();
-        }
-        resetPriorityQueue();
+        resetHeap();
     }
 
     @Override
     protected void seekInternal(InternalKey targetKey)
     {
-        if (memTableIterator != null) {
-            memTableIterator.seek(targetKey);
+        for (OrdinalIterator ord : heap) {
+            ord.iterator.seek(targetKey);
         }
-        if (immutableMemTableIterator != null) {
-            immutableMemTableIterator.seek(targetKey);
+        resetHeap();
+    }
+
+    private Tuple<OrdinalIterator, Integer> getMaxAndIndex()
+    {
+      /*
+       * forward iteration can take advantage of the heap ordering but reverse iteration cannot,
+       * requiring linear search. there were attempts to maintain two parallel heaps, one min-heap
+       * and one max-heap each containing the same iterators. however, these proved to be difficult
+       * to coordinate. on the bright side, there tends to be only a small number of iterators (less
+       * than 10) even when the database contains a substantial number of items (in the millions)
+       * (the c++ implementation, as of this writing, uses linear search forwards and backwards)
+       */
+        OrdinalIterator max = heap[0];
+        int maxIndex = 0;
+
+        for (int i = 1; i < heap.length; i++) {
+            OrdinalIterator ord = heap[i];
+            if (largerPrev.compare(ord, max) > 0) {
+                max = ord;
+                maxIndex = i;
+            }
         }
-        for (InternalTableIterator level0File : level0Files) {
-            level0File.seek(targetKey);
+
+        return Tuple.of(max, maxIndex);
+    }
+
+    @Override
+    protected boolean hasNextInternal()
+    {
+        return heap[0].iterator.hasNext();
+    }
+
+    @Override
+    protected boolean hasPrevInternal()
+    {
+        for (OrdinalIterator ord : heap) {
+            if (ord.iterator.hasPrev()) {
+                return true;
+            }
         }
-        for (LevelIterator level : levels) {
-            level.seek(targetKey);
-        }
-        resetPriorityQueue();
+        return false;
     }
 
     @Override
     protected Entry<InternalKey, Slice> getNextElement()
     {
-        if (heapSize == 0) {
-            return null;
-        }
+        Entry<InternalKey, Slice> next = heap[0].iterator.next();
+        siftDown(heap, smallerNext, 0, heap[0]);
 
-        ComparableIterator smallest = heap[0];
-        Entry<InternalKey, Slice> result = smallest.next();
-
-        // if the smallest iterator has more elements, put it back in the heap,
-        // otherwise use the last element in the queue
-        ComparableIterator replacementElement;
-        if (smallest.hasNext()) {
-            replacementElement = smallest;
-        }
-        else {
-            heapSize--;
-            replacementElement = heap[heapSize];
-            heap[heapSize] = null;
-        }
-
-        if (replacementElement != null) {
-            heap[0] = replacementElement;
-            heapSiftDown(0);
-        }
-
-        return result;
+        return next;
     }
 
-    private void resetPriorityQueue()
+    @Override
+    protected Entry<InternalKey, Slice> getPrevElement()
     {
-        int i = 0;
-        heapSize = 0;
-        if (memTableIterator != null && memTableIterator.hasNext()) {
-            heapAdd(new ComparableIterator(memTableIterator, comparator, i++, memTableIterator.next()));
+        Tuple<OrdinalIterator, Integer> maxAndIndex = getMaxAndIndex();
+        OrdinalIterator ord = maxAndIndex.item1;
+        int index = maxAndIndex.item2;
+
+        Entry<InternalKey, Slice> prev = ord.iterator.prev();
+        siftUp(heap, smallerNext, index, heap[index]);
+        siftDown(heap, smallerNext, index, heap[index]);
+
+        return prev;
+    }
+
+    @Override
+    protected Entry<InternalKey, Slice> peekInternal()
+    {
+        return heap[0].iterator.peek();
+    }
+
+    @Override
+    protected Entry<InternalKey, Slice> peekPrevInternal()
+    {
+        return getMaxAndIndex().item1.iterator.peekPrev();
+    }
+
+    private void resetHeap()
+    {
+        // heapify
+        for (int i = (heap.length >>> 1) - 1; i >= 0; i--) {
+            siftDown(heap, smallerNext, i, heap[i]);
         }
-        if (immutableMemTableIterator != null && immutableMemTableIterator.hasNext()) {
-            heapAdd(new ComparableIterator(immutableMemTableIterator, comparator, i++, immutableMemTableIterator.next()));
-        }
-        for (InternalTableIterator level0File : level0Files) {
-            if (level0File.hasNext()) {
-                heapAdd(new ComparableIterator(level0File, comparator, i++, level0File.next()));
+    }
+
+    private static <E> void siftDown(E[] queue, Comparator<E> comparator, int k, E x)
+    {
+        int half = queue.length >>> 1;
+        while (k < half) {
+            int child = (k << 1) + 1;
+            E c = queue[child];
+            int right = child + 1;
+            if (right < queue.length &&
+                    comparator.compare(c, queue[right]) > 0) {
+                c = queue[child = right];
             }
-        }
-        for (LevelIterator level : levels) {
-            if (level.hasNext()) {
-                heapAdd(new ComparableIterator(level, comparator, i++, level.next()));
-            }
-        }
-    }
-
-    private boolean heapAdd(ComparableIterator newElement)
-    {
-        Preconditions.checkNotNull(newElement, "newElement is null");
-
-        heap[heapSize] = newElement;
-        heapSiftUp(heapSize++);
-        return true;
-    }
-
-    private void heapSiftUp(int childIndex)
-    {
-        ComparableIterator target = heap[childIndex];
-        int parentIndex;
-        while (childIndex > 0) {
-            parentIndex = (childIndex - 1) / 2;
-            ComparableIterator parent = heap[parentIndex];
-            if (parent.compareTo(target) <= 0) {
+            if (comparator.compare(x, c) <= 0) {
                 break;
             }
-            heap[childIndex] = parent;
-            childIndex = parentIndex;
+            queue[k] = c;
+            k = child;
         }
-        heap[childIndex] = target;
+        queue[k] = x;
     }
 
-    private void heapSiftDown(int rootIndex)
+    private static <E> void siftUp(E[] queue, Comparator<E> comparator, int k, E x)
     {
-        ComparableIterator target = heap[rootIndex];
-        int childIndex;
-        while ((childIndex = rootIndex * 2 + 1) < heapSize) {
-            if (childIndex + 1 < heapSize
-                    && heap[childIndex + 1].compareTo(heap[childIndex]) < 0) {
-                childIndex++;
-            }
-            if (target.compareTo(heap[childIndex]) <= 0) {
+        while (k > 0) {
+            int parent = (k - 1) >>> 1;
+            E e = queue[parent];
+            if (comparator.compare(x, e) >= 0) {
                 break;
             }
-            heap[rootIndex] = heap[childIndex];
-            rootIndex = childIndex;
+            queue[k] = e;
+            k = parent;
         }
-        heap[rootIndex] = target;
+        queue[k] = x;
     }
 
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         sb.append("DbIterator");
-        sb.append("{memTableIterator=").append(memTableIterator);
-        sb.append(", immutableMemTableIterator=").append(immutableMemTableIterator);
-        sb.append(", level0Files=").append(level0Files);
-        sb.append(", levels=").append(levels);
-        sb.append(", comparator=").append(comparator);
+        sb.append("{iterators=").append(Arrays.asList(heap));
+        sb.append(", userComparator=").append(userComparator);
         sb.append('}');
         return sb.toString();
     }
 
-    private static class ComparableIterator
-            implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
+    private class OrdinalIterator
     {
-        private final SeekingIterator<InternalKey, Slice> iterator;
-        private final Comparator<InternalKey> comparator;
-        private final int ordinal;
-        private Entry<InternalKey, Slice> nextElement;
+        final public ReverseSeekingIterator<InternalKey, Slice> iterator;
+        final public int ordinal;
 
-        private ComparableIterator(SeekingIterator<InternalKey, Slice> iterator, Comparator<InternalKey> comparator, int ordinal, Entry<InternalKey, Slice> nextElement)
+        public OrdinalIterator(int ordinal, ReverseSeekingIterator<InternalKey, Slice> iterator)
         {
-            this.iterator = iterator;
-            this.comparator = comparator;
             this.ordinal = ordinal;
-            this.nextElement = nextElement;
+            this.iterator = iterator;
+        }
+    }
+
+    protected class SmallerNextElementComparator
+            implements Comparator<OrdinalIterator>
+    {
+        @Override
+        public int compare(OrdinalIterator o1, OrdinalIterator o2)
+        {
+            if (o1.iterator.hasNext()) {
+                if (o2.iterator.hasNext()) {
+                    // both iterators have a next element
+                    int result =
+                            userComparator.compare(o1.iterator.peek().getKey(),
+                                    o2.iterator.peek().getKey());
+                    return result == 0 ? Integer.compare(o1.ordinal, o2.ordinal) : result;
+                }
+                return -1; // o2 does not have a next element, consider o1 less than the empty o2
+            }
+            if (o2.iterator.hasNext()) {
+                return 1; // o1 does not have a next element, consider o2 less than the empty o1
+            }
+            return 0; // neither o1 nor o2 have a next element, consider them equals as empty iterators in this direction
+        }
+    }
+
+    protected class LargerPrevElementComparator
+            implements Comparator<OrdinalIterator>
+    {
+        @Override
+        public int compare(OrdinalIterator o1, OrdinalIterator o2)
+        {
+            if (o1.iterator.hasPrev()) {
+                if (o2.iterator.hasPrev()) {
+                    int result =
+                            userComparator.compare(o1.iterator.peekPrev().getKey(),
+                                    o2.iterator.peekPrev().getKey());
+                    return result == 0 ? Integer.compare(o1.ordinal, o2.ordinal) : result;
+                }
+                return 1; // if o2 has no prev, return o1 as larger
+            }
+            if (o2.iterator.hasPrev()) {
+                return -1; // if o1 has no prev, return o2 as larger
+            }
+            return 0; //neither o1 nor o2 have a next element, consider them equals as empty iterators in this direction
+        }
+    }
+
+    private static class Tuple<T1, T2>
+    {
+        final public T1 item1;
+        final public T2 item2;
+
+        public Tuple(T1 item1, T2 item2)
+        {
+            this.item1 = item1;
+            this.item2 = item2;
         }
 
-        @Override
-        public boolean hasNext()
+        public static <A, B> Tuple<A, B> of(A a, B b)
         {
-            return nextElement != null;
-        }
-
-        @Override
-        public Entry<InternalKey, Slice> next()
-        {
-            if (nextElement == null) {
-                throw new NoSuchElementException();
-            }
-
-            Entry<InternalKey, Slice> result = nextElement;
-            if (iterator.hasNext()) {
-                nextElement = iterator.next();
-            }
-            else {
-                nextElement = null;
-            }
-            return result;
-        }
-
-        @Override
-        public void remove()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
-            ComparableIterator comparableIterator = (ComparableIterator) o;
-
-            if (ordinal != comparableIterator.ordinal) {
-                return false;
-            }
-            if (nextElement != null ? !nextElement.equals(comparableIterator.nextElement) : comparableIterator.nextElement != null) {
-                return false;
-            }
-
-            return true;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            int result = ordinal;
-            result = 31 * result + (nextElement != null ? nextElement.hashCode() : 0);
-            return result;
-        }
-
-        @Override
-        public int compareTo(ComparableIterator that)
-        {
-            int result = comparator.compare(this.nextElement.getKey(), that.nextElement.getKey());
-            if (result == 0) {
-                result = Ints.compare(this.ordinal, that.ordinal);
-            }
-            return result;
+            return new Tuple<A, B>(a, b);
         }
     }
 }

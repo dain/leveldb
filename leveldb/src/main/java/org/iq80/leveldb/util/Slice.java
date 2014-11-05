@@ -432,7 +432,8 @@ public final class Slice
             readBytes += localReadBytes;
             index += localReadBytes;
             length -= localReadBytes;
-        } while (length > 0);
+        }
+        while (length > 0);
 
         return readBytes;
     }
@@ -476,7 +477,8 @@ public final class Slice
                 break;
             }
             readBytes += localReadBytes;
-        } while (readBytes < length);
+        }
+        while (readBytes < length);
 
         return readBytes;
     }
@@ -509,7 +511,8 @@ public final class Slice
                 break;
             }
             readBytes += localReadBytes;
-        } while (readBytes < length);
+        }
+        while (readBytes < length);
 
         return readBytes;
     }

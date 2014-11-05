@@ -357,7 +357,6 @@ public class DbBenchmark
             System.out.printf("\n%s\n", postMessage);
             postMessage = null;
         }
-
     }
 
     private void write(WriteOptions writeOptions, Order order, DBState state, int numEntries, int valueSize, int entriesPerBatch)
@@ -439,7 +438,6 @@ public class DbBenchmark
                 nextReport += 100000;
             }
             System.out.printf("... finished %d ops%30s\r", done, "");
-
         }
     }
 
@@ -447,6 +445,7 @@ public class DbBenchmark
     {
         for (int loops = 0; loops < 5; loops++) {
             DBIterator iterator = db.iterator();
+            iterator.seekToFirst();
             for (int i = 0; i < reads && iterator.hasNext(); i++) {
                 Map.Entry<byte[], byte[]> entry = iterator.next();
                 bytes += entry.getKey().length + entry.getValue().length;
@@ -458,7 +457,16 @@ public class DbBenchmark
 
     private void readReverse()
     {
-        //To change body of created methods use File | Settings | File Templates.
+        for (int loops = 0; loops < 3; loops++) {
+            DBIterator iterator = db.iterator();
+            iterator.seekToLast();
+            for (int i = 0; i < reads && iterator.hasPrev(); i++) {
+                Map.Entry<byte[], byte[]> entry = iterator.prev();
+                bytes += entry.getKey().length + entry.getValue().length;
+                finishedSingleOp();
+            }
+            Closeables.closeQuietly(iterator);
+        }
     }
 
     private void readRandom()
@@ -500,7 +508,6 @@ public class DbBenchmark
         byte[] data = new byte[blockSize];
         for (int i = 0; i < data.length; i++) {
             data[i] = 'x';
-
         }
 
         long bytes = 0;
@@ -650,7 +657,6 @@ public class DbBenchmark
                 System.err.println("Invalid argument " + arg);
                 System.exit(1);
             }
-
         }
         new DbBenchmark(flags).run();
     }

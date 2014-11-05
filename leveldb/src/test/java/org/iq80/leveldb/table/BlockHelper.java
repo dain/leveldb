@@ -17,6 +17,9 @@
  */
 package org.iq80.leveldb.table;
 
+import com.google.common.base.Charsets;
+
+import org.iq80.leveldb.impl.ReverseSeekingIterator;
 import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -77,6 +80,29 @@ public final class BlockHelper
         }
         try {
             seekingIterator.next();
+            fail("expected NoSuchElementException");
+        }
+        catch (NoSuchElementException expected) {
+        }
+    }
+
+    public static <K, V> void assertReverseSequence(ReverseSeekingIterator<K, V> rSeekingIterator, Iterable<? extends Entry<K, V>> reversedEntries)
+    {
+        for (Entry<K, V> entry : reversedEntries) {
+            assertTrue(rSeekingIterator.hasPrev());
+            assertEntryEquals(rSeekingIterator.peekPrev(), entry);
+            assertEntryEquals(rSeekingIterator.prev(), entry);
+        }
+        assertFalse(rSeekingIterator.hasPrev());
+
+        try {
+            rSeekingIterator.peekPrev();
+            fail("expected NoSuchElementException");
+        }
+        catch (NoSuchElementException expected) {
+        }
+        try {
+            rSeekingIterator.prev();
             fail("expected NoSuchElementException");
         }
         catch (NoSuchElementException expected) {
@@ -147,7 +173,6 @@ public final class BlockHelper
 
             previousKey = entry.getKey();
             restartBlockCount++;
-
         }
         return size;
     }
