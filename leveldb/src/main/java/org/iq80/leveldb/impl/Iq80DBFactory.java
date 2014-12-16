@@ -35,7 +35,18 @@ import java.io.UnsupportedEncodingException;
 public class Iq80DBFactory
         implements DBFactory
 {
-    public static final int CPU_DATA_MODEL = Integer.getInteger("sun.arch.data.model");
+    public static final int CPU_DATA_MODEL;
+
+    static {
+        boolean is64bit;
+        if (System.getProperty("os.name").contains("Windows")) {
+            is64bit = System.getenv("ProgramFiles(x86)") != null;
+        }
+        else {
+            is64bit = System.getProperty("os.arch").contains("64");
+        }
+        CPU_DATA_MODEL = is64bit ? 64 : 32;
+    }
 
     // We only use MMAP on 64 bit systems since it's really easy to run out of
     // virtual address space on a 32 bit system when all the data is getting mapped
