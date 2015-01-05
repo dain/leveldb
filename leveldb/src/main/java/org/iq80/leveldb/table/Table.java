@@ -49,7 +49,6 @@ public abstract class Table
         Preconditions.checkNotNull(fileChannel, "fileChannel is null");
         long size = fileChannel.size();
         Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
-        Preconditions.checkArgument(size <= Integer.MAX_VALUE, "File must be smaller than %s bytes", Integer.MAX_VALUE);
         Preconditions.checkNotNull(comparator, "comparator is null");
 
         this.name = name;
