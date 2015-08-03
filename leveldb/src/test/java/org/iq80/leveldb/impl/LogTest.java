@@ -18,7 +18,6 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.collect.ImmutableList;
-import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
@@ -139,17 +138,15 @@ public class LogTest
         }
 
         // test readRecord
-        FileChannel fileChannel = new FileInputStream(writer.getFile()).getChannel();
-        try {
+
+        try (FileInputStream fis = new FileInputStream(writer.getFile());
+                FileChannel fileChannel = fis.getChannel()) {
             LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
             for (Slice expected : records) {
                 Slice actual = reader.readRecord();
                 assertEquals(actual, expected);
             }
             assertNull(reader.readRecord());
-        }
-        finally {
-            Closeables.closeQuietly(fileChannel);
         }
     }
 

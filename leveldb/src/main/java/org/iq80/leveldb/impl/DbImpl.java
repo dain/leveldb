@@ -517,7 +517,8 @@ public class DbImpl
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
         File file = new File(databaseDir, Filename.logFileName(fileNumber));
-        try (FileChannel channel = new FileInputStream(file).getChannel()) {
+        try (FileInputStream fis = new FileInputStream(file);
+                FileChannel channel = fis.getChannel()) {
             LogMonitor logMonitor = LogMonitors.logMonitor();
             LogReader logReader = new LogReader(channel, logMonitor, true, 0);
 
