@@ -17,26 +17,27 @@
  */
 package org.iq80.leveldb.impl;
 
+import java.util.concurrent.ExecutionException;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+
+import org.iq80.leveldb.table.FileChannelTable;
+import org.iq80.leveldb.table.MMapTable;
+import org.iq80.leveldb.table.Table;
+import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Finalizer;
+import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.Slice;
+
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-import org.iq80.leveldb.table.FileChannelTable;
-import org.iq80.leveldb.table.MMapTable;
-import org.iq80.leveldb.table.Table;
-import org.iq80.leveldb.table.UserComparator;
-import org.iq80.leveldb.util.Closeables;
-import org.iq80.leveldb.util.Finalizer;
-import org.iq80.leveldb.util.InternalTableIterator;
-import org.iq80.leveldb.util.Slice;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.concurrent.ExecutionException;
 
 public class TableCache
 {
@@ -114,15 +115,14 @@ public class TableCache
     private static final class TableAndFile
     {
         private final Table table;
-        private final FileChannel fileChannel;
 
         private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
                 throws IOException
         {
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
-            fileChannel = new FileInputStream(tableFile).getChannel();
-            try {
+            try (FileInputStream fis = new FileInputStream(tableFile);
+                 FileChannel fileChannel = fis.getChannel();) {
                 if (Iq80DBFactory.USE_MMAP) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
                 }
@@ -131,7 +131,6 @@ public class TableCache
                 }
             }
             catch (IOException e) {
-                Closeables.closeQuietly(fileChannel);
                 throw e;
             }
         }
