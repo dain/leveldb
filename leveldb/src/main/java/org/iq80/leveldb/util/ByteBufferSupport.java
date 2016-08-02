@@ -18,25 +18,36 @@
 package org.iq80.leveldb.util;
 
 import com.google.common.base.Throwables;
-import sun.nio.ch.FileChannelImpl;
 
 import java.lang.reflect.Method;
 import java.nio.MappedByteBuffer;
 
 public final class ByteBufferSupport
 {
-    private static final Method unmap;
+    private static final Method getCleaner;
+    private static final Method clean;
 
     static {
-        Method x;
         try {
-            x = FileChannelImpl.class.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            getCleaner = Class.forName("java.nio.DirectByteBuffer").getDeclaredMethod("cleaner");
+            getCleaner.setAccessible(true);
+        }
+        catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
+
+        try {
+            Class<?> returnType = getCleaner.getReturnType();
+            if (Runnable.class.isAssignableFrom(returnType)) {
+                clean = Runnable.class.getMethod("run");
+            }
+            else {
+                clean = returnType.getMethod("clean");
+            }
         }
         catch (NoSuchMethodException e) {
             throw new AssertionError(e);
         }
-        x.setAccessible(true);
-        unmap = x;
     }
 
     private ByteBufferSupport()
@@ -46,7 +57,8 @@ public final class ByteBufferSupport
     public static void unmap(MappedByteBuffer buffer)
     {
         try {
-            unmap.invoke(null, buffer);
+            Object cleaner = getCleaner.invoke(buffer);
+            clean.invoke(cleaner);
         }
         catch (Exception ignored) {
             throw Throwables.propagate(ignored);
