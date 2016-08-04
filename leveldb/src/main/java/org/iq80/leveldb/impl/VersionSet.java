@@ -342,7 +342,8 @@ public class VersionSet
         currentName = currentName.substring(0, currentName.length() - 1);
 
         // open file channel
-        try (FileChannel fileChannel = new FileInputStream(new File(databaseDir, currentName)).getChannel()) {
+        try (FileInputStream fis = new FileInputStream(new File(databaseDir, currentName));
+             FileChannel fileChannel = fis.getChannel()) {
             // read log edit log
             Long nextFileNumber = null;
             Long lastSequence = null;

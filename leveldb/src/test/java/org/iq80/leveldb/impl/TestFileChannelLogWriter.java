@@ -17,15 +17,15 @@
  */
 package org.iq80.leveldb.impl;
 
-import org.iq80.leveldb.util.Slice;
-import org.testng.annotations.Test;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.channels.FileChannel;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
+import org.iq80.leveldb.util.Slice;
+import org.testng.annotations.Test;
 
 public class TestFileChannelLogWriter
 {
@@ -44,16 +44,16 @@ public class TestFileChannelLogWriter
 
             LogMonitor logMonitor = new AssertNoCorruptionLogMonitor();
 
-            FileChannel channel = new FileInputStream(file).getChannel();
-
-            LogReader logReader = new LogReader(channel, logMonitor, true, 0);
-
-            int count = 0;
-            for (Slice slice = logReader.readRecord(); slice != null; slice = logReader.readRecord()) {
-                assertEquals(slice.length(), recordSize);
-                count++;
+            try (FileInputStream fis = new FileInputStream(file);
+                 FileChannel channel = fis.getChannel();) {
+                LogReader logReader = new LogReader(channel, logMonitor, true, 0);
+                int count = 0;
+                for (Slice slice = logReader.readRecord(); slice != null; slice = logReader.readRecord()) {
+                    assertEquals(slice.length(), recordSize);
+                    count++;
+                }
+                assertEquals(count, 1);
             }
-            assertEquals(count, 1);
         }
         finally {
             file.delete();
