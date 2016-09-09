@@ -135,34 +135,36 @@ public class NativeInteropTest
         Options options = new Options().createIfMissing(true);
 
         File path = getTestDirectory(getClass().getName() + "_" + NEXT_ID.incrementAndGet());
-        DB db = firstFactory.open(path, options);
-
         WriteOptions wo = new WriteOptions().sync(false);
         ReadOptions ro = new ReadOptions().fillCache(true).verifyChecksums(true);
-        db.put(bytes("Tampa"), bytes("green"));
-        db.put(bytes("London"), bytes("red"));
-        db.put(bytes("New York"), bytes("blue"));
+        try (DB db = firstFactory.open(path, options)) {
+            db.put(bytes("Tampa"), bytes("green"));
+            db.put(bytes("London"), bytes("red"));
+            db.put(bytes("New York"), bytes("blue"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        db.close();
-        db = secondFactory.open(path, options);
+        try (DB db = firstFactory.open(path, options)) {
+            assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
+            assertEquals(db.get(bytes("London"), ro), bytes("red"));
+            assertEquals(db.get(bytes("New York"), ro), bytes("blue"));
 
-        assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
-        assertEquals(db.get(bytes("London"), ro), bytes("red"));
-        assertEquals(db.get(bytes("New York"), ro), bytes("blue"));
+            db.delete(bytes("New York"), wo);
 
-        db.delete(bytes("New York"), wo);
+            assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
+            assertEquals(db.get(bytes("London"), ro), bytes("red"));
+            assertNull(db.get(bytes("New York"), ro));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
-        assertEquals(db.get(bytes("London"), ro), bytes("red"));
-        assertNull(db.get(bytes("New York"), ro));
-
-        db.close();
-        db = firstFactory.open(path, options);
-
-        assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
-        assertEquals(db.get(bytes("London"), ro), bytes("red"));
-        assertNull(db.get(bytes("New York"), ro));
-
-        db.close();
+        try (DB db = firstFactory.open(path, options)) {
+            assertEquals(db.get(bytes("Tampa"), ro), bytes("green"));
+            assertEquals(db.get(bytes("London"), ro), bytes("red"));
+            assertNull(db.get(bytes("New York"), ro));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

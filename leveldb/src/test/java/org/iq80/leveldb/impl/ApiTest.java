@@ -90,38 +90,41 @@ public class ApiTest
         Options options = new Options().createIfMissing(true).compressionType(CompressionType.NONE);
 
         File path = getTestDirectory("testCompaction");
-        DB db = factory.open(path, options);
 
-        System.out.println("Adding");
-        for (int i = 0; i < 1000 * 1000; i++) {
-            if (i % 100000 == 0) {
-                System.out.println("  at: " + i);
+        try (DB db = factory.open(path, options)) {
+            System.out.println("Adding");
+            for (int i = 0; i < 1000 * 1000; i++) {
+                if (i % 100000 == 0) {
+                    System.out.println("  at: " + i);
+                }
+                db.put(bytes("key" + i), bytes("value" + i));
             }
-            db.put(bytes("key" + i), bytes("value" + i));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
-        db.close();
-        db = factory.open(path, options);
-
-        System.out.println("Deleting");
-        for (int i = 0; i < 1000 * 1000; i++) {
-            if (i % 100000 == 0) {
-                System.out.println("  at: " + i);
+        try (DB db = factory.open(path, options)) {
+            System.out.println("Deleting");
+            for (int i = 0; i < 1000 * 1000; i++) {
+                if (i % 100000 == 0) {
+                    System.out.println("  at: " + i);
+                }
+                db.delete(bytes("key" + i));
             }
-            db.delete(bytes("key" + i));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
-        db.close();
-        db = factory.open(path, options);
-
-        System.out.println("Adding");
-        for (int i = 0; i < 1000 * 1000; i++) {
-            if (i % 100000 == 0) {
-                System.out.println("  at: " + i);
+        try (DB db = factory.open(path, options)) {
+            System.out.println("Adding");
+            for (int i = 0; i < 1000 * 1000; i++) {
+                if (i % 100000 == 0) {
+                    System.out.println("  at: " + i);
+                }
+                db.put(bytes("key" + i), bytes("value" + i));
             }
-            db.put(bytes("key" + i), bytes("value" + i));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        db.close();
     }
 }

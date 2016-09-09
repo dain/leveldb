@@ -24,7 +24,7 @@ import java.util.Map;
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
 public interface DB
-        extends Iterable<Map.Entry<byte[], byte[]>>, Closeable
+        extends Iterable<Map.Entry<byte[], byte[]>>, AutoCloseable, Closeable
 {
     byte[] get(byte[] key)
             throws DBException;

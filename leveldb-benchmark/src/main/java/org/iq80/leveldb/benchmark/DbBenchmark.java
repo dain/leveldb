@@ -446,13 +446,15 @@ public class DbBenchmark
     private void readSequential()
     {
         for (int loops = 0; loops < 5; loops++) {
-            DBIterator iterator = db.iterator();
-            for (int i = 0; i < reads && iterator.hasNext(); i++) {
-                Map.Entry<byte[], byte[]> entry = iterator.next();
-                bytes += entry.getKey().length + entry.getValue().length;
-                finishedSingleOp();
+            try (DBIterator iterator = db.iterator()) {
+                for (int i = 0; i < reads && iterator.hasNext(); i++) {
+                    Map.Entry<byte[], byte[]> entry = iterator.next();
+                    bytes += entry.getKey().length + entry.getValue().length;
+                    finishedSingleOp();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            Closeables.closeQuietly(iterator);
         }
     }
 

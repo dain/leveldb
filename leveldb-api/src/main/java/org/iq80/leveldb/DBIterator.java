@@ -25,7 +25,7 @@ import java.util.Map;
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
 public interface DBIterator
-        extends Iterator<Map.Entry<byte[], byte[]>>, Closeable
+        extends Iterator<Map.Entry<byte[], byte[]>>, AutoCloseable, Closeable
 {
     /**
      * Repositions the iterator so the key of the next BlockElement
