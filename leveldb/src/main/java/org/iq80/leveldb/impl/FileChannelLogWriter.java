@@ -17,12 +17,8 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
-import org.iq80.leveldb.util.Closeables;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
+import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
+import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -32,8 +28,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
-import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
+import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
+
+import com.google.common.base.Preconditions;
 
 public class FileChannelLogWriter
         implements LogWriter
@@ -66,7 +67,7 @@ public class FileChannelLogWriter
     }
 
     @Override
-    public synchronized void close()
+    public void close()
     {
         closed.set(true);
 
@@ -82,7 +83,7 @@ public class FileChannelLogWriter
     }
 
     @Override
-    public synchronized void delete()
+    public void delete()
     {
         closed.set(true);
 
@@ -107,7 +108,7 @@ public class FileChannelLogWriter
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
     @Override
-    public synchronized void addRecord(Slice record, boolean force)
+    public void addRecord(Slice record, boolean force)
             throws IOException
     {
         Preconditions.checkState(!closed.get(), "Log has been closed");

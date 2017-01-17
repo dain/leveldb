@@ -17,13 +17,7 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import org.iq80.leveldb.impl.SeekingIterable;
-import org.iq80.leveldb.util.Closeables;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.TableIterator;
-import org.iq80.leveldb.util.VariableLengthQuantity;
+import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,6 +25,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
+
+import org.iq80.leveldb.impl.SeekingIterable;
+import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
+import org.iq80.leveldb.util.TableIterator;
+import org.iq80.leveldb.util.VariableLengthQuantity;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 public abstract class Table
         implements SeekingIterable<Slice, Slice>
@@ -85,7 +90,42 @@ public abstract class Table
 
     protected static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
 
-    protected abstract Block readBlock(BlockHandle blockHandle)
+    @SuppressWarnings({"NonPrivateFieldAccessedInSynchronizedContext", "AssignmentToStaticFieldFromInstanceMethod"})
+    private Block readBlock(BlockHandle blockHandle)
+            throws IOException
+    {
+        // read block trailer
+        ByteBuffer trailerData = read(blockHandle.getOffset() + blockHandle.getDataSize(), BlockTrailer.ENCODED_LENGTH);
+        BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(Slices.copiedBuffer(trailerData));
+
+// todo re-enable crc check when ported to support direct buffers
+//        // only verify check sums if explicitly asked by the user
+//        if (verifyChecksums) {
+//            // checksum data and the compression type in the trailer
+//            PureJavaCrc32C checksum = new PureJavaCrc32C();
+//            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
+//            int actualCrc32c = checksum.getMaskedValue();
+//
+//            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
+//        }
+
+        // decompress data
+        Slice uncompressedData;
+        ByteBuffer uncompressedBuffer = read((int) blockHandle.getOffset(), blockHandle.getDataSize());
+        if (blockTrailer.getCompressionType() == SNAPPY) {
+            int uncompressedLength = uncompressedLength(uncompressedBuffer);
+            final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(uncompressedLength);
+            Snappy.uncompress(uncompressedBuffer, byteBuffer);
+            uncompressedData = Slices.copiedBuffer(byteBuffer);
+        }
+        else {
+            uncompressedData = Slices.copiedBuffer(uncompressedBuffer);
+        }
+
+        return new Block(uncompressedData, comparator);
+    }
+
+    protected abstract ByteBuffer read(long offset, int dataSize)
             throws IOException;
 
     protected int uncompressedLength(ByteBuffer data)

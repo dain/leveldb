@@ -17,28 +17,29 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableList.Builder;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import org.iq80.leveldb.util.InternalIterator;
-import org.iq80.leveldb.util.InternalTableIterator;
-import org.iq80.leveldb.util.LevelIterator;
-import org.iq80.leveldb.util.MergingIterator;
-import org.iq80.leveldb.util.Slice;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Ordering.natural;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.iq80.leveldb.util.InternalIterator;
+import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.LevelIterator;
+import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.Slice;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 
 // todo this class should be immutable
 public class Version
@@ -110,22 +111,23 @@ public class Version
         return versionSet.getInternalKeyComparator();
     }
 
-    public synchronized int getCompactionLevel()
+    public int getCompactionLevel()
     {
         return compactionLevel;
     }
 
-    public synchronized void setCompactionLevel(int compactionLevel)
+    public void setCompactionLevel(int compactionLevel)
     {
         this.compactionLevel = compactionLevel;
     }
 
-    public synchronized double getCompactionScore()
+
+    public double getCompactionScore()
     {
         return compactionScore;
     }
 
-    public synchronized void setCompactionScore(double compactionScore)
+    public void setCompactionScore(double compactionScore)
     {
         this.compactionScore = compactionScore;
     }
@@ -159,12 +161,11 @@ public class Version
         return builder.build();
     }
 
-    public LookupResult get(LookupKey key)
+    public LookupResult get(LookupKey key, ReadStats readStats)
     {
         // We can search level-by-level since entries never hop across
         // levels.  Therefore we are guaranteed that if we find data
         // in an smaller level, later levels are irrelevant.
-        ReadStats readStats = new ReadStats();
         LookupResult lookupResult = level0.get(key, readStats);
         if (lookupResult == null) {
             for (Level level : levels) {
@@ -174,7 +175,6 @@ public class Version
                 }
             }
         }
-        updateStats(readStats.getSeekFileLevel(), readStats.getSeekFile());
         return lookupResult;
     }
 
@@ -260,8 +260,11 @@ public class Version
         }
     }
 
-    private boolean updateStats(int seekFileLevel, FileMetaData seekFile)
+    public boolean updateStats(ReadStats readStats)
     {
+        final int seekFileLevel = readStats.getSeekFileLevel();
+        final FileMetaData seekFile = readStats.getSeekFile();
+
         if (seekFile == null) {
             return false;
         }

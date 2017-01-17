@@ -17,20 +17,10 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
-import com.google.common.io.Files;
-import org.iq80.leveldb.table.UserComparator;
-import org.iq80.leveldb.util.InternalIterator;
-import org.iq80.leveldb.util.Level0Iterator;
-import org.iq80.leveldb.util.MergingIterator;
-import org.iq80.leveldb.util.Slice;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Lists.newArrayListWithCapacity;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -49,10 +39,21 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.newArrayListWithCapacity;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
+import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.InternalIterator;
+import org.iq80.leveldb.util.Level0Iterator;
+import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.Slice;
+
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.MapMaker;
+import com.google.common.collect.Maps;
+import com.google.common.io.Files;
 
 public class VersionSet
         implements SeekingIterable<InternalKey, Slice>
@@ -215,11 +216,6 @@ public class VersionSet
             }
         }
         return new MergingIterator(list, internalKeyComparator);
-    }
-
-    public LookupResult get(LookupKey key)
-    {
-        return current.get(key);
     }
 
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)

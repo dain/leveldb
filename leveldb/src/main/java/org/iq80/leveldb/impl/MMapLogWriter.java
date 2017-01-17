@@ -17,13 +17,9 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
-import org.iq80.leveldb.util.ByteBufferSupport;
-import org.iq80.leveldb.util.Closeables;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.SliceInput;
-import org.iq80.leveldb.util.SliceOutput;
-import org.iq80.leveldb.util.Slices;
+import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
+import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
+import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,9 +29,14 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
-import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
-import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
+import org.iq80.leveldb.util.ByteBufferSupport;
+import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
+
+import com.google.common.base.Preconditions;
 
 public class MMapLogWriter
         implements LogWriter
@@ -71,7 +72,7 @@ public class MMapLogWriter
     }
 
     @Override
-    public synchronized void close()
+    public void close()
             throws IOException
     {
         closed.set(true);
@@ -87,7 +88,7 @@ public class MMapLogWriter
     }
 
     @Override
-    public synchronized void delete()
+    public void delete()
             throws IOException
     {
         close();
@@ -119,7 +120,7 @@ public class MMapLogWriter
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
     @Override
-    public synchronized void addRecord(Slice record, boolean force)
+    public void addRecord(Slice record, boolean force)
             throws IOException
     {
         Preconditions.checkState(!closed.get(), "Log has been closed");
