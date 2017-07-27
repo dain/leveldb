@@ -154,6 +154,7 @@
                         <option>-dontwarn org.xerial.snappy.SnappyLoader</option>
                         <option>-dontwarn org.xerial.snappy.SnappyBundleActivator</option>
                         <option>-dontwarn org.iq80.snappy.HadoopSnappyCodec**</option>
+                        <option>-dontwarn org.iq80.leveldb.util.ByteBufferSupport</option>
                         <option>-dontoptimize</option>
                     </options>
                 </configuration>
