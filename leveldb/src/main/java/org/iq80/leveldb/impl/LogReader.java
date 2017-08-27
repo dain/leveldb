@@ -145,7 +145,7 @@ public class LogReader
 
         boolean inFragmentedRecord = false;
         while (true) {
-            long physicalRecordOffset = endOfBufferOffset - currentChunk.length();
+            final long physicalRecordOffset = endOfBufferOffset - currentBlock.available();
             LogChunkType chunkType = readNextChunk();
             switch (chunkType) {
                 case FULL:
