@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
+import org.iq80.leveldb.impl.LogListener.LogStructure;
 import org.iq80.leveldb.util.DynamicSliceOutput;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
@@ -25,6 +26,8 @@ import org.iq80.leveldb.util.Slices;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.iq80.leveldb.impl.LogChunkType.BAD_CHUNK;
 import static org.iq80.leveldb.impl.LogChunkType.EOF;
@@ -83,12 +86,39 @@ public class LogReader
      */
     private Slice currentChunk = Slices.EMPTY_SLICE;
 
+    /**
+     * Log events listeners
+     */
+    private Set<LogListener> listeners = null;
+
     public LogReader(FileChannel fileChannel, LogMonitor monitor, boolean verifyChecksums, long initialOffset)
     {
         this.fileChannel = fileChannel;
         this.monitor = monitor;
         this.verifyChecksums = verifyChecksums;
         this.initialOffset = initialOffset;
+    }
+
+    public void addListener(final LogListener listener)
+    {
+        if (listeners == null) {
+            listeners = new HashSet<>();
+        }
+        listeners.add(listener);
+    }
+
+    public void clearListeners()
+    {
+        listeners = null;
+    }
+
+    private void notifyListeners(final LogStructure logStructure, final long startOffset, final long endOffset)
+    {
+        if (listeners != null) {
+            for (final LogListener listener : listeners) {
+                listener.event(logStructure, startOffset, endOffset);
+            }
+        }
     }
 
     public long getLastRecordOffset()
@@ -146,7 +176,8 @@ public class LogReader
         boolean inFragmentedRecord = false;
         while (true) {
             final long physicalRecordOffset = endOfBufferOffset - currentBlock.available();
-            LogChunkType chunkType = readNextChunk();
+            final LogChunkType chunkType = readNextChunk();
+            final long physicalRecordEndOffset = physicalRecordOffset + HEADER_SIZE + currentChunk.length() - 1;
             switch (chunkType) {
                 case FULL:
                     if (inFragmentedRecord) {
@@ -156,6 +187,11 @@ public class LogReader
                     recordScratch.reset();
                     prospectiveRecordOffset = physicalRecordOffset;
                     lastRecordOffset = prospectiveRecordOffset;
+
+                    if (listeners != null) {
+                        notifyListeners(LogStructure.FULL_CHUNK, physicalRecordOffset, physicalRecordEndOffset);
+                    }
+
                     return currentChunk.copySlice();
 
                 case FIRST:
@@ -167,6 +203,11 @@ public class LogReader
                     prospectiveRecordOffset = physicalRecordOffset;
                     recordScratch.writeBytes(currentChunk);
                     inFragmentedRecord = true;
+
+                    if (listeners != null) {
+                        notifyListeners(LogStructure.FIRST_CHUNK, physicalRecordOffset, physicalRecordEndOffset);
+                    }
+
                     break;
 
                 case MIDDLE:
@@ -179,6 +220,11 @@ public class LogReader
                     else {
                         recordScratch.writeBytes(currentChunk);
                     }
+
+                    if (listeners != null) {
+                        notifyListeners(LogStructure.MIDDLE_CHUNK, physicalRecordOffset, physicalRecordEndOffset);
+                    }
+
                     break;
 
                 case LAST:
@@ -187,10 +233,19 @@ public class LogReader
 
                         // clear the scratch and skip this chunk
                         recordScratch.reset();
+
+                        if (listeners != null) {
+                            notifyListeners(LogStructure.LAST_CHUNK, physicalRecordOffset, physicalRecordEndOffset);
+                        }
                     }
                     else {
                         recordScratch.writeBytes(currentChunk);
                         lastRecordOffset = prospectiveRecordOffset;
+
+                        if (listeners != null) {
+                            notifyListeners(LogStructure.LAST_CHUNK, physicalRecordOffset, physicalRecordEndOffset);
+                        }
+
                         return recordScratch.slice().copySlice();
                     }
                     break;
@@ -210,6 +265,11 @@ public class LogReader
                         inFragmentedRecord = false;
                         recordScratch.reset();
                     }
+
+                    if (listeners != null) {
+                        notifyListeners(LogStructure.BAD_CHUNK, physicalRecordOffset, physicalRecordEndOffset);
+                    }
+
                     break;
 
                 default:
@@ -307,6 +367,19 @@ public class LogReader
         // clear the block
         blockScratch.reset();
 
+        final long blockOffset;
+        if (listeners != null) {
+            try {
+                blockOffset = fileChannel.position();
+            }
+            catch (final IOException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        else {
+            blockOffset = -1;
+        }
+
         // read the next full block
         while (blockScratch.writableBytes() > 0) {
             try {
@@ -326,7 +399,20 @@ public class LogReader
             }
 
         }
+
         currentBlock = blockScratch.slice().input();
+
+        if (listeners != null && currentBlock.isReadable()) {
+            final long blockEndOffset;
+            try {
+                blockEndOffset = fileChannel.position() - 1;
+            }
+            catch (final IOException e) {
+                throw new IllegalStateException(e);
+            }
+            notifyListeners(LogStructure.BLOCK, blockOffset, blockEndOffset);
+        }
+
         return currentBlock.isReadable();
     }
 
