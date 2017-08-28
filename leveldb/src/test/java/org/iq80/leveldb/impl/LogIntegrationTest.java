@@ -560,10 +560,18 @@ public class LogIntegrationTest
             if (chunkEvent.logStructure == LogStructure.BLOCK) {
                 throw new IllegalStateException("Blocks cannot be nested");
             }
-            if (chunkEvent.startOffset < startOffset) {
+
+            //first chunk start must match block start
+            if(i == 1 && chunkEvent.startOffset != startOffset) {
+                throw new IllegalStateException(String.format("First chunk startOffset: %d within block must start at block startOffset: %d", chunkEvent.startOffset, startOffset));
+            } else if (chunkEvent.startOffset < startOffset) {
                 throw new IllegalStateException(String.format("Chunk startOffset: %d cannot be less than block startOffset: %d", chunkEvent.startOffset, startOffset));
             }
-            if (chunkEvent.endOffset > endOffset) {
+
+            //last chunk end must match block end
+            if(i == chunkEvents.length && chunkEvent.endOffset != endOffset && chunkEvent.logStructure != LogStructure.BAD_CHUNK) {
+                throw new IllegalStateException(String.format("Last chunk endOffset: %d within block must end at block endOffset: %d", chunkEvent.endOffset, endOffset));
+            } else if (chunkEvent.endOffset > endOffset) {
                 throw new IllegalStateException(String.format("Chunk endOffset: %d cannot be less than block endOffset: %d", chunkEvent.startOffset, startOffset));
             }
 
