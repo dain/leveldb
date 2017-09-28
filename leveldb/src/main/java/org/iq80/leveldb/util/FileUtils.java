@@ -19,128 +19,89 @@ package org.iq80.leveldb.util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
 
-import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public final class FileUtils
 {
-    private static final int TEMP_DIR_ATTEMPTS = 10000;
-
     private FileUtils()
     {
     }
 
-    public static boolean isSymbolicLink(File file)
+    public static ImmutableList<Path> listFiles(Path dir)
+            throws IOException
     {
-        try {
-            File canonicalFile = file.getCanonicalFile();
-            File absoluteFile = file.getAbsoluteFile();
-            File parentFile = file.getParentFile();
-            // a symbolic link has a different name between the canonical and absolute path
-            return !canonicalFile.getName().equals(absoluteFile.getName()) ||
-                    // or the canonical parent path is not the same as the file's parent path,
-                    // provided the file has a parent path
-                    parentFile != null && !parentFile.getCanonicalPath().equals(canonicalFile.getParent());
-        }
-        catch (IOException e) {
-            // error on the side of caution
-            return true;
-        }
-    }
-
-    public static ImmutableList<File> listFiles(File dir)
-    {
-        File[] files = dir.listFiles();
-        if (files == null) {
+        if (!Files.exists(dir)) {
             return ImmutableList.of();
         }
-        return ImmutableList.copyOf(files);
-    }
 
-    public static ImmutableList<File> listFiles(File dir, FilenameFilter filter)
-    {
-        File[] files = dir.listFiles(filter);
-        if (files == null) {
-            return ImmutableList.of();
-        }
-        return ImmutableList.copyOf(files);
-    }
-
-    public static File createTempDir(String prefix)
-    {
-        return createTempDir(new File(System.getProperty("java.io.tmpdir")), prefix);
-    }
-
-    public static File createTempDir(File parentDir, String prefix)
-    {
-        String baseName = "";
-        if (prefix != null) {
-            baseName += prefix + "-";
-        }
-
-        baseName += System.currentTimeMillis() + "-";
-        for (int counter = 0; counter < TEMP_DIR_ATTEMPTS; counter++) {
-            File tempDir = new File(parentDir, baseName + counter);
-            if (tempDir.mkdir()) {
-                return tempDir;
+        ImmutableList.Builder<Path> result = ImmutableList.builder();
+        try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(dir)) {
+            for (Path path : directoryStream) {
+                result.add(path);
             }
         }
-        throw new IllegalStateException("Failed to create directory within "
-                + TEMP_DIR_ATTEMPTS + " attempts (tried "
-                + baseName + "0 to " + baseName + (TEMP_DIR_ATTEMPTS - 1) + ')');
+        return result.build();
     }
 
-    public static boolean deleteDirectoryContents(File directory)
+    public static Path createTempDir(String prefix)
+            throws IOException
     {
-        Preconditions.checkArgument(directory.isDirectory(), "Not a directory: %s", directory);
+        return Files.createTempDirectory(prefix);
+    }
+
+    public static void deleteDirectoryContents(Path directory)
+            throws IOException
+    {
+        Preconditions.checkArgument(Files.isDirectory(directory), "Not a directory: %s", directory);
 
         // Don't delete symbolic link directories
-        if (isSymbolicLink(directory)) {
+        if (Files.isSymbolicLink(directory)) {
+            return;
+        }
+
+        for (Path file : listFiles(directory)) {
+            deleteRecursively(file);
+        }
+    }
+
+    public static void deleteRecursively(Path file)
+            throws IOException
+    {
+        if (Files.isDirectory(file)) {
+            deleteDirectoryContents(file);
+        }
+
+        Files.deleteIfExists(file);
+    }
+
+    public static boolean copyDirectoryContents(Path src, Path target)
+            throws IOException
+    {
+        Preconditions.checkArgument(Files.isDirectory(src), "Source dir is not a directory: %s", src);
+
+        // Don't delete symbolic link directories
+        if (Files.isSymbolicLink(src)) {
             return false;
         }
 
+        Files.createDirectories(target);
+        Preconditions.checkArgument(Files.isDirectory(target), "Target dir is not a directory: %s", src);
+
         boolean success = true;
-        for (File file : listFiles(directory)) {
-            success = deleteRecursively(file) && success;
+        for (Path file : listFiles(src)) {
+            success = copyRecursively(file, target.resolve(file.getFileName().toString())) && success;
         }
         return success;
     }
 
-    public static boolean deleteRecursively(File file)
+    public static boolean copyRecursively(Path src, Path target)
+            throws IOException
     {
-        boolean success = true;
-        if (file.isDirectory()) {
-            success = deleteDirectoryContents(file);
-        }
-
-        return file.delete() && success;
-    }
-
-    public static boolean copyDirectoryContents(File src, File target)
-    {
-        Preconditions.checkArgument(src.isDirectory(), "Source dir is not a directory: %s", src);
-
-        // Don't delete symbolic link directories
-        if (isSymbolicLink(src)) {
-            return false;
-        }
-
-        target.mkdirs();
-        Preconditions.checkArgument(target.isDirectory(), "Target dir is not a directory: %s", src);
-
-        boolean success = true;
-        for (File file : listFiles(src)) {
-            success = copyRecursively(file, new File(target, file.getName())) && success;
-        }
-        return success;
-    }
-
-    public static boolean copyRecursively(File src, File target)
-    {
-        if (src.isDirectory()) {
+        if (Files.isDirectory(src)) {
             return copyDirectoryContents(src, target);
         }
         else {
@@ -152,33 +113,5 @@ public final class FileUtils
                 return false;
             }
         }
-    }
-
-    public static File newFile(String parent, String... paths)
-    {
-        Preconditions.checkNotNull(parent, "parent is null");
-        Preconditions.checkNotNull(paths, "paths is null");
-
-        return newFile(new File(parent), ImmutableList.copyOf(paths));
-    }
-
-    public static File newFile(File parent, String... paths)
-    {
-        Preconditions.checkNotNull(parent, "parent is null");
-        Preconditions.checkNotNull(paths, "paths is null");
-
-        return newFile(parent, ImmutableList.copyOf(paths));
-    }
-
-    public static File newFile(File parent, Iterable<String> paths)
-    {
-        Preconditions.checkNotNull(parent, "parent is null");
-        Preconditions.checkNotNull(paths, "paths is null");
-
-        File result = parent;
-        for (String path : paths) {
-            result = new File(result, path);
-        }
-        return result;
     }
 }

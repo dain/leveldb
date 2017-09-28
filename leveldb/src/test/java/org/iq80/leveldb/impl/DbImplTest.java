@@ -36,8 +36,10 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,7 +71,7 @@ public class DbImplTest
     private static final String DOES_NOT_EXIST_FILENAME = "/foo/bar/doowop/idontexist";
     private static final String DOES_NOT_EXIST_FILENAME_PATTERN = ".foo.bar.doowop.idontexist";
 
-    private File databaseDir;
+    private Path databaseDir;
 
     @Test
     public void testBackgroundCompaction()
@@ -108,7 +110,7 @@ public class DbImplTest
             throws Exception
     {
         Options options = new Options();
-        File databaseDir = this.databaseDir;
+        Path databaseDir = this.databaseDir;
         DbStringWrapper db = new DbStringWrapper(options, databaseDir);
         assertNull(db.get("foo"));
     }
@@ -810,28 +812,16 @@ public class DbImplTest
     public void testCantCreateDirectoryReturnMessage()
             throws Exception
     {
-        new DbStringWrapper(new Options(), new File(DOES_NOT_EXIST_FILENAME));
+        new DbStringWrapper(new Options(), Paths.get(DOES_NOT_EXIST_FILENAME));
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Database directory.*is not a directory")
-    public void testDBDirectoryIsFileRetrunMessage()
+    public void testDBDirectoryIsFileReturnMessage()
             throws Exception
     {
-        File databaseFile = new File(databaseDir + "/imafile");
-        assertTrue(databaseFile.createNewFile());
+        Path databaseFile = databaseDir.resolve("imafile");
+        Files.createFile(databaseFile);
         new DbStringWrapper(new Options(), databaseFile);
-    }
-
-    @Test
-    public void testSymbolicLinkForFileWithoutParent()
-    {
-        assertFalse(FileUtils.isSymbolicLink(new File("db")));
-    }
-
-    @Test
-    public void testSymbolicLinkForFileWithParent()
-    {
-        assertFalse(FileUtils.isSymbolicLink(new File(DOES_NOT_EXIST_FILENAME, "db")));
     }
 
     @Test
@@ -1062,10 +1052,10 @@ public class DbImplTest
     private class DbStringWrapper
     {
         private final Options options;
-        private final File databaseDir;
+        private final Path databaseDir;
         private DbImpl db;
 
-        private DbStringWrapper(Options options, File databaseDir)
+        private DbStringWrapper(Options options, Path databaseDir)
                 throws IOException
         {
             this.options = options.verifyChecksums(true).createIfMissing(true).errorIfExists(true);

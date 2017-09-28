@@ -24,21 +24,22 @@ import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 
 public class FileChannelLogWriter
         implements LogWriter
 {
-    private final File file;
+    private final Path file;
     private final long fileNumber;
     private final FileChannel fileChannel;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -48,15 +49,15 @@ public class FileChannelLogWriter
      */
     private int blockOffset;
 
-    public FileChannelLogWriter(File file, long fileNumber)
-            throws FileNotFoundException
+    public FileChannelLogWriter(Path file, long fileNumber)
+            throws IOException
     {
         Preconditions.checkNotNull(file, "file is null");
         Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
 
         this.file = file;
         this.fileNumber = fileNumber;
-        this.fileChannel = new FileOutputStream(file).getChannel();
+        this.fileChannel = FileChannel.open(file, CREATE, WRITE);
     }
 
     @Override
@@ -83,6 +84,7 @@ public class FileChannelLogWriter
 
     @Override
     public synchronized void delete()
+            throws IOException
     {
         closed.set(true);
 
@@ -90,11 +92,11 @@ public class FileChannelLogWriter
         Closeables.closeQuietly(fileChannel);
 
         // try to delete the file
-        file.delete();
+        Files.deleteIfExists(file);
     }
 
     @Override
-    public File getFile()
+    public Path getFile()
     {
         return file;
     }

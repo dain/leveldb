@@ -21,8 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.CharStreams;
-import com.google.common.io.Files;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBFactory;
 import org.iq80.leveldb.DBIterator;
@@ -38,9 +36,12 @@ import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Date;
 import java.util.EnumMap;
 import java.util.List;
@@ -59,7 +60,7 @@ public class DbBenchmark
 {
     private final boolean useExisting;
     private final Integer writeBufferSize;
-    private final File databaseDir;
+    private final Path databaseDir;
     private final double compressionRatio;
     private long startTime;
 
@@ -112,12 +113,12 @@ public class DbBenchmark
         bytes = 0;
         random = new Random(301);
 
-        databaseDir = new File((String) flags.get(Flag.db));
+        databaseDir = Paths.get((String) flags.get(Flag.db));
 
         // delete heap files in db
-        for (File file : FileUtils.listFiles(databaseDir)) {
-            if (file.getName().startsWith("heap-")) {
-                file.delete();
+        for (Path file : FileUtils.listFiles(databaseDir)) {
+            if (file.getFileName().toString().startsWith("heap-")) {
+                Files.deleteIfExists(file);
             }
         }
 
@@ -271,12 +272,12 @@ public class DbBenchmark
 
         System.out.printf("Date:       %tc\n", new Date());
 
-        File cpuInfo = new File("/proc/cpuinfo");
-        if (cpuInfo.canRead()) {
+        Path cpuInfo = Paths.get("/proc/cpuinfo");
+        if (Files.isReadable(cpuInfo)) {
             int numberOfCpus = 0;
             String cpuType = null;
             String cacheSize = null;
-            for (String line : CharStreams.readLines(Files.newReader(cpuInfo, UTF_8))) {
+            for (String line : Files.readAllLines(cpuInfo, StandardCharsets.UTF_8)) {
                 ImmutableList<String> parts = ImmutableList.copyOf(Splitter.on(':').omitEmptyStrings().trimResults().limit(2).split(line));
                 if (parts.size() != 2) {
                     continue;
@@ -614,6 +615,7 @@ public class DbBenchmark
     }
 
     private void destroyDb()
+            throws IOException
     {
         Closeables.closeQuietly(db);
         db = null;

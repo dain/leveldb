@@ -19,8 +19,8 @@ package org.iq80.leveldb.impl;
 
 import org.iq80.leveldb.util.Slice;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 
 public interface LogWriter
 {
@@ -32,7 +32,7 @@ public interface LogWriter
     void delete()
             throws IOException;
 
-    File getFile();
+    Path getFile();
 
     long getFileNumber();
 

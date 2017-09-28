@@ -25,13 +25,13 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.List;
 
 import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.file.StandardOpenOption.READ;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -139,8 +139,7 @@ public class LogTest
 
         // test readRecord
 
-        try (FileInputStream fis = new FileInputStream(writer.getFile());
-                FileChannel fileChannel = fis.getChannel()) {
+        try (FileChannel fileChannel = FileChannel.open(writer.getFile(), READ)) {
             LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
             for (Slice expected : records) {
                 Slice actual = reader.readRecord();
@@ -154,7 +153,7 @@ public class LogTest
     public void setUp()
             throws Exception
     {
-        writer = Logs.createLogWriter(File.createTempFile("table", ".log"), 42);
+        writer = Logs.createLogWriter(Files.createTempFile("table", ".log"), 42);
     }
 
     @AfterMethod

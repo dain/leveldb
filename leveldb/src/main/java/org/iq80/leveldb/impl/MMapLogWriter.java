@@ -25,14 +25,17 @@ import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
@@ -42,7 +45,7 @@ public class MMapLogWriter
 {
     private static final int PAGE_SIZE = 1024 * 1024;
 
-    private final File file;
+    private final Path file;
     private final long fileNumber;
     private final FileChannel fileChannel;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -53,14 +56,14 @@ public class MMapLogWriter
      */
     private int blockOffset;
 
-    public MMapLogWriter(File file, long fileNumber)
+    public MMapLogWriter(Path file, long fileNumber)
             throws IOException
     {
         Preconditions.checkNotNull(file, "file is null");
         Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
         this.file = file;
         this.fileNumber = fileNumber;
-        this.fileChannel = new RandomAccessFile(file, "rw").getChannel();
+        this.fileChannel = FileChannel.open(file, CREATE, READ, WRITE);
         mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, 0, PAGE_SIZE);
     }
 
@@ -93,7 +96,7 @@ public class MMapLogWriter
         close();
 
         // try to delete the file
-        file.delete();
+        Files.deleteIfExists(file);
     }
 
     private void destroyMappedByteBuffer()
@@ -106,7 +109,7 @@ public class MMapLogWriter
     }
 
     @Override
-    public File getFile()
+    public Path getFile()
     {
         return file;
     }

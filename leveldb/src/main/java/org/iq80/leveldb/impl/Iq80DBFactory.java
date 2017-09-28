@@ -23,11 +23,11 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.FileUtils;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Path;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
@@ -76,14 +76,14 @@ public class Iq80DBFactory
     public static final Iq80DBFactory factory = new Iq80DBFactory();
 
     @Override
-    public DB open(File path, Options options)
+    public DB open(Path path, Options options)
             throws IOException
     {
         return new DbImpl(options, path);
     }
 
     @Override
-    public void destroy(File path, Options options)
+    public void destroy(Path path, Options options)
             throws IOException
     {
         // TODO: This should really only delete leveldb-created files.
@@ -91,7 +91,7 @@ public class Iq80DBFactory
     }
 
     @Override
-    public void repair(File path, Options options)
+    public void repair(Path path, Options options)
             throws IOException
     {
         throw new UnsupportedOperationException();

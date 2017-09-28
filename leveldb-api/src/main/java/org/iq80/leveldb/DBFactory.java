@@ -17,20 +17,20 @@
  */
 package org.iq80.leveldb;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
  */
 public interface DBFactory
 {
-    DB open(File path, Options options)
+    DB open(Path path, Options options)
             throws IOException;
 
-    void destroy(File path, Options options)
+    void destroy(Path path, Options options)
             throws IOException;
 
-    void repair(File path, Options options)
+    void repair(Path path, Options options)
             throws IOException;
 }

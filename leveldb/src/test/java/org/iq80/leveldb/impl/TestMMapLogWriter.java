@@ -20,10 +20,11 @@ package org.iq80.leveldb.impl;
 import org.iq80.leveldb.util.Slice;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
+import static java.nio.file.StandardOpenOption.READ;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -33,7 +34,7 @@ public class TestMMapLogWriter
     public void testLogRecordBounds()
             throws Exception
     {
-        File file = File.createTempFile("test", ".log");
+        Path file = Files.createTempFile("test", ".log");
         try {
             int recordSize = LogConstants.BLOCK_SIZE - LogConstants.HEADER_SIZE;
             Slice record = new Slice(recordSize);
@@ -44,19 +45,19 @@ public class TestMMapLogWriter
 
             LogMonitor logMonitor = new AssertNoCorruptionLogMonitor();
 
-            FileChannel channel = new FileInputStream(file).getChannel();
+            try (FileChannel channel = FileChannel.open(file, READ)) {
+                LogReader logReader = new LogReader(channel, logMonitor, true, 0);
 
-            LogReader logReader = new LogReader(channel, logMonitor, true, 0);
-
-            int count = 0;
-            for (Slice slice = logReader.readRecord(); slice != null; slice = logReader.readRecord()) {
-                assertEquals(slice.length(), recordSize);
-                count++;
+                int count = 0;
+                for (Slice slice = logReader.readRecord(); slice != null; slice = logReader.readRecord()) {
+                    assertEquals(slice.length(), recordSize);
+                    count++;
+                }
+                assertEquals(count, 1);
             }
-            assertEquals(count, 1);
         }
         finally {
-            file.delete();
+            Files.deleteIfExists(file);
         }
     }
 

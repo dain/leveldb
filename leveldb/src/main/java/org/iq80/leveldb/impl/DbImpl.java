@@ -46,13 +46,13 @@ import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.channels.FileChannel;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
@@ -67,6 +67,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
@@ -84,7 +87,7 @@ public class DbImpl
         implements DB
 {
     private final Options options;
-    private final File databaseDir;
+    private final Path databaseDir;
     private final TableCache tableCache;
     private final DbLock dbLock;
     private final VersionSet versions;
@@ -108,7 +111,7 @@ public class DbImpl
 
     private ManualCompaction manualCompaction;
 
-    public DbImpl(Options options, File databaseDir)
+    public DbImpl(Options options, Path databaseDir)
             throws IOException
     {
         Preconditions.checkNotNull(options, "options is null");
@@ -157,18 +160,27 @@ public class DbImpl
         // create the version set
 
         // create the database dir if it does not already exist
-        databaseDir.mkdirs();
-        Preconditions.checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created", databaseDir);
-        Preconditions.checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory", databaseDir);
+        try {
+            Files.createDirectories(databaseDir);
+        }
+        catch (FileAlreadyExistsException e) {
+            Preconditions.checkArgument(Files.isDirectory(databaseDir), "Database directory '%s' is not a directory", databaseDir);
+        }
+        catch (AccessDeniedException e) {
+            Preconditions.checkArgument(Files.exists(databaseDir), "Database directory '%s' does not exist and could not be created", databaseDir);
+        }
+
+        Preconditions.checkArgument(Files.exists(databaseDir), "Database directory '%s' does not exist and could not be created", databaseDir);
+        Preconditions.checkArgument(Files.isDirectory(databaseDir), "Database directory '%s' is not a directory", databaseDir);
 
         mutex.lock();
         try {
             // lock the database dir
-            dbLock = new DbLock(new File(databaseDir, Filename.lockFileName()));
+            dbLock = new DbLock(databaseDir.resolve(Filename.lockFileName()));
 
             // verify the "current" file
-            File currentFile = new File(databaseDir, Filename.currentFileName());
-            if (!currentFile.canRead()) {
+            Path currentFile = databaseDir.resolve(Filename.currentFileName());
+            if (!Files.isReadable(currentFile)) {
                 Preconditions.checkArgument(options.createIfMissing(), "Database '%s' does not exist and the create if missing option is disabled", databaseDir);
             }
             else {
@@ -189,10 +201,10 @@ public class DbImpl
             // produced by an older version of leveldb.
             long minLogNumber = versions.getLogNumber();
             long previousLogNumber = versions.getPrevLogNumber();
-            List<File> filenames = Filename.listFiles(databaseDir);
+            List<Path> filenames = Filename.listFiles(databaseDir);
 
             List<Long> logs = newArrayList();
-            for (File filename : filenames) {
+            for (Path filename : filenames) {
                 FileInfo fileInfo = Filename.parseFileName(filename);
 
                 if (fileInfo != null &&
@@ -214,7 +226,7 @@ public class DbImpl
 
             // open transaction log
             long logFileNumber = versions.getNextFileNumber();
-            this.log = Logs.createLogWriter(new File(databaseDir, Filename.logFileName(logFileNumber)), logFileNumber);
+            this.log = Logs.createLogWriter(databaseDir.resolve(Filename.logFileName(logFileNumber)), logFileNumber);
             edit.setLogNumber(log.getFileNumber());
 
             // apply recovered edits
@@ -277,6 +289,7 @@ public class DbImpl
     }
 
     private void deleteObsoleteFiles()
+            throws IOException
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
@@ -286,7 +299,7 @@ public class DbImpl
             live.add(fileMetaData.getNumber());
         }
 
-        for (File file : Filename.listFiles(databaseDir)) {
+        for (Path file : Filename.listFiles(databaseDir)) {
             FileInfo fileInfo = Filename.parseFileName(file);
             if (fileInfo == null) {
                 continue;
@@ -326,7 +339,12 @@ public class DbImpl
 //                Log(options_.info_log, "Delete type=%d #%lld\n",
 //                int(type),
 //                        static_cast < unsigned long long>(number));
-                file.delete();
+                try {
+                    Files.deleteIfExists(file);
+                }
+                catch (IOException e) {
+                    options.logger().log(Throwables.getStackTraceAsString(e));
+                }
             }
         }
     }
@@ -516,9 +534,8 @@ public class DbImpl
             throws IOException
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
-        File file = new File(databaseDir, Filename.logFileName(fileNumber));
-        try (FileInputStream fis = new FileInputStream(file);
-                FileChannel channel = fis.getChannel()) {
+        Path file = databaseDir.resolve(Filename.logFileName(fileNumber));
+        try (FileChannel channel = FileChannel.open(file, READ)) {
             LogMonitor logMonitor = LogMonitors.logMonitor();
             LogReader logReader = new LogReader(channel, logMonitor, true, 0);
 
@@ -870,11 +887,11 @@ public class DbImpl
                 // open a new log
                 long logNumber = versions.getNextFileNumber();
                 try {
-                    this.log = Logs.createLogWriter(new File(databaseDir, Filename.logFileName(logNumber)), logNumber);
+                    this.log = Logs.createLogWriter(databaseDir.resolve(Filename.logFileName(logNumber)), logNumber);
                 }
                 catch (IOException e) {
                     throw new RuntimeException("Unable to open new log file " +
-                            new File(databaseDir, Filename.logFileName(logNumber)).getAbsoluteFile(), e);
+                            databaseDir.resolve(Filename.logFileName(logNumber)).toAbsolutePath(), e);
                 }
 
                 // create a new mem table
@@ -972,11 +989,11 @@ public class DbImpl
     private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data, long fileNumber)
             throws IOException
     {
-        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
+        Path file = databaseDir.resolve(Filename.tableFileName(fileNumber));
         try {
             InternalKey smallest = null;
             InternalKey largest = null;
-            FileChannel channel = new FileOutputStream(file).getChannel();
+            FileChannel channel = FileChannel.open(file, CREATE, WRITE);
             try {
                 TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
 
@@ -1005,7 +1022,7 @@ public class DbImpl
             if (smallest == null) {
                 return null;
             }
-            FileMetaData fileMetaData = new FileMetaData(fileNumber, file.length(), smallest, largest);
+            FileMetaData fileMetaData = new FileMetaData(fileNumber, Files.size(file), smallest, largest);
 
             // verify table can be opened
             tableCache.newIterator(fileMetaData);
@@ -1013,10 +1030,14 @@ public class DbImpl
             pendingOutputs.remove(fileNumber);
 
             return fileMetaData;
-
         }
         catch (IOException e) {
-            file.delete();
+            try {
+                Files.deleteIfExists(file);
+            }
+            catch (IOException e2) {
+                e2.printStackTrace();
+            }
             throw e;
         }
     }
@@ -1130,7 +1151,7 @@ public class DbImpl
     }
 
     private void openCompactionOutputFile(CompactionState compactionState)
-            throws FileNotFoundException
+            throws IOException
     {
         Preconditions.checkNotNull(compactionState, "compactionState is null");
         Preconditions.checkArgument(compactionState.builder == null, "compactionState builder is not null");
@@ -1144,8 +1165,8 @@ public class DbImpl
             compactionState.currentSmallest = null;
             compactionState.currentLargest = null;
 
-            File file = new File(databaseDir, Filename.tableFileName(fileNumber));
-            compactionState.outfile = new FileOutputStream(file).getChannel();
+            Path file = databaseDir.resolve(Filename.tableFileName(fileNumber));
+            compactionState.outfile = FileChannel.open(file, CREATE, WRITE);
             compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
         }
         finally {
@@ -1210,8 +1231,13 @@ public class DbImpl
 
             // Discard any files we may have created during this failed compaction
             for (FileMetaData output : compact.outputs) {
-                File file = new File(databaseDir, Filename.tableFileName(output.getNumber()));
-                file.delete();
+                Path file = databaseDir.resolve(Filename.tableFileName(output.getNumber()));
+                try {
+                    Files.deleteIfExists(file);
+                }
+                catch (IOException e2) {
+                    e.printStackTrace();
+                }
             }
             compact.outputs.clear();
         }

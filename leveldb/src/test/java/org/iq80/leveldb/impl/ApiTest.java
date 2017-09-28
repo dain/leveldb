@@ -25,9 +25,10 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.FileUtils;
 import org.testng.annotations.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 import static org.testng.Assert.assertTrue;
@@ -39,7 +40,12 @@ import static org.testng.Assert.assertTrue;
  */
 public class ApiTest
 {
-    private final File databaseDir = FileUtils.createTempDir("leveldb");
+    private final Path databaseDir = FileUtils.createTempDir("leveldb");
+
+    public ApiTest()
+            throws IOException
+    {
+    }
 
     public static byte[] bytes(String value)
     {
@@ -74,12 +80,12 @@ public class ApiTest
 
     private final DBFactory factory = Iq80DBFactory.factory;
 
-    File getTestDirectory(String name)
+    Path getTestDirectory(String name)
             throws IOException
     {
-        File rc = new File(databaseDir, name);
+        Path rc = databaseDir.resolve(name);
         factory.destroy(rc, new Options().createIfMissing(true));
-        rc.mkdirs();
+        Files.createDirectories(rc);
         return rc;
     }
 
@@ -89,7 +95,7 @@ public class ApiTest
     {
         Options options = new Options().createIfMissing(true).compressionType(CompressionType.NONE);
 
-        File path = getTestDirectory("testCompaction");
+        Path path = getTestDirectory("testCompaction");
         DB db = factory.open(path, options);
 
         System.out.println("Adding");

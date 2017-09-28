@@ -21,28 +21,30 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.util.Closeables;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.file.Path;
 
 import static java.lang.String.format;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 public class DbLock
 {
-    private final File lockFile;
+    private final Path lockFile;
     private final FileChannel channel;
     private final FileLock lock;
 
-    public DbLock(File lockFile)
+    public DbLock(Path lockFile)
             throws IOException
     {
         Preconditions.checkNotNull(lockFile, "lockFile is null");
         this.lockFile = lockFile;
 
         // open and lock the file
-        channel = new RandomAccessFile(lockFile, "rw").getChannel();
+        channel = FileChannel.open(lockFile, CREATE, READ, WRITE);
         try {
             lock = channel.tryLock();
         }
@@ -52,7 +54,7 @@ public class DbLock
         }
 
         if (lock == null) {
-            throw new IOException(format("Unable to acquire lock on '%s'", lockFile.getAbsolutePath()));
+            throw new IOException(format("Unable to acquire lock on '%s'", lockFile.toAbsolutePath().toString()));
         }
     }
 

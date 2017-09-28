@@ -26,9 +26,10 @@ import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.util.FileUtils;
 import org.testng.annotations.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -42,7 +43,7 @@ public class NativeInteropTest
 {
     private static final AtomicInteger NEXT_ID = new AtomicInteger();
 
-    private final File databaseDir = FileUtils.createTempDir("leveldb");
+    private final Path databaseDir = FileUtils.createTempDir("leveldb");
 
     public static byte[] bytes(String value)
     {
@@ -79,6 +80,7 @@ public class NativeInteropTest
     private final DBFactory jnifactory;
 
     public NativeInteropTest()
+            throws IOException
     {
         DBFactory jnifactory = Iq80DBFactory.factory;
         try {
@@ -92,12 +94,12 @@ public class NativeInteropTest
         this.jnifactory = jnifactory;
     }
 
-    File getTestDirectory(String name)
+    Path getTestDirectory(String name)
             throws IOException
     {
-        File rc = new File(databaseDir, name);
+        Path rc = databaseDir.resolve(name);
         iq80factory.destroy(rc, new Options().createIfMissing(true));
-        rc.mkdirs();
+        Files.createDirectories(rc);
         return rc;
     }
 
@@ -134,7 +136,7 @@ public class NativeInteropTest
     {
         Options options = new Options().createIfMissing(true);
 
-        File path = getTestDirectory(getClass().getName() + "_" + NEXT_ID.incrementAndGet());
+        Path path = getTestDirectory(getClass().getName() + "_" + NEXT_ID.incrementAndGet());
         DB db = firstFactory.open(path, options);
 
         WriteOptions wo = new WriteOptions().sync(false);

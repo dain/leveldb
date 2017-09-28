@@ -21,10 +21,16 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 public final class Filename
 {
@@ -113,7 +119,7 @@ public final class Filename
      * The number encoded in the filename is stored in *number.  If the
      * filename was successfully parsed, returns true.  Else return false.
      */
-    public static FileInfo parseFileName(File file)
+    public static FileInfo parseFileName(Path file)
     {
         // Owned filenames have the form:
         //    dbname/CURRENT
@@ -122,7 +128,7 @@ public final class Filename
         //    dbname/LOG.old
         //    dbname/MANIFEST-[0-9]+
         //    dbname/[0-9]+.(log|sst|dbtmp)
-        String fileName = file.getName();
+        String fileName = file.getFileName().toString();
         if ("CURRENT".equals(fileName)) {
             return new FileInfo(FileType.CURRENT);
         }
@@ -160,41 +166,48 @@ public final class Filename
      *
      * @return true if successful; false otherwise
      */
-    public static boolean setCurrentFile(File databaseDir, long descriptorNumber)
+    public static void setCurrentFile(Path databaseDir, long descriptorNumber)
             throws IOException
     {
         String manifest = descriptorFileName(descriptorNumber);
         String temp = tempFileName(descriptorNumber);
 
-        File tempFile = new File(databaseDir, temp);
+        Path tempFile = databaseDir.resolve(temp);
         writeStringToFileSync(manifest + "\n", tempFile);
 
-        File to = new File(databaseDir, currentFileName());
-        boolean ok = tempFile.renameTo(to);
-        if (!ok) {
-            tempFile.delete();
+        Path to = databaseDir.resolve(currentFileName());
+        try {
+            Files.move(tempFile, to);
+        }
+        catch (Exception e) {
+            Files.deleteIfExists(tempFile);
             writeStringToFileSync(manifest + "\n", to);
         }
-        return ok;
     }
 
-    private static void writeStringToFileSync(String str, File file)
+    private static void writeStringToFileSync(String str, Path file)
             throws IOException
     {
-        try (FileOutputStream stream = new FileOutputStream(file)) {
-            stream.write(str.getBytes(Charsets.UTF_8));
-            stream.flush();
-            stream.getFD().sync();
+        try (FileChannel channel = FileChannel.open(file, CREATE, WRITE)) {
+            channel.write(ByteBuffer.wrap(str.getBytes(Charsets.UTF_8)));
+            channel.force(true);
         }
     }
 
-    public static List<File> listFiles(File dir)
+    public static List<Path> listFiles(Path dir)
+            throws IOException
     {
-        File[] files = dir.listFiles();
-        if (files == null) {
+        if (!Files.exists(dir)) {
             return ImmutableList.of();
         }
-        return ImmutableList.copyOf(files);
+
+        ImmutableList.Builder<Path> result = ImmutableList.builder();
+        try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(dir)) {
+            for (Path path : directoryStream) {
+                result.add(path);
+            }
+        }
+        return result.build();
     }
 
     private static String makeFileName(long number, String suffix)
