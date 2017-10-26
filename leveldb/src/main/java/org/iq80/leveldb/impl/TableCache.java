@@ -119,14 +119,13 @@ public class TableCache
         {
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
-            try (FileInputStream fis = new FileInputStream(tableFile);
-                    FileChannel fileChannel = fis.getChannel()) {
-                if (Iq80DBFactory.USE_MMAP) {
-                    table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
-                }
-                else {
-                    table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
-                }
+            FileInputStream fis = new FileInputStream(tableFile);
+            FileChannel fileChannel = fis.getChannel();
+            if (Iq80DBFactory.USE_MMAP) {
+                table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+            }
+            else {
+                table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
             }
         }
 

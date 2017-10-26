@@ -31,7 +31,11 @@ import static com.google.common.collect.Lists.newArrayList;
 public class WriteBatchImpl
         implements WriteBatch
 {
+    // WriteBatch header has an 8-byte sequence number followed by a 4-byte count.
+    private static final int HEADER_SIZE = 12;
+
     private final List<Entry<Slice, Slice>> batch = newArrayList();
+    //TODO fix this count that is wrong!!!
     private int approximateSize;
 
     public int getApproximateSize()
@@ -50,7 +54,7 @@ public class WriteBatchImpl
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
         batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), Slices.wrappedBuffer(value)));
-        approximateSize += 12 + key.length + value.length;
+        approximateSize += HEADER_SIZE + key.length + value.length;
         return this;
     }
 
@@ -59,7 +63,7 @@ public class WriteBatchImpl
         Preconditions.checkNotNull(key, "key is null");
         Preconditions.checkNotNull(value, "value is null");
         batch.add(Maps.immutableEntry(key, value));
-        approximateSize += 12 + key.length() + value.length();
+        approximateSize += HEADER_SIZE + key.length() + value.length();
         return this;
     }
 
@@ -97,6 +101,18 @@ public class WriteBatchImpl
                 handler.delete(key);
             }
         }
+    }
+
+    public void append(WriteBatchImpl batch)
+    {
+        this.batch.addAll(batch.batch);
+        this.approximateSize += batch.approximateSize;
+    }
+
+    public void clear()
+    {
+        approximateSize = 0;
+        batch.clear();
     }
 
     public interface Handler
