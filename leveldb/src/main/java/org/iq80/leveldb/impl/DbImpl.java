@@ -914,7 +914,7 @@ public class DbImpl
     private void makeRoomForWrite(boolean force)
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
-        assert !writers.isEmpty();
+        Preconditions.checkState(!writers.isEmpty());
 
         boolean allowDelay = !force;
 
