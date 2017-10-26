@@ -17,38 +17,9 @@
  */
 package org.iq80.leveldb.impl;
 
-import static com.google.common.collect.Lists.newArrayList;
-import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
-import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
-import static org.iq80.leveldb.impl.ValueType.DELETION;
-import static org.iq80.leveldb.impl.ValueType.VALUE;
-import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
-import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
-import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
-import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
-import java.nio.channels.FileChannel;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBComparator;
@@ -75,9 +46,39 @@ import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.nio.channels.FileChannel;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Lists.newLinkedList;
+import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
+import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
+import static org.iq80.leveldb.impl.ValueType.DELETION;
+import static org.iq80.leveldb.impl.ValueType.VALUE;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
+import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
+import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
+import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
 // todo make thread safe and concurrent
 @SuppressWarnings("AccessingNonPublicFieldOfAnotherObject")
@@ -95,6 +96,8 @@ public class DbImpl
     private final Condition backgroundCondition = mutex.newCondition();
 
     private final List<Long> pendingOutputs = newArrayList(); // todo
+    private final Deque<WriteBatchInternal> writers = newLinkedList();
+    private final WriteBatchImpl tmpBatch = new WriteBatchImpl();
 
     private LogWriter log;
 
@@ -337,7 +340,7 @@ public class DbImpl
         mutex.lock();
         try {
             // force compaction
-            makeRoomForWrite(true);
+            writeInternal(null, new WriteOptions());
 
             // todo bg_error code
             while (immutableMemTable != null) {
@@ -362,7 +365,9 @@ public class DbImpl
             while (this.manualCompaction != null) {
                 backgroundCondition.awaitUninterruptibly();
             }
-            ManualCompaction manualCompaction = new ManualCompaction(level, start, end);
+            ManualCompaction manualCompaction = new ManualCompaction(level,
+                    new InternalKey(start, SequenceNumber.MAX_SEQUENCE_NUMBER, VALUE),
+                    new InternalKey(end, 0, DELETION));
             this.manualCompaction = manualCompaction;
 
             maybeScheduleCompaction();
@@ -466,8 +471,8 @@ public class DbImpl
         Compaction compaction;
         if (manualCompaction != null) {
             compaction = versions.compactRange(manualCompaction.level,
-                    new InternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, VALUE),
-                    new InternalKey(manualCompaction.end, 0, DELETION));
+                    manualCompaction.begin,
+                    manualCompaction.end);
         }
         else {
             compaction = versions.pickCompaction();
@@ -519,7 +524,7 @@ public class DbImpl
         Preconditions.checkState(mutex.isHeldByCurrentThread());
         File file = new File(databaseDir, Filename.logFileName(fileNumber));
         try (FileInputStream fis = new FileInputStream(file);
-                FileChannel channel = fis.getChannel()) {
+             FileChannel channel = fis.getChannel()) {
             LogMonitor logMonitor = LogMonitors.logMonitor();
             LogReader logReader = new LogReader(channel, logMonitor, true, 0);
 
@@ -637,21 +642,27 @@ public class DbImpl
     public Snapshot put(byte[] key, byte[] value, WriteOptions options)
             throws DBException
     {
-        return writeInternal(new WriteBatchImpl().put(key, value), options);
+        try (WriteBatchImpl writeBatch = new WriteBatchImpl()) {
+            return writeInternal(writeBatch.put(key, value), options);
+        }
     }
 
     @Override
     public void delete(byte[] key)
             throws DBException
     {
-        writeInternal(new WriteBatchImpl().delete(key), new WriteOptions());
+        try (WriteBatchImpl writeBatch = new WriteBatchImpl()) {
+            writeInternal(writeBatch.delete(key), new WriteOptions());
+        }
     }
 
     @Override
     public Snapshot delete(byte[] key, WriteOptions options)
             throws DBException
     {
-        return writeInternal(new WriteBatchImpl().delete(key), options);
+        try (WriteBatchImpl writeBatch = new WriteBatchImpl()) {
+            return writeInternal(writeBatch.delete(key), options);
+        }
     }
 
     @Override
@@ -668,37 +679,84 @@ public class DbImpl
         return writeInternal((WriteBatchImpl) updates, options);
     }
 
-    public Snapshot writeInternal(WriteBatchImpl updates, WriteOptions options)
+    public Snapshot writeInternal(WriteBatchImpl myBatch, WriteOptions options)
             throws DBException
     {
         checkBackgroundException();
+        final WriteBatchInternal w = new WriteBatchInternal(myBatch, options.sync(), mutex.newCondition());
         mutex.lock();
         try {
+            writers.offerLast(w);
+            while (!w.done && writers.peekFirst() != w) {
+                w.await();
+            }
+            if (w.done) {
+                return null;
+            }
             long sequenceEnd;
-            if (updates.size() != 0) {
-                makeRoomForWrite(false);
+            WriteBatchImpl updates = null;
+            ValueHolder<WriteBatchInternal> lastWriter = new ValueHolder<>(w);
+            // May temporarily unlock and wait.
+            makeRoomForWrite(myBatch == null);
+            if (myBatch != null) {
+                updates = buildBatchGroup(lastWriter);
 
                 // Get sequence numbers for this change set
                 long sequenceBegin = versions.getLastSequence() + 1;
                 sequenceEnd = sequenceBegin + updates.size() - 1;
 
+
+                // Add to log and apply to memtable.  We can release the lock
+                // during this phase since "w" is currently responsible for logging
+                // and protects against concurrent loggers and concurrent writes
+                // into mem_.
+                // log and memtable are modified by makeRoomForWrite
+                {
+                    mutex.unlock();
+                    try {
+                        // Log write
+                        Slice record = writeWriteBatch(updates, sequenceBegin);
+                        try {
+                            log.addRecord(record, options.sync());
+                        }
+                        catch (IOException e) {
+                            throw Throwables.propagate(e);
+                        }
+
+                        // Update memtable
+                        //this.memTable is modified by makeRoomForWrite
+                        updates.forEach(new InsertIntoHandler(this.memTable, sequenceBegin));
+                    }
+                    finally {
+                        mutex.lock();
+                    }
+                }
+                if (updates == tmpBatch) {
+                    tmpBatch.clear();
+                }
                 // Reserve this sequence in the version set
                 versions.setLastSequence(sequenceEnd);
-
-                // Log write
-                Slice record = writeWriteBatch(updates, sequenceBegin);
-                try {
-                    log.addRecord(record, options.sync());
-                }
-                catch (IOException e) {
-                    throw Throwables.propagate(e);
-                }
-
-                // Update memtable
-                updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
             }
             else {
                 sequenceEnd = versions.getLastSequence();
+            }
+
+            final WriteBatchInternal lastWriteV = lastWriter.getValue();
+            while (true) {
+                WriteBatchInternal ready = writers.peekFirst();
+                writers.pollFirst();
+                if (ready != w) {
+                    ready.done = true;
+                    ready.signal();
+                }
+                if (ready == lastWriteV) {
+                    break;
+                }
+            }
+
+            // Notify new head of write queue
+            if (!writers.isEmpty()) {
+                writers.peekFirst().signal();
             }
 
             if (options.snapshot()) {
@@ -711,6 +769,60 @@ public class DbImpl
         finally {
             mutex.unlock();
         }
+    }
+
+    /**
+     * REQUIRES: Writer list must be non-empty
+     * REQUIRES: First writer must have a non-NULL batch
+     */
+    private WriteBatchImpl buildBatchGroup(ValueHolder<WriteBatchInternal> lastWriter)
+    {
+        Preconditions.checkArgument(!writers.isEmpty(), "A least one writer is required");
+        final WriteBatchInternal first = writers.peekFirst();
+        WriteBatchImpl result = first.batch;
+        Preconditions.checkArgument(result != null, "Batch must be non null");
+
+        int sizeInit;
+        sizeInit = first.batch.getApproximateSize();
+        /*
+         * Allow the group to grow up to a maximum size, but if the
+         * original write is small, limit the growth so we do not slow
+         * down the small write too much.
+         */
+        int maxSize = 1 << 20;
+        if (sizeInit <= (128 << 10)) {
+            maxSize = sizeInit + (128 << 10);
+        }
+
+        int size = 0;
+        lastWriter.setValue(first);
+        for (WriteBatchInternal w : writers) {
+            if (w.sync && !lastWriter.getValue().sync) {
+                // Do not include a sync write into a batch handled by a non-sync write.
+                break;
+            }
+
+            if (w.batch != null) {
+                size += w.batch.getApproximateSize();
+                if (size > maxSize) {
+                    // Do not make batch too big
+                    break;
+                }
+
+                // Append to result
+                if (result == first.batch) {
+                    // Switch to temporary batch instead of disturbing caller's batch
+                    result = tmpBatch;
+                    Preconditions.checkState(result.size() == 0, "Temp batch should be clean");
+                    result.append(first.batch);
+                }
+                else if (first.batch != w.batch) {
+                    result.append(w.batch);
+                }
+            }
+            lastWriter.setValue(w);
+        }
+        return result;
     }
 
     @Override
@@ -802,17 +914,15 @@ public class DbImpl
     private void makeRoomForWrite(boolean force)
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
+        assert !writers.isEmpty();
 
         boolean allowDelay = !force;
 
         while (true) {
-            // todo background processing system need work
-//            if (!bg_error_.ok()) {
-//              // Yield previous error
-//              s = bg_error_;
-//              break;
-//            } else
-            if (allowDelay && versions.numberOfFilesInLevel(0) > L0_SLOWDOWN_WRITES_TRIGGER) {
+            if (backgroundException != null) {
+                throw new DBException("Background exception occurred", backgroundException);
+            }
+            else if (allowDelay && versions.numberOfFilesInLevel(0) > L0_SLOWDOWN_WRITES_TRIGGER) {
                 // We are getting close to hitting a hard limit on the number of
                 // L0 files.  Rather than delaying a single write by several
                 // seconds when we hit the hard limit, start delaying each
@@ -1278,10 +1388,11 @@ public class DbImpl
     private static class ManualCompaction
     {
         private final int level;
-        private final Slice begin;
-        private final Slice end;
+        private final InternalKey begin;
+        private final InternalKey end;
+        public boolean done;
 
-        private ManualCompaction(int level, Slice begin, Slice end)
+        private ManualCompaction(int level, InternalKey begin, InternalKey end)
         {
             this.level = level;
             this.begin = begin;
@@ -1436,6 +1547,118 @@ public class DbImpl
     public void compactRange(byte[] begin, byte[] end)
             throws DBException
     {
-        throw new UnsupportedOperationException("Not yet implemented");
+        final Slice smallestUserKey = new Slice(begin, 0, begin.length);
+        final Slice largestUserKey = new Slice(end, 0, end.length);
+        int maxLevelWithFiles = 1;
+        mutex.lock();
+        try {
+            Version base = versions.getCurrent();
+            for (int level = 1; level < DbConstants.NUM_LEVELS; level++) {
+                if (base.overlapInLevel(level, smallestUserKey, largestUserKey)) {
+                    maxLevelWithFiles = level;
+                }
+            }
+        }
+        finally {
+            mutex.unlock();
+        }
+        testCompactMemTable(); // TODO: Skip if memtable does not overlap
+        for (int level = 0; level < maxLevelWithFiles; level++) {
+            testCompactRange(level, smallestUserKey, largestUserKey);
+        }
+    }
+
+    private void testCompactRange(int level, Slice begin, Slice end) throws DBException
+    {
+        Preconditions.checkArgument(level >= 0);
+        Preconditions.checkArgument(level + 1 < DbConstants.NUM_LEVELS);
+
+        final InternalKey beginStorage = begin == null ? null : new InternalKey(begin, SequenceNumber.MAX_SEQUENCE_NUMBER, VALUE);
+        final InternalKey endStorage = end == null ? null : new InternalKey(end, 0, DELETION);
+        ManualCompaction manual = new ManualCompaction(level, beginStorage, endStorage);
+        mutex.lock();
+        try {
+            while (!manual.done && !shuttingDown.get() && backgroundException == null) {
+                if (manualCompaction == null) {  // Idle
+                    manualCompaction = manual;
+                    maybeScheduleCompaction();
+                }
+                else {  // Running either my compaction or another compaction.
+                    try {
+                        backgroundCondition.wait();
+                    }
+                    catch (InterruptedException e) {
+                        throw new DBException(e);
+                    }
+                }
+            }
+            if (manualCompaction == manual) {
+                // Cancel my manual compaction since we aborted early for some reason.
+                manualCompaction = null;
+            }
+        }
+        finally {
+            mutex.unlock();
+        }
+    }
+
+    private void testCompactMemTable() throws DBException
+    {
+        // NULL batch means just wait for earlier writes to be done
+        writeInternal(null, new WriteOptions());
+        // Wait until the compaction completes
+        mutex.lock();
+
+        try {
+            while (immutableMemTable != null && backgroundException == null) {
+                try {
+                    backgroundCondition.wait();
+                }
+                catch (InterruptedException e) {
+                    throw new DBException(e);
+                }
+            }
+            if (immutableMemTable != null) {
+                if (backgroundException != null) {
+                    throw new DBException(backgroundException);
+                }
+            }
+        }
+        finally {
+            mutex.unlock();
+        }
+    }
+
+
+    private class WriteBatchInternal
+    {
+        private final WriteBatchImpl batch;
+        private final boolean sync;
+        private final Condition backgroundCondition;
+        private boolean done = false;
+
+        public WriteBatchInternal(WriteBatchImpl batch, boolean sync, Condition backgroundCondition)
+        {
+            this.batch = batch;
+            this.sync = sync;
+            this.backgroundCondition = backgroundCondition;
+        }
+
+        public void await() throws DBException
+        {
+            try {
+                backgroundCondition.await();
+            }
+            catch (InterruptedException e) {
+                //TODO what will we do here????????????????
+                Thread.currentThread().interrupt();
+                throw new DBException(e);
+            }
+        }
+
+        public void signal()
+        {
+            backgroundCondition.signal();
+        }
     }
 }

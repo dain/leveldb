@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,6 +46,9 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
@@ -86,6 +90,63 @@ public class DbImplTest
             if ((i % 50000) == 0 && i != 0) {
                 System.out.println(i + " rows written");
             }
+        }
+    }
+
+    @Test
+    public void testConcurrentWrite() throws Exception
+    {
+        Options options = new Options();
+        options.maxOpenFiles(50);
+        options.createIfMissing(true);
+        final DbImpl db = new DbImpl(options, this.databaseDir);
+        ExecutorService ex = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 4);
+        try {
+            final int numEntries = 1000000;
+            final int growValueBy = 10;
+            final CountDownLatch segmentsToPutEnd = new CountDownLatch(numEntries / 100);
+            final Random random = new Random(Thread.currentThread().getId());
+            final int segmentSize = 100;
+            //dispatch writes
+            for (int i = 0; i < numEntries; i += segmentSize) {
+                final int finalI = i;
+                ex.submit(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        final int i2 = finalI + segmentSize;
+                        for (int j = finalI; j < i2; j++) {
+                            final BigInteger bigInteger = BigInteger.valueOf(j);
+                            final byte[] value = bigInteger.toByteArray();
+                            final byte[] bytes = new byte[growValueBy + value.length];
+                            for (int k = 0; k < growValueBy; k += value.length) {
+                                System.arraycopy(value, 0, bytes, k, value.length);
+                            }
+                            db.put(value, bytes);
+                            if (random.nextInt(100) < 2) {
+                                Thread.yield();
+                            }
+                        }
+                        segmentsToPutEnd.countDown();
+                    }
+                });
+            }
+            segmentsToPutEnd.await();
+            //check all writes have
+            for (int i = 0; i < numEntries; i++) {
+                final BigInteger bigInteger = BigInteger.valueOf(i);
+                final byte[] value = bigInteger.toByteArray();
+                final byte[] bytes = new byte[growValueBy + value.length];
+                for (int k = 0; k < growValueBy; k += value.length) {
+                    System.arraycopy(value, 0, bytes, k, value.length);
+                }
+                assertEquals(db.get(value), bytes);
+            }
+        }
+        finally {
+            db.close();
+            ex.shutdown();
         }
     }
 
@@ -700,7 +761,8 @@ public class DbImplTest
 
         db.delete("foo");
         db.put("foo", "v2");
-        assertEquals(db.allEntriesFor("foo"), asList("v2", "DEL", "v1"));
+        final List<String> foo = db.allEntriesFor("foo");
+        assertEquals(foo, asList("v2", "DEL", "v1"));
         db.compactMemTable();  // Moves to level last-2
         assertEquals(db.get("a"), "begin");
         assertEquals(db.get("foo"), "v2");
