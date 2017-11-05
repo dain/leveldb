@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.newArrayListWithCapacity;
@@ -245,7 +246,7 @@ public class VersionSet
         this.lastSequence = newLastSequence;
     }
 
-    public void logAndApply(VersionEdit edit)
+    public void logAndApply(VersionEdit edit, ReentrantLock mutex)
             throws IOException
     {
         if (edit.getLogNumber() != null) {
@@ -271,24 +272,30 @@ public class VersionSet
         finalizeVersion(version);
 
         boolean createdNewManifest = false;
+        final long mFileNumber = manifestFileNumber;
         try {
             // Initialize new descriptor log file if necessary by creating
             // a temporary file that contains a snapshot of the current version.
             if (descriptorLog == null) {
                 edit.setNextFileNumber(nextFileNumber.get());
-                descriptorLog = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber, allowMmapWrites);
+                descriptorLog = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(mFileNumber)), mFileNumber, allowMmapWrites);
                 writeSnapshot(descriptorLog);
                 createdNewManifest = true;
             }
+            mutex.unlock();
+            try {
+                // Write new record to MANIFEST log
+                Slice record = edit.encode();
+                descriptorLog.addRecord(record, true);
 
-            // Write new record to MANIFEST log
-            Slice record = edit.encode();
-            descriptorLog.addRecord(record, true);
-
-            // If we just created a new descriptor file, install it by writing a
-            // new CURRENT file that points to it.
-            if (createdNewManifest) {
-                Filename.setCurrentFile(databaseDir, descriptorLog.getFileNumber());
+                // If we just created a new descriptor file, install it by writing a
+                // new CURRENT file that points to it.
+                if (createdNewManifest) {
+                    Filename.setCurrentFile(databaseDir, mFileNumber);
+                }
+            }
+            finally {
+                mutex.lock();
             }
         }
         catch (IOException e) {
@@ -296,7 +303,7 @@ public class VersionSet
             if (createdNewManifest) {
                 descriptorLog.close();
                 // todo add delete method to LogWriter
-                new File(databaseDir, Filename.logFileName(descriptorLog.getFileNumber())).delete();
+                new File(databaseDir, Filename.logFileName(mFileNumber)).delete();
                 descriptorLog = null;
             }
             throw e;

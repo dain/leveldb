@@ -230,7 +230,7 @@ public class DbImpl
             edit.setLogNumber(log.getFileNumber());
 
             // apply recovered edits
-            versions.logAndApply(edit);
+            versions.logAndApply(edit, mutex);
 
             // cleanup unused files
             deleteObsoleteFiles();
@@ -495,7 +495,7 @@ public class DbImpl
             FileMetaData fileMetaData = compaction.getLevelInputs().get(0);
             compaction.getEdit().deleteFile(compaction.getLevel(), fileMetaData.getNumber());
             compaction.getEdit().addFile(compaction.getLevel() + 1, fileMetaData);
-            versions.logAndApply(compaction.getEdit());
+            versions.logAndApply(compaction.getEdit(), mutex);
             // log
         }
         else {
@@ -1035,7 +1035,7 @@ public class DbImpl
             // Replace immutable memtable with the generated Table
             edit.setPreviousLogNumber(0);
             edit.setLogNumber(log.getFileNumber());  // Earlier logs no longer needed
-            versions.logAndApply(edit);
+            versions.logAndApply(edit, mutex);
 
             immutableMemTable = null;
 
@@ -1122,8 +1122,6 @@ public class DbImpl
 
             // verify table can be opened
             tableCache.newIterator(fileMetaData);
-
-            pendingOutputs.remove(fileNumber);
 
             return fileMetaData;
 
@@ -1315,7 +1313,7 @@ public class DbImpl
         }
 
         try {
-            versions.logAndApply(compact.compaction.getEdit());
+            versions.logAndApply(compact.compaction.getEdit(), mutex);
             deleteObsoleteFiles();
         }
         catch (IOException e) {
@@ -1578,7 +1576,8 @@ public class DbImpl
         }
     }
 
-    private void testCompactRange(int level, Slice begin, Slice end) throws DBException
+    @VisibleForTesting
+    void testCompactRange(int level, Slice begin, Slice end) throws DBException
     {
         Preconditions.checkArgument(level >= 0);
         Preconditions.checkArgument(level + 1 < DbConstants.NUM_LEVELS);
@@ -1594,12 +1593,7 @@ public class DbImpl
                     maybeScheduleCompaction();
                 }
                 else {  // Running either my compaction or another compaction.
-                    try {
-                        backgroundCondition.wait();
-                    }
-                    catch (InterruptedException e) {
-                        throw new DBException(e);
-                    }
+                    backgroundCondition.awaitUninterruptibly();
                 }
             }
             if (manualCompaction == manual) {
@@ -1612,7 +1606,8 @@ public class DbImpl
         }
     }
 
-    private void testCompactMemTable() throws DBException
+    @VisibleForTesting
+    void testCompactMemTable() throws DBException
     {
         // NULL batch means just wait for earlier writes to be done
         writeInternal(null, new WriteOptions());
@@ -1621,12 +1616,7 @@ public class DbImpl
 
         try {
             while (immutableMemTable != null && backgroundException == null) {
-                try {
-                    backgroundCondition.wait();
-                }
-                catch (InterruptedException e) {
-                    throw new DBException(e);
-                }
+                backgroundCondition.awaitUninterruptibly();
             }
             if (immutableMemTable != null) {
                 if (backgroundException != null) {
