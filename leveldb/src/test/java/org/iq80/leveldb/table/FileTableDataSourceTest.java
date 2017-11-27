@@ -17,19 +17,20 @@
  */
 package org.iq80.leveldb.table;
 
+import org.iq80.leveldb.util.LRUCache;
 import org.iq80.leveldb.util.Slice;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
-public class MMapTableTest
+public class FileTableDataSourceTest
         extends TableTest
 {
     @Override
     protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
             throws IOException
     {
-        return new MMapTable(name, fileChannel, comparator, verifyChecksums);
+        return new Table(new FileTableDataSource(name, fileChannel), comparator, verifyChecksums, new LRUCache<>(8 << 5, new BlockHandleSliceWeigher()));
     }
 }

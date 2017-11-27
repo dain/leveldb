@@ -15,21 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.iq80.leveldb.table;
+
+import com.google.common.cache.Weigher;
 
 import org.iq80.leveldb.util.Slice;
 
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
-
-public class FileChannelTableTest
-        extends TableTest
+/**
+ * @author Honore Vasconcelos
+ */
+public class BlockHandleSliceWeigher implements Weigher<BlockHandle, Slice>
 {
     @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
-            throws IOException
+    public int weigh(BlockHandle key, Slice value)
     {
-        return new FileChannelTable(name, fileChannel, comparator, verifyChecksums);
+        //approximate weigher
+        return 64 + value.getRawArray().length;
     }
 }

@@ -17,57 +17,73 @@
  */
 package org.iq80.leveldb.table;
 
-import static org.iq80.leveldb.CompressionType.SNAPPY;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
-import java.util.concurrent.Callable;
-
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+import com.google.common.cache.CacheLoader;
 import org.iq80.leveldb.impl.SeekingIterable;
-import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.LRUCache;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
 import org.iq80.leveldb.util.TableIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Comparator;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
-public abstract class Table
+import static org.iq80.leveldb.CompressionType.SNAPPY;
+
+public final class Table
         implements SeekingIterable<Slice, Slice>
 {
-    protected final String name;
-    protected final FileChannel fileChannel;
-    protected final Comparator<Slice> comparator;
-    protected final boolean verifyChecksums;
-    protected final Block indexBlock;
-    protected final BlockHandle metaindexBlockHandle;
+    private final Comparator<Slice> comparator;
+    private final boolean verifyChecksums;
+    private final Block indexBlock;
+    private final BlockHandle metaindexBlockHandle;
+    private final TableDataSource source;
+    private final LRUCache.LRUSubCache<BlockHandle, Slice> blockCache;
 
-    public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    public Table(TableDataSource source, Comparator<Slice> comparator, boolean verifyChecksum, LRUCache<BlockHandle, Slice> blockCache)
             throws IOException
     {
-        Preconditions.checkNotNull(name, "name is null");
-        Preconditions.checkNotNull(fileChannel, "fileChannel is null");
-        long size = fileChannel.size();
+        this.source = source;
+        this.blockCache = cacheForTable(blockCache);
+        Preconditions.checkNotNull(source, "fileChannel is null");
+        long size = source.size();
         Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
         Preconditions.checkNotNull(comparator, "comparator is null");
 
-        this.name = name;
-        this.fileChannel = fileChannel;
-        this.verifyChecksums = verifyChecksums;
+        this.verifyChecksums = verifyChecksum;
         this.comparator = comparator;
+        final ByteBuffer footerData = source.read(size - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
 
-        Footer footer = init();
-        indexBlock = readBlock(footer.getIndexBlockHandle());
+        Footer footer = Footer.readFooter(Slices.avoidCopiedBuffer(footerData));
+        indexBlock = new Block(readRawBlock(footer.getIndexBlockHandle()), comparator); //no need for cache
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
     }
 
-    protected abstract Footer init()
-            throws IOException;
+    /**
+     * Get reference to a new sub cache to current table.
+     *
+     * @param blockCache global cache
+     * @return cache scoped to current table
+     */
+    private LRUCache.LRUSubCache<BlockHandle, Slice> cacheForTable(LRUCache<BlockHandle, Slice> blockCache)
+    {
+        final LRUCache<BlockHandle, Slice> cache = Preconditions.checkNotNull(blockCache, "Block cache should not be null");
+        return cache.subCache(new CacheLoader<BlockHandle, Slice>()
+        {
+            @Override
+            public Slice load(@Nonnull BlockHandle key) throws Exception
+            {
+                return readRawBlock(key);
+            }
+        });
+    }
 
     @Override
     public TableIterator iterator()
@@ -88,15 +104,26 @@ public abstract class Table
         return dataBlock;
     }
 
-    protected static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
-
-    @SuppressWarnings({"NonPrivateFieldAccessedInSynchronizedContext", "AssignmentToStaticFieldFromInstanceMethod"})
     private Block readBlock(BlockHandle blockHandle)
             throws IOException
     {
+        try {
+            final Slice rawBlock = blockCache.load(blockHandle);
+            return new Block(rawBlock, comparator);
+        }
+        catch (ExecutionException e) {
+            Throwables.propagateIfPossible(e.getCause(), IOException.class);
+            throw new IOException(e.getCause());
+        }
+    }
+
+    @SuppressWarnings({"AssignmentToStaticFieldFromInstanceMethod", "NonPrivateFieldAccessedInSynchronizedContext"})
+    private Slice readRawBlock(BlockHandle blockHandle)
+            throws IOException
+    {
         // read block trailer
-        ByteBuffer trailerData = read(blockHandle.getOffset() + blockHandle.getDataSize(), BlockTrailer.ENCODED_LENGTH);
-        BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(Slices.copiedBuffer(trailerData));
+        final ByteBuffer trailerData = source.read(blockHandle.getOffset() + blockHandle.getDataSize(), BlockTrailer.ENCODED_LENGTH);
+        final BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(Slices.avoidCopiedBuffer(trailerData));
 
 // todo re-enable crc check when ported to support direct buffers
 //        // only verify check sums if explicitly asked by the user
@@ -111,28 +138,23 @@ public abstract class Table
 
         // decompress data
         Slice uncompressedData;
-        ByteBuffer uncompressedBuffer = read((int) blockHandle.getOffset(), blockHandle.getDataSize());
+        ByteBuffer uncompressedBuffer = source.read(blockHandle.getOffset(), blockHandle.getDataSize());
         if (blockTrailer.getCompressionType() == SNAPPY) {
             int uncompressedLength = uncompressedLength(uncompressedBuffer);
-            final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(uncompressedLength);
-            Snappy.uncompress(uncompressedBuffer, byteBuffer);
-            uncompressedData = Slices.copiedBuffer(byteBuffer);
+            final ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(uncompressedLength);
+            Snappy.uncompress(uncompressedBuffer, uncompressedScratch);
+            uncompressedData = Slices.copiedBuffer(uncompressedScratch);
         }
         else {
-            uncompressedData = Slices.copiedBuffer(uncompressedBuffer);
+            uncompressedData = Slices.avoidCopiedBuffer(uncompressedBuffer);
         }
 
-        return new Block(uncompressedData, comparator);
+        return uncompressedData;
     }
 
-    protected abstract ByteBuffer read(long offset, int dataSize)
-            throws IOException;
-
-    protected int uncompressedLength(ByteBuffer data)
-            throws IOException
+    private int uncompressedLength(ByteBuffer data)
     {
-        int length = VariableLengthQuantity.readVariableLengthInt(data.duplicate());
-        return length;
+        return VariableLengthQuantity.readVariableLengthInt(data.duplicate());
     }
 
     /**
@@ -161,35 +183,15 @@ public abstract class Table
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Table");
-        sb.append("{name='").append(name).append('\'');
-        sb.append(", comparator=").append(comparator);
-        sb.append(", verifyChecksums=").append(verifyChecksums);
-        sb.append('}');
-        return sb.toString();
+        return "Table" +
+                "{source='" + source + '\'' +
+                ", comparator=" + comparator +
+                ", verifyChecksums=" + verifyChecksums +
+                '}';
     }
 
     public Callable<?> closer()
     {
-        return new Closer(fileChannel);
-    }
-
-    private static class Closer
-            implements Callable<Void>
-    {
-        private final Closeable closeable;
-
-        public Closer(Closeable closeable)
-        {
-            this.closeable = closeable;
-        }
-
-        @Override
-        public Void call()
-        {
-            Closeables.closeQuietly(closeable);
-            return null;
-        }
+        return source.closer();
     }
 }

@@ -33,6 +33,7 @@ public class Options
     private DBComparator comparator;
     private Logger logger;
     private long cacheSize;
+    private boolean allowMmapReads = true;
 
     static void checkArgNotNull(Object value, String name)
     {
@@ -172,5 +173,16 @@ public class Options
     {
         this.paranoidChecks = paranoidChecks;
         return this;
+    }
+
+    public Options allowMmapReads(boolean allowMmapReads)
+    {
+        this.allowMmapReads = allowMmapReads;
+        return this;
+    }
+
+    public boolean allowMmapReads()
+    {
+        return allowMmapReads;
     }
 }

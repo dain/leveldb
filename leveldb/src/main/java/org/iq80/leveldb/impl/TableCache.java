@@ -23,16 +23,23 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-import org.iq80.leveldb.table.FileChannelTable;
-import org.iq80.leveldb.table.MMapTable;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.table.BlockHandle;
+import org.iq80.leveldb.table.BlockHandleSliceWeigher;
+import org.iq80.leveldb.table.FileTableDataSource;
+import org.iq80.leveldb.table.MMTableDataSource;
 import org.iq80.leveldb.table.Table;
+import org.iq80.leveldb.table.TableDataSource;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Finalizer;
 import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.LRUCache;
 import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ExecutionException;
@@ -41,11 +48,15 @@ public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<>(1);
+    private final LRUCache<BlockHandle, Slice> blockCache;
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
+    public TableCache(final File databaseDir,
+                      int tableCacheSize,
+                      final UserComparator userComparator,
+                      final Options options)
     {
         Preconditions.checkNotNull(databaseDir, "databaseName is null");
-
+        blockCache = new LRUCache<>(options.cacheSize() > 0 ? (int) options.cacheSize() : 8 << 20, new BlockHandleSliceWeigher()); //TODO add possibility to disable cache?
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
                 .removalListener(new RemovalListener<Long, TableAndFile>()
@@ -53,8 +64,11 @@ public class TableCache
                     @Override
                     public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
                     {
-                        Table table = notification.getValue().getTable();
-                        finalizer.addCleanup(table, table.closer());
+                        final TableAndFile value = notification.getValue();
+                        if (value != null) {
+                            final Table table = value.getTable();
+                            finalizer.addCleanup(table, table.closer());
+                        }
                     }
                 })
                 .build(new CacheLoader<Long, TableAndFile>()
@@ -63,7 +77,7 @@ public class TableCache
                     public TableAndFile load(Long fileNumber)
                             throws IOException
                     {
-                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
+                        return new TableAndFile(databaseDir, fileNumber, userComparator, options, blockCache);
                     }
                 });
     }
@@ -113,19 +127,43 @@ public class TableCache
     private static final class TableAndFile
     {
         private final Table table;
+        private FileChannel fileChannel;
 
-        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
+        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, Options options, LRUCache<BlockHandle, Slice> blockCache)
                 throws IOException
         {
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
-            FileInputStream fis = new FileInputStream(tableFile);
-            FileChannel fileChannel = fis.getChannel();
-            if (Iq80DBFactory.USE_MMAP) {
-                table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+
+            try {
+                fileChannel = new FileInputStream(tableFile).getChannel();
             }
-            else {
-                table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+            catch (FileNotFoundException ldbNotFound) {
+                try {
+                    // attempt to open older .sst extension
+                    tableFileName = Filename.sstTableFileName(fileNumber);
+                    tableFile = new File(databaseDir, tableFileName);
+                    fileChannel = new FileInputStream(tableFile).getChannel();
+                }
+                catch (FileNotFoundException sstNotFound) {
+                    throw ldbNotFound;
+                }
+            }
+
+            try {
+                final TableDataSource source;
+                if (options.allowMmapReads()) {
+                    source = new MMTableDataSource(tableFile.getAbsolutePath(), fileChannel);
+                }
+                else {
+                    source = new FileTableDataSource(tableFile.getAbsolutePath(), fileChannel);
+                }
+                table = new Table(source, userComparator,
+                        options.verifyChecksums(), blockCache);
+            }
+            catch (IOException e) {
+                Closeables.closeQuietly(fileChannel);
+                throw e;
             }
         }
 
