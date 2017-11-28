@@ -114,50 +114,18 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <configuration>
-                        <excludes>
-                        </excludes>
+                        <properties>
+                            <property>
+                                <name>surefire.testng.verbose</name>
+                                <value>10</value>
+                            </property>
+                        </properties>
+                        <forkCount>3</forkCount>
+                        <reuseForks>true</reuseForks>
+                        <argLine>-Xmx2048m</argLine>
                     </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
     </build>
-
-    <profiles>
-        <profile>
-            <id>lib/rt.jar</id>
-            <activation>
-                <file>
-                    <exists>${java.home}/lib/rt.jar</exists>
-                </file>
-            </activation>
-            <properties>
-                <rt.jar.path>${java.home}/lib/rt.jar</rt.jar.path>
-                <jsse.jar.path>${java.home}/lib/jsse.jar</jsse.jar.path>
-            </properties>
-        </profile>
-        <profile>
-            <id>Classes/classes.jar</id>
-            <activation>
-                <file>
-                    <exists>${java.home}/../Classes/classes.jar</exists>
-                </file>
-            </activation>
-            <properties>
-                <rt.jar.path>${java.home}/../Classes/classes.jar</rt.jar.path>
-                <jsse.jar.path>${java.home}/../Classes/jsse.jar</jsse.jar.path>
-            </properties>
-        </profile>
-        <profile>
-            <id>jre/lib/rt.jar</id>
-            <activation>
-                <file>
-                    <exists>${java.home}/jre/lib/rt.jar</exists>
-                </file>
-            </activation>
-            <properties>
-                <rt.jar.path>${java.home}/jre/lib/rt.jar</rt.jar.path>
-                <jsse.jar.path>${java.home}/jre/lib/jsse.jar</jsse.jar.path>
-            </properties>
-        </profile>
-    </profiles>
 </project>

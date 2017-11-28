@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -590,16 +591,17 @@ public class DbImpl
         LookupResult lookupResult;
         mutex.lock();
         try {
-            SnapshotImpl snapshot = getSnapshot(options);
-            lookupKey = new LookupKey(Slices.wrappedBuffer(key), snapshot.getLastSequence());
+            long lastSequence = options.snapshot() instanceof SnapshotImpl ?
+                    ((SnapshotImpl) options.snapshot()).getLastSequence() : versions.getLastSequence();
+            lookupKey = new LookupKey(Slices.wrappedBuffer(key), lastSequence);
 
             // First look in the memtable, then in the immutable memtable (if any).
             final MemTable memTable = this.memTable;
             final MemTable immutableMemTable = this.immutableMemTable;
             final Version current = versions.getCurrent();
             ReadStats readStats = null;
-            {
-                mutex.unlock();
+            mutex.unlock();
+            try {
                 lookupResult = memTable.get(lookupKey);
                 if (lookupResult == null && immutableMemTable != null) {
                     lookupResult = immutableMemTable.get(lookupKey);
@@ -612,6 +614,8 @@ public class DbImpl
                 }
 
                 // schedule compaction if necessary
+            }
+            finally {
                 mutex.lock();
             }
             if (readStats != null && current.updateStats(readStats)) {
@@ -1319,13 +1323,18 @@ public class DbImpl
         }
     }
 
+    /**
+     * Only for testing
+     */
+    @VisibleForTesting
     int numberOfFilesInLevel(int level)
     {
         mutex.lock();
         Version v;
         try {
             v = versions.getCurrent();
-        }finally {
+        }
+        finally {
             mutex.unlock();
         }
         return v.numberOfFilesInLevel(level);
@@ -1349,7 +1358,8 @@ public class DbImpl
         Version v;
         try {
             v = versions.getCurrent();
-        }finally {
+        }
+        finally {
             mutex.unlock();
         }
 
@@ -1363,7 +1373,13 @@ public class DbImpl
 
     public long getMaxNextLevelOverlappingBytes()
     {
-        return versions.getMaxNextLevelOverlappingBytes();
+        mutex.lock();
+        try {
+            return versions.getMaxNextLevelOverlappingBytes();
+        }
+        finally {
+            mutex.unlock();
+        }
     }
 
     private static class CompactionState
