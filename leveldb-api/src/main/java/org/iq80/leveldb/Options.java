@@ -34,6 +34,7 @@ public class Options
     private Logger logger;
     private long cacheSize;
     private boolean allowMmapReads = true;
+    private boolean allowMmapWrites = true;
 
     static void checkArgNotNull(Object value, String name)
     {
@@ -184,5 +185,16 @@ public class Options
     public boolean allowMmapReads()
     {
         return allowMmapReads;
+    }
+
+    public Options allowMmapWrites(boolean allowMmapWrites)
+    {
+        this.allowMmapWrites = allowMmapWrites;
+        return this;
+    }
+
+    public boolean allowMmapWrites()
+    {
+        return allowMmapWrites;
     }
 }

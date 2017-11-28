@@ -17,10 +17,20 @@
  */
 package org.iq80.leveldb.impl;
 
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.newArrayListWithCapacity;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.MapMaker;
+import com.google.common.collect.Maps;
+import com.google.common.io.Files;
+import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.InternalIterator;
+import org.iq80.leveldb.util.Level0Iterator;
+import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,21 +49,10 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.iq80.leveldb.table.UserComparator;
-import org.iq80.leveldb.util.InternalIterator;
-import org.iq80.leveldb.util.Level0Iterator;
-import org.iq80.leveldb.util.MergingIterator;
-import org.iq80.leveldb.util.Slice;
-
-import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
-import com.google.common.io.Files;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Lists.newArrayListWithCapacity;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
 public class VersionSet
         implements SeekingIterable<InternalKey, Slice>
@@ -77,16 +76,18 @@ public class VersionSet
     private final File databaseDir;
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
+    private final boolean allowMmapWrites;
 
     private LogWriter descriptorLog;
     private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
 
-    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator, boolean allowMmapWrites)
             throws IOException
     {
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
+        this.allowMmapWrites = allowMmapWrites;
         appendVersion(new Version(this));
 
         initializeIfNeeded();
@@ -104,7 +105,7 @@ public class VersionSet
             edit.setNextFileNumber(nextFileNumber.get());
             edit.setLastSequenceNumber(lastSequence);
 
-            LogWriter log = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
+            LogWriter log = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber, allowMmapWrites);
             try {
                 writeSnapshot(log);
                 log.addRecord(edit.encode(), false);
@@ -275,7 +276,7 @@ public class VersionSet
             // a temporary file that contains a snapshot of the current version.
             if (descriptorLog == null) {
                 edit.setNextFileNumber(nextFileNumber.get());
-                descriptorLog = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
+                descriptorLog = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber, allowMmapWrites);
                 writeSnapshot(descriptorLog);
                 createdNewManifest = true;
             }
