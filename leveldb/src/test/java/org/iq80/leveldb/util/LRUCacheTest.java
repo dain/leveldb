@@ -50,7 +50,6 @@ public class LRUCacheTest
         }
     }
 
-
     @Test
     public void testLimitIsRespected() throws Exception
     {

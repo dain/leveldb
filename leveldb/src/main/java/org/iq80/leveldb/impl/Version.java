@@ -17,29 +17,28 @@
  */
 package org.iq80.leveldb.impl;
 
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Ordering.natural;
-import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
-import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.iq80.leveldb.util.InternalIterator;
-import org.iq80.leveldb.util.InternalTableIterator;
-import org.iq80.leveldb.util.LevelIterator;
-import org.iq80.leveldb.util.MergingIterator;
-import org.iq80.leveldb.util.Slice;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import org.iq80.leveldb.util.InternalIterator;
+import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.LevelIterator;
+import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.Slice;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Ordering.natural;
+import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
+import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
+import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
+import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
 // todo this class should be immutable
 public class Version
@@ -120,7 +119,6 @@ public class Version
     {
         this.compactionLevel = compactionLevel;
     }
-
 
     public double getCompactionScore()
     {

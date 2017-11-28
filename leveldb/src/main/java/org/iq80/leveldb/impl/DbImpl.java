@@ -705,7 +705,6 @@ public class DbImpl
                 long sequenceBegin = versions.getLastSequence() + 1;
                 sequenceEnd = sequenceBegin + updates.size() - 1;
 
-
                 // Add to log and apply to memtable.  We can release the lock
                 // during this phase since "w" is currently responsible for logging
                 // and protects against concurrent loggers and concurrent writes
@@ -1628,7 +1627,6 @@ public class DbImpl
             mutex.unlock();
         }
     }
-
 
     private class WriteBatchInternal
     {
