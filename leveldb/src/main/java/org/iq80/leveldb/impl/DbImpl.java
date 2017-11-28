@@ -1321,7 +1321,14 @@ public class DbImpl
 
     int numberOfFilesInLevel(int level)
     {
-        return versions.getCurrent().numberOfFilesInLevel(level);
+        mutex.lock();
+        Version v;
+        try {
+            v = versions.getCurrent();
+        }finally {
+            mutex.unlock();
+        }
+        return v.numberOfFilesInLevel(level);
     }
 
     @Override
@@ -1338,7 +1345,13 @@ public class DbImpl
 
     public long getApproximateSizes(Range range)
     {
-        Version v = versions.getCurrent();
+        mutex.lock();
+        Version v;
+        try {
+            v = versions.getCurrent();
+        }finally {
+            mutex.unlock();
+        }
 
         InternalKey startKey = new InternalKey(Slices.wrappedBuffer(range.start()), MAX_SEQUENCE_NUMBER, VALUE);
         InternalKey limitKey = new InternalKey(Slices.wrappedBuffer(range.limit()), MAX_SEQUENCE_NUMBER, VALUE);
