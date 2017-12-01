@@ -28,9 +28,9 @@ public class MMTableDataSourceTest
         extends TableTest
 {
     @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
             throws IOException
     {
-        return new Table(new MMTableDataSource(name, fileChannel), comparator, verifyChecksums, new LRUCache<>(8 << 20, new BlockHandleSliceWeigher()));
+        return new Table(new MMTableDataSource(name, fileChannel), comparator, verifyChecksums, new LRUCache<>(8 << 20, new BlockHandleSliceWeigher()), filterPolicy);
     }
 }

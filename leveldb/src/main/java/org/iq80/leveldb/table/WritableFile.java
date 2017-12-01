@@ -17,20 +17,30 @@
  */
 package org.iq80.leveldb.table;
 
-import org.iq80.leveldb.util.LRUCache;
 import org.iq80.leveldb.util.Slice;
 
+import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
 
-public class FileTableDataSourceTest
-        extends TableTest
+/**
+ * A file abstraction for sequential writing.  The implementation
+ * must provide buffering since callers may append small fragments
+ * at a time to the file.
+ *
+ * @author Honore Vasconcelos
+ */
+public interface WritableFile extends Closeable
 {
-    @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
-            throws IOException
-    {
-        return new Table(new FileTableDataSource(name, fileChannel), comparator, verifyChecksums, new LRUCache<>(8 << 5, new BlockHandleSliceWeigher()), filterPolicy);
-    }
+    /**
+     * Append {@code data} to current file position.
+     * @param data data to append
+     * @throws IOException
+     */
+    void append(Slice data) throws IOException;
+
+    /**
+     * Force sync bytes to filesystem.
+     * @throws IOException
+     */
+    void force() throws IOException;
 }

@@ -35,6 +35,28 @@ public class Options
     private long cacheSize;
     private boolean allowMmapReads = true;
     private boolean allowMmapWrites = true;
+    private XFilterPolicy filterPolicy;
+
+    public static Options fromOptions(Options options)
+    {
+        final Options options1 = new Options();
+        options1.createIfMissing = options.createIfMissing;
+        options1.errorIfExists = options.errorIfExists;
+        options1.writeBufferSize = options.writeBufferSize;
+        options1.maxOpenFiles = options.maxOpenFiles;
+        options1.blockRestartInterval = options.blockRestartInterval;
+        options1.blockSize = options.blockSize;
+        options1.compressionType = options.compressionType;
+        options1.verifyChecksums = options.verifyChecksums;
+        options1.paranoidChecks = options.paranoidChecks;
+        options1.comparator = options.comparator;
+        options1.logger = options.logger;
+        options1.cacheSize = options.cacheSize;
+        options1.allowMmapReads = options.allowMmapReads;
+        options1.allowMmapWrites = options.allowMmapWrites;
+        options1.filterPolicy = options.filterPolicy;
+        return options1;
+    }
 
     static void checkArgNotNull(Object value, String name)
     {
@@ -196,5 +218,23 @@ public class Options
     public boolean allowMmapWrites()
     {
         return allowMmapWrites;
+    }
+
+    /**
+     * Set table filter policy
+     *
+     * @param filterPolicy new filter policy
+     * @return self
+     */
+    public Options filterPolicy(XFilterPolicy filterPolicy)
+    {
+        this.filterPolicy = filterPolicy;
+        return this;
+    }
+
+    public XFilterPolicy
+    filterPolicy()
+    {
+        return filterPolicy;
     }
 }

@@ -27,6 +27,8 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.table.BlockHandle;
 import org.iq80.leveldb.table.BlockHandleSliceWeigher;
 import org.iq80.leveldb.table.FileTableDataSource;
+import org.iq80.leveldb.table.FilterPolicy;
+import org.iq80.leveldb.table.KeyValueFunction;
 import org.iq80.leveldb.table.MMTableDataSource;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.TableDataSource;
@@ -90,6 +92,13 @@ public class TableCache
     public InternalTableIterator newIterator(long number)
     {
         return new InternalTableIterator(getTable(number).iterator());
+    }
+
+    public <T> T get(Slice key, FileMetaData fileMetaData, KeyValueFunction<T> resultBuilder)
+    {
+        final Table table = getTable(fileMetaData.getNumber());
+        return table.internalGet(key, resultBuilder);
+
     }
 
     public long getApproximateOffsetOf(FileMetaData file, Slice key)
@@ -158,8 +167,9 @@ public class TableCache
                 else {
                     source = new FileTableDataSource(tableFile.getAbsolutePath(), fileChannel);
                 }
+                final FilterPolicy filterPolicy = (FilterPolicy) options.filterPolicy();
                 table = new Table(source, userComparator,
-                        options.verifyChecksums(), blockCache);
+                        options.verifyChecksums(), blockCache, filterPolicy);
             }
             catch (IOException e) {
                 Closeables.closeQuietly(fileChannel);

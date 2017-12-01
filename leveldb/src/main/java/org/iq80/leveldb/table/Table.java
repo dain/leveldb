@@ -29,8 +29,10 @@ import org.iq80.leveldb.util.TableIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -40,14 +42,16 @@ import static org.iq80.leveldb.CompressionType.SNAPPY;
 public final class Table
         implements SeekingIterable<Slice, Slice>
 {
+    private static final Charset CHARSET = Charset.forName("UTF-8");
     private final Comparator<Slice> comparator;
     private final boolean verifyChecksums;
     private final Block indexBlock;
     private final BlockHandle metaindexBlockHandle;
     private final TableDataSource source;
     private final LRUCache.LRUSubCache<BlockHandle, Slice> blockCache;
+    private final FilterBlockReader filter;
 
-    public Table(TableDataSource source, Comparator<Slice> comparator, boolean verifyChecksum, LRUCache<BlockHandle, Slice> blockCache)
+    public Table(TableDataSource source, Comparator<Slice> comparator, boolean verifyChecksum, LRUCache<BlockHandle, Slice> blockCache, final FilterPolicy filterPolicy)
             throws IOException
     {
         this.source = source;
@@ -64,6 +68,32 @@ public final class Table
         Footer footer = Footer.readFooter(Slices.avoidCopiedBuffer(footerData));
         indexBlock = new Block(readRawBlock(footer.getIndexBlockHandle()), comparator); //no need for cache
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
+        this.filter = readMeta(filterPolicy);
+
+    }
+
+    private FilterBlockReader readMeta(FilterPolicy filterPolicy) throws IOException
+    {
+        if (filterPolicy == null) {
+            return null;  // Do not need any metadata
+        }
+
+        final Block meta = new Block(readRawBlock(metaindexBlockHandle), new BytewiseComparator());
+        final BlockIterator iterator = meta.iterator();
+        final Slice targetKey = new Slice(("filter." + filterPolicy.name()).getBytes(CHARSET));
+        iterator.seek(targetKey);
+        if (iterator.hasNext() && iterator.peek().getKey().equals(targetKey)) {
+            return readFilter(filterPolicy, iterator.next().getValue());
+        }
+        else {
+            return null;
+        }
+    }
+
+    protected FilterBlockReader readFilter(FilterPolicy filterPolicy, Slice filterHandle) throws IOException
+    {
+        final Slice filterBlock = readRawBlock(BlockHandle.readBlockHandle(filterHandle.input()));
+        return new FilterBlockReader(filterPolicy, filterBlock);
     }
 
     /**
@@ -89,6 +119,12 @@ public final class Table
     public TableIterator iterator()
     {
         return new TableIterator(this, indexBlock.iterator());
+    }
+
+    @Nullable
+    public FilterBlockReader getFilter()
+    {
+        return filter;
     }
 
     public Block openBlock(Slice blockEntry)
@@ -117,8 +153,7 @@ public final class Table
         }
     }
 
-    @SuppressWarnings({"AssignmentToStaticFieldFromInstanceMethod", "NonPrivateFieldAccessedInSynchronizedContext"})
-    private Slice readRawBlock(BlockHandle blockHandle)
+    protected Slice readRawBlock(BlockHandle blockHandle)
             throws IOException
     {
         // read block trailer
@@ -150,6 +185,28 @@ public final class Table
         }
 
         return uncompressedData;
+    }
+
+    public <T> T internalGet(Slice key, KeyValueFunction<T> keyValueFunction)
+    {
+        final BlockIterator iterator = indexBlock.iterator();
+        iterator.seek(key);
+        if (iterator.hasNext()) {
+            final BlockEntry peek = iterator.peek();
+            final Slice handleValue = peek.getValue();
+            if (filter != null && !filter.keyMayMatch(BlockHandle.readBlockHandle(handleValue.input()).getOffset(), key)) {
+                return null;
+            }
+            else {
+                final BlockIterator iterator1 = openBlock(handleValue).iterator();
+                iterator1.seek(key);
+                if (iterator1.hasNext()) {
+                    final BlockEntry next = iterator1.next();
+                    return keyValueFunction.apply(next.getKey(), next.getValue());
+                }
+            }
+        }
+        return null;
     }
 
     private int uncompressedLength(ByteBuffer data)

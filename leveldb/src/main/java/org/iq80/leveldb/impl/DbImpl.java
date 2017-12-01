@@ -37,8 +37,11 @@ import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.CustomUserComparator;
+import org.iq80.leveldb.table.FileChannelWritableFile;
+import org.iq80.leveldb.table.FilterPolicy;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.table.WritableFile;
 import org.iq80.leveldb.util.DbIterator;
 import org.iq80.leveldb.util.MergingIterator;
 import org.iq80.leveldb.util.Slice;
@@ -50,7 +53,6 @@ import org.iq80.leveldb.util.Snappy;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.channels.FileChannel;
@@ -126,6 +128,11 @@ public class DbImpl
         }
 
         this.databaseDir = databaseDir;
+
+        if (this.options.filterPolicy() != null) {
+            Preconditions.checkArgument(this.options.filterPolicy() instanceof FilterPolicy, "Filter policy must implement Java interface FilterPolicy");
+            this.options.filterPolicy(InternalFilterPolicy.convert(this.options.filterPolicy()));
+        }
 
         //use custom comparator if set
         DBComparator comparator = options.comparator();
@@ -1082,7 +1089,7 @@ public class DbImpl
         try {
             InternalKey smallest = null;
             InternalKey largest = null;
-            FileChannel channel = new FileOutputStream(file).getChannel();
+            WritableFile channel = FileChannelWritableFile.fileChannel(file);
             try {
                 TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
 
@@ -1101,7 +1108,7 @@ public class DbImpl
             }
             finally {
                 try {
-                    channel.force(true);
+                    channel.force();
                 }
                 finally {
                     channel.close();
@@ -1251,7 +1258,7 @@ public class DbImpl
             compactionState.currentLargest = null;
 
             File file = new File(databaseDir, Filename.tableFileName(fileNumber));
-            compactionState.outfile = new FileOutputStream(file).getChannel();
+            compactionState.outfile = FileChannelWritableFile.fileChannel(file);
             compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
         }
         finally {
@@ -1284,7 +1291,7 @@ public class DbImpl
 
         compactionState.builder = null;
 
-        compactionState.outfile.force(true);
+        compactionState.outfile.force();
         compactionState.outfile.close();
         compactionState.outfile = null;
 
@@ -1391,7 +1398,7 @@ public class DbImpl
         private long smallestSnapshot;
 
         // State kept for output being generated
-        private FileChannel outfile;
+        private WritableFile outfile;
         private TableBuilder builder;
 
         // Current file being generated
@@ -1481,31 +1488,6 @@ public class DbImpl
             }
         });
         return record.slice(0, sliceOutput.size());
-    }
-
-    private static class InsertIntoHandler
-            implements Handler
-    {
-        private long sequence;
-        private final MemTable memTable;
-
-        public InsertIntoHandler(MemTable memTable, long sequenceBegin)
-        {
-            this.memTable = memTable;
-            this.sequence = sequenceBegin;
-        }
-
-        @Override
-        public void put(Slice key, Slice value)
-        {
-            memTable.add(sequence++, VALUE, key, value);
-        }
-
-        @Override
-        public void delete(Slice key)
-        {
-            memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
-        }
     }
 
     public static class DatabaseShutdownException

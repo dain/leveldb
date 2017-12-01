@@ -20,16 +20,13 @@ package org.iq80.leveldb.impl;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.iq80.leveldb.table.UserComparator;
-import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Level0Iterator;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map.Entry;
 
-import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
@@ -96,27 +93,9 @@ public class Level0
 
         readStats.clear();
         for (FileMetaData fileMetaData : fileMetaDataList) {
-            // open the iterator
-            InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
-
-            // seek to the key
-            iterator.seek(key.getInternalKey());
-
-            if (iterator.hasNext()) {
-                // parse the key in the block
-                Entry<InternalKey, Slice> entry = iterator.next();
-                InternalKey internalKey = entry.getKey();
-                Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey().toString(UTF_8));
-
-                // if this is a value key (not a delete) and the keys match, return the value
-                if (key.getUserKey().equals(internalKey.getUserKey())) {
-                    if (internalKey.getValueType() == ValueType.DELETION) {
-                        return LookupResult.deleted(key);
-                    }
-                    else if (internalKey.getValueType() == VALUE) {
-                        return LookupResult.ok(key, entry.getValue());
-                    }
-                }
+            final LookupResult lookupResult = tableCache.get(key.getInternalKey().encode(), fileMetaData, new KeyMatchingLookup(key));
+            if (lookupResult != null) {
+                return lookupResult;
             }
 
             if (readStats.getSeekFile() == null) {
