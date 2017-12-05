@@ -69,6 +69,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.newLinkedList;
@@ -285,6 +287,26 @@ public class DbImpl
     public String getProperty(String name)
     {
         checkBackgroundException();
+        if (!name.startsWith("leveldb.")) {
+            return null;
+        }
+        String key = name.substring("leveldb.".length());
+        mutex.lock();
+        try {
+            Matcher matcher;
+            matcher = Pattern.compile("num-files-at-level(\\d+)")
+                    .matcher(key);
+            if (matcher.matches()) {
+                final int level = Integer.valueOf(matcher.group(1));
+                return String.valueOf(versions.numberOfFilesInLevel(level));
+            }
+            //TODO implement stats
+            //TODO implement sstables
+            //TODO implement approximate-memory-usage
+        }
+        finally {
+            mutex.unlock();
+        }
         return null;
     }
 

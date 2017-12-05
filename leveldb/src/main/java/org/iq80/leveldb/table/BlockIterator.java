@@ -109,6 +109,16 @@ public class BlockIterator
         }
     }
 
+    public void seekToLast()
+    {
+        if (restartCount > 0) {
+            seekToRestartPosition(restartCount - 1);
+            while (peek() != null) {
+                next();
+            }
+        }
+    }
+
     /**
      * Repositions the iterator so the key of the next BlockElement returned greater than or equal to the specified targetKey.
      */
@@ -142,7 +152,7 @@ public class BlockIterator
 
         // linear search (within restart block) for first key greater than or equal to targetKey
         for (seekToRestartPosition(left); nextEntry != null; next()) {
-            if (comparator.compare(peek().getKey(), targetKey) >= 0) {
+            if (comparator.compare(nextEntry.getKey(), targetKey) >= 0) {
                 break;
             }
         }

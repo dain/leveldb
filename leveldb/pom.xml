@@ -116,11 +116,11 @@
                     <configuration>
                         <properties>
                             <property>
-                                <name>surefire.testng.verbose</name>
-                                <value>10</value>
+                                <name>listener</name>
+                                <value>org.testng.reporters.VerboseReporter</value>
                             </property>
                         </properties>
-                        <forkCount>3</forkCount>
+                        <forkCount>1</forkCount>
                         <reuseForks>true</reuseForks>
                         <argLine>-Xmx2048m</argLine>
                     </configuration>

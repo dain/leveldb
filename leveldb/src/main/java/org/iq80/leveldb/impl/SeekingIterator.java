@@ -30,7 +30,7 @@ public interface SeekingIterator<K, V>
     void seekToFirst();
 
     /**
-     * Repositions the iterator so the key of the next BlockElement returned greater than or equal to the specified targetKey.
+     * Repositions the iterator so the key of the next element returned greater than or equal to the specified targetKey.
      */
     void seek(K targetKey);
 }

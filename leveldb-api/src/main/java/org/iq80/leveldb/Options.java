@@ -232,8 +232,7 @@ public class Options
         return this;
     }
 
-    public XFilterPolicy
-    filterPolicy()
+    public XFilterPolicy filterPolicy()
     {
         return filterPolicy;
     }

@@ -23,6 +23,7 @@ import org.iq80.leveldb.DBException;
 import org.iq80.leveldb.DBFactory;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.FileUtils;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -123,5 +124,11 @@ public class ApiTest
         }
 
         db.close();
+    }
+
+    @AfterMethod
+    public void tearDown() throws Exception
+    {
+        FileUtils.deleteRecursively(databaseDir);
     }
 }
