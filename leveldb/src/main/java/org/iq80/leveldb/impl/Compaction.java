@@ -17,12 +17,12 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
@@ -95,7 +95,7 @@ public class Compaction
     // Return the ith input file at "level()+which" ("which" must be 0 or 1).
     public FileMetaData input(int which, int i)
     {
-        Preconditions.checkArgument(which == 0 || which == 1, "which must be either 0 or 1");
+        checkArgument(which == 0 || which == 1, "which must be either 0 or 1");
         if (which == 0) {
             return levelInputs.get(i);
         }

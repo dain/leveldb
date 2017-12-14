@@ -63,7 +63,7 @@ public class FileChannelTable
 //            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
 //            int actualCrc32c = checksum.getMaskedValue();
 //
-//            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
+//            checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
 //        }
 
         // decompress data

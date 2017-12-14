@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.InternalTableIterator;
@@ -30,6 +29,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
@@ -47,7 +48,7 @@ public class Level
 
     public Level(int levelNumber, List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
-        Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
+        checkArgument(levelNumber >= 0, "levelNumber is negative");
         requireNonNull(files, "files is null");
         requireNonNull(tableCache, "tableCache is null");
         requireNonNull(internalKeyComparator, "internalKeyComparator is null");
@@ -55,7 +56,7 @@ public class Level
         this.files = new ArrayList<>(files);
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
-        Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
+        checkArgument(levelNumber >= 0, "levelNumber is negative");
         this.levelNumber = levelNumber;
     }
 
@@ -137,7 +138,7 @@ public class Level
                 // parse the key in the block
                 Entry<InternalKey, Slice> entry = iterator.next();
                 InternalKey internalKey = entry.getKey();
-                Preconditions.checkState(internalKey != null, "Corrupt key for %s", key.getUserKey().toString(UTF_8));
+                checkState(internalKey != null, "Corrupt key for %s", key.getUserKey().toString(UTF_8));
 
                 // if this is a value key (not a delete) and the keys match, return the value
                 if (key.getUserKey().equals(internalKey.getUserKey())) {

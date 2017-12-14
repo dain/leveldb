@@ -17,12 +17,12 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.table.BlockHandle.readBlockHandle;
 import static org.iq80.leveldb.table.BlockHandle.writeBlockHandleTo;
@@ -54,7 +54,7 @@ public class Footer
     public static Footer readFooter(Slice slice)
     {
         requireNonNull(slice, "slice is null");
-        Preconditions.checkArgument(slice.length() == ENCODED_LENGTH, "Expected slice.size to be %s but was %s", ENCODED_LENGTH, slice.length());
+        checkArgument(slice.length() == ENCODED_LENGTH, "Expected slice.size to be %s but was %s", ENCODED_LENGTH, slice.length());
 
         SliceInput sliceInput = slice.input();
 
@@ -67,7 +67,7 @@ public class Footer
 
         // verify magic number
         long magicNumber = sliceInput.readUnsignedInt() | (sliceInput.readUnsignedInt() << 32);
-        Preconditions.checkArgument(magicNumber == TableBuilder.TABLE_MAGIC_NUMBER, "File is not a table (bad magic number)");
+        checkArgument(magicNumber == TableBuilder.TABLE_MAGIC_NUMBER, "File is not a table (bad magic number)");
 
         return new Footer(metaindexBlockHandle, indexBlockHandle);
     }

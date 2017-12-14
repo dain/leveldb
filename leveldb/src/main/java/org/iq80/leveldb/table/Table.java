@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.impl.SeekingIterable;
 import org.iq80.leveldb.util.Closeables;
@@ -32,6 +31,7 @@ import java.nio.channels.FileChannel;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public abstract class Table
@@ -50,7 +50,7 @@ public abstract class Table
         requireNonNull(name, "name is null");
         requireNonNull(fileChannel, "fileChannel is null");
         long size = fileChannel.size();
-        Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
+        checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
         requireNonNull(comparator, "comparator is null");
 
         this.name = name;

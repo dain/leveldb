@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 
@@ -25,6 +24,7 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public final class FileUtils
@@ -97,7 +97,7 @@ public final class FileUtils
 
     public static boolean deleteDirectoryContents(File directory)
     {
-        Preconditions.checkArgument(directory.isDirectory(), "Not a directory: %s", directory);
+        checkArgument(directory.isDirectory(), "Not a directory: %s", directory);
 
         // Don't delete symbolic link directories
         if (isSymbolicLink(directory)) {
@@ -123,7 +123,7 @@ public final class FileUtils
 
     public static boolean copyDirectoryContents(File src, File target)
     {
-        Preconditions.checkArgument(src.isDirectory(), "Source dir is not a directory: %s", src);
+        checkArgument(src.isDirectory(), "Source dir is not a directory: %s", src);
 
         // Don't delete symbolic link directories
         if (isSymbolicLink(src)) {
@@ -131,7 +131,7 @@ public final class FileUtils
         }
 
         target.mkdirs();
-        Preconditions.checkArgument(target.isDirectory(), "Target dir is not a directory: %s", src);
+        checkArgument(target.isDirectory(), "Target dir is not a directory: %s", src);
 
         boolean success = true;
         for (File file : listFiles(src)) {

@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import org.iq80.leveldb.util.DynamicSliceOutput;
 import org.iq80.leveldb.util.IntVector;
@@ -26,6 +25,9 @@ import org.iq80.leveldb.util.VariableLengthQuantity;
 
 import java.util.Comparator;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkPositionIndex;
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
@@ -44,8 +46,8 @@ public class BlockBuilder
 
     public BlockBuilder(int estimatedSize, int blockRestartInterval, Comparator<Slice> comparator)
     {
-        Preconditions.checkArgument(estimatedSize >= 0, "estimatedSize is negative");
-        Preconditions.checkArgument(blockRestartInterval >= 0, "blockRestartInterval is negative");
+        checkArgument(estimatedSize >= 0, "estimatedSize is negative");
+        checkArgument(blockRestartInterval >= 0, "blockRestartInterval is negative");
         requireNonNull(comparator, "comparator is null");
 
         this.block = new DynamicSliceOutput(estimatedSize);
@@ -104,10 +106,10 @@ public class BlockBuilder
     {
         requireNonNull(key, "key is null");
         requireNonNull(value, "value is null");
-        Preconditions.checkState(!finished, "block is finished");
-        Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
+        checkState(!finished, "block is finished");
+        checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 
-        Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
+        checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
 
         int sharedKeyBytes = 0;
         if (restartBlockEntryCount < blockRestartInterval) {

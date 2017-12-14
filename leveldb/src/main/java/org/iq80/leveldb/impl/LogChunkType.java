@@ -17,7 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkArgument;
 
 public enum LogChunkType
 {
@@ -54,7 +54,7 @@ public enum LogChunkType
 
     public int getPersistentId()
     {
-        Preconditions.checkArgument(persistentId != null, "%s is not a persistent chunk type", name());
+        checkArgument(persistentId != null, "%s is not a persistent chunk type", name());
         return persistentId;
     }
 }

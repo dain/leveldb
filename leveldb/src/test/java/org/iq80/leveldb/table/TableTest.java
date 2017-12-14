@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.Closeables;
@@ -35,6 +34,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertTrue;
 
@@ -162,7 +162,7 @@ public abstract class TableTest
             throws Exception
     {
         reopenFile();
-        Preconditions.checkState(0 == fileChannel.position(), "Expected fileChannel.position %s to be 0", fileChannel.position());
+        checkState(0 == fileChannel.position(), "Expected fileChannel.position %s to be 0", fileChannel.position());
     }
 
     private void reopenFile()

@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.benchmark;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -48,6 +47,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.benchmark.DbBenchmark.DBState.EXISTING;
 import static org.iq80.leveldb.benchmark.DbBenchmark.DBState.FRESH;
@@ -395,7 +395,7 @@ public class DbBenchmark
 
     public static byte[] formatNumber(long n)
     {
-        Preconditions.checkArgument(n >= 0, "number must be positive");
+        checkArgument(n >= 0, "number must be positive");
 
         byte[] slice = new byte[16];
 

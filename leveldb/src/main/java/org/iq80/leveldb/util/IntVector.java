@@ -17,9 +17,9 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
-
 import java.util.Arrays;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public class IntVector
 {
@@ -43,7 +43,7 @@ public class IntVector
 
     public void add(int value)
     {
-        Preconditions.checkArgument(size + 1 >= 0, "Invalid minLength: %s", size + 1);
+        checkArgument(size + 1 >= 0, "Invalid minLength: %s", size + 1);
 
         ensureCapacity(size + 1);
 

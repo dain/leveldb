@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.io.File;
@@ -25,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -66,7 +66,7 @@ public final class Filename
      */
     public static String descriptorFileName(long number)
     {
-        Preconditions.checkArgument(number >= 0, "number is negative");
+        checkArgument(number >= 0, "number is negative");
         return String.format("MANIFEST-%06d", number);
     }
 
@@ -201,7 +201,7 @@ public final class Filename
 
     private static String makeFileName(long number, String suffix)
     {
-        Preconditions.checkArgument(number >= 0, "number is negative");
+        checkArgument(number >= 0, "number is negative");
         requireNonNull(suffix, "suffix is null");
         return String.format("%06d.%s", number, suffix);
     }

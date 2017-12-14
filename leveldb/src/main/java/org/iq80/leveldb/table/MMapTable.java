@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.ByteBufferSupport;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
@@ -34,6 +33,7 @@ import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 public class MMapTable
@@ -45,7 +45,7 @@ public class MMapTable
             throws IOException
     {
         super(name, fileChannel, comparator, verifyChecksums);
-        Preconditions.checkArgument(fileChannel.size() <= Integer.MAX_VALUE, "File must be smaller than %s bytes", Integer.MAX_VALUE);
+        checkArgument(fileChannel.size() <= Integer.MAX_VALUE, "File must be smaller than %s bytes", Integer.MAX_VALUE);
     }
 
     @Override
@@ -104,7 +104,7 @@ public class MMapTable
 //            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
 //            int actualCrc32c = checksum.getMaskedValue();
 //
-//            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
+//            checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
 //        }
 
         // decompress data

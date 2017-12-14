@@ -18,7 +18,6 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
@@ -49,6 +48,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
@@ -138,7 +139,7 @@ public class VersionSet
     private void appendVersion(Version version)
     {
         requireNonNull(version, "version is null");
-        Preconditions.checkArgument(version != current, "version is the current version");
+        checkArgument(version != current, "version is the current version");
         Version previous = current;
         current = version;
         activeVersions.put(version, new Object());
@@ -150,7 +151,7 @@ public class VersionSet
     public void removeVersion(Version version)
     {
         requireNonNull(version, "version is null");
-        Preconditions.checkArgument(version != current, "version is the current version");
+        checkArgument(version != current, "version is the current version");
         boolean removed = activeVersions.remove(version) != null;
         assert removed : "Expected the version to still be in the active set";
     }
@@ -244,7 +245,7 @@ public class VersionSet
 
     public void setLastSequence(long newLastSequence)
     {
-        Preconditions.checkArgument(newLastSequence >= lastSequence, "Expected newLastSequence to be greater than or equal to current lastSequence");
+        checkArgument(newLastSequence >= lastSequence, "Expected newLastSequence to be greater than or equal to current lastSequence");
         this.lastSequence = newLastSequence;
     }
 
@@ -252,8 +253,8 @@ public class VersionSet
             throws IOException
     {
         if (edit.getLogNumber() != null) {
-            Preconditions.checkArgument(edit.getLogNumber() >= logNumber);
-            Preconditions.checkArgument(edit.getLogNumber() < nextFileNumber.get());
+            checkArgument(edit.getLogNumber() >= logNumber);
+            checkArgument(edit.getLogNumber() < nextFileNumber.get());
         }
         else {
             edit.setLogNumber(logNumber);
@@ -333,7 +334,7 @@ public class VersionSet
     {
         // Read "CURRENT" file, which contains a pointer to the current manifest file
         File currentFile = new File(databaseDir, Filename.currentFileName());
-        Preconditions.checkState(currentFile.exists(), "CURRENT file does not exist");
+        checkState(currentFile.exists(), "CURRENT file does not exist");
 
         String currentName = Files.toString(currentFile, UTF_8);
         if (currentName.isEmpty() || currentName.charAt(currentName.length() - 1) != '\n') {
@@ -360,7 +361,7 @@ public class VersionSet
                 // todo implement user comparator
                 String editComparator = edit.getComparatorName();
                 String userComparator = internalKeyComparator.name();
-                Preconditions.checkArgument(editComparator == null || editComparator.equals(userComparator),
+                checkArgument(editComparator == null || editComparator.equals(userComparator),
                         "Expected user comparator %s to match existing database comparator ", userComparator, editComparator);
 
                 // apply edit
@@ -509,8 +510,8 @@ public class VersionSet
         List<FileMetaData> levelInputs;
         if (sizeCompaction) {
             level = current.getCompactionLevel();
-            Preconditions.checkState(level >= 0);
-            Preconditions.checkState(level + 1 < NUM_LEVELS);
+            checkState(level >= 0);
+            checkState(level + 1 < NUM_LEVELS);
 
             // Pick the first file that comes after compact_pointer_[level]
             levelInputs = new ArrayList<>();
@@ -542,7 +543,7 @@ public class VersionSet
             // which will include the picked file.
             levelInputs = getOverlappingInputs(0, range.getKey(), range.getValue());
 
-            Preconditions.checkState(!levelInputs.isEmpty());
+            checkState(!levelInputs.isEmpty());
         }
 
         Compaction compaction = setupOtherInputs(level, levelInputs);
