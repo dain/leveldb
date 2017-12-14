@@ -26,6 +26,7 @@ import org.iq80.leveldb.util.VariableLengthQuantity;
 
 import java.util.Comparator;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 public class BlockBuilder
@@ -45,7 +46,7 @@ public class BlockBuilder
     {
         Preconditions.checkArgument(estimatedSize >= 0, "estimatedSize is negative");
         Preconditions.checkArgument(blockRestartInterval >= 0, "blockRestartInterval is negative");
-        Preconditions.checkNotNull(comparator, "comparator is null");
+        requireNonNull(comparator, "comparator is null");
 
         this.block = new DynamicSliceOutput(estimatedSize);
         this.blockRestartInterval = blockRestartInterval;
@@ -95,14 +96,14 @@ public class BlockBuilder
 
     public void add(BlockEntry blockEntry)
     {
-        Preconditions.checkNotNull(blockEntry, "blockEntry is null");
+        requireNonNull(blockEntry, "blockEntry is null");
         add(blockEntry.getKey(), blockEntry.getValue());
     }
 
     public void add(Slice key, Slice value)
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
         Preconditions.checkState(!finished, "block is finished");
         Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 

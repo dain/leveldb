@@ -23,6 +23,7 @@ import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.table.BlockHandle.readBlockHandle;
 import static org.iq80.leveldb.table.BlockHandle.writeBlockHandleTo;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
@@ -52,7 +53,7 @@ public class Footer
 
     public static Footer readFooter(Slice slice)
     {
-        Preconditions.checkNotNull(slice, "slice is null");
+        requireNonNull(slice, "slice is null");
         Preconditions.checkArgument(slice.length() == ENCODED_LENGTH, "Expected slice.size to be %s but was %s", ENCODED_LENGTH, slice.length());
 
         SliceInput sliceInput = slice.input();

@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 
 public final class Filename
 {
@@ -201,7 +202,7 @@ public final class Filename
     private static String makeFileName(long number, String suffix)
     {
         Preconditions.checkArgument(number >= 0, "number is negative");
-        Preconditions.checkNotNull(suffix, "suffix is null");
+        requireNonNull(suffix, "suffix is null");
         return String.format("%06d.%s", number, suffix);
     }
 
@@ -227,7 +228,7 @@ public final class Filename
 
         public FileInfo(FileType fileType, long fileNumber)
         {
-            Preconditions.checkNotNull(fileType, "fileType is null");
+            requireNonNull(fileType, "fileType is null");
             this.fileType = fileType;
             this.fileNumber = fileNumber;
         }

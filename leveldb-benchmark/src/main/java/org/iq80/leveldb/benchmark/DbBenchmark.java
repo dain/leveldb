@@ -466,7 +466,9 @@ public class DbBenchmark
         for (int i = 0; i < reads; i++) {
             byte[] key = formatNumber(random.nextInt(num));
             byte[] value = db.get(key);
-            Preconditions.checkNotNull(value, "db.get(%s) is null", new String(key, UTF_8));
+            if (value == null) {
+                throw new NullPointerException(String.format("db.get(%s) is null", new String(key, UTF_8)));
+            }
             bytes += key.length + value.length;
             finishedSingleOp();
         }

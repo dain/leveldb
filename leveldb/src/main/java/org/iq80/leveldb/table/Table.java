@@ -32,6 +32,8 @@ import java.nio.channels.FileChannel;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
 
+import static java.util.Objects.requireNonNull;
+
 public abstract class Table
         implements SeekingIterable<Slice, Slice>
 {
@@ -45,11 +47,11 @@ public abstract class Table
     public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
             throws IOException
     {
-        Preconditions.checkNotNull(name, "name is null");
-        Preconditions.checkNotNull(fileChannel, "fileChannel is null");
+        requireNonNull(name, "name is null");
+        requireNonNull(fileChannel, "fileChannel is null");
         long size = fileChannel.size();
         Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
-        Preconditions.checkNotNull(comparator, "comparator is null");
+        requireNonNull(comparator, "comparator is null");
 
         this.name = name;
         this.fileChannel = fileChannel;

@@ -67,6 +67,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
@@ -111,8 +112,8 @@ public class DbImpl
     public DbImpl(Options options, File databaseDir)
             throws IOException
     {
-        Preconditions.checkNotNull(options, "options is null");
-        Preconditions.checkNotNull(databaseDir, "databaseDir is null");
+        requireNonNull(options, "options is null");
+        requireNonNull(databaseDir, "databaseDir is null");
         this.options = options;
 
         if (this.options.compressionType() == CompressionType.SNAPPY && !Snappy.available()) {
@@ -353,8 +354,8 @@ public class DbImpl
     {
         Preconditions.checkArgument(level >= 0, "level is negative");
         Preconditions.checkArgument(level + 1 < NUM_LEVELS, "level is greater than or equal to %s", NUM_LEVELS);
-        Preconditions.checkNotNull(start, "start is null");
-        Preconditions.checkNotNull(end, "end is null");
+        requireNonNull(start, "start is null");
+        requireNonNull(end, "end is null");
 
         mutex.lock();
         try {
@@ -1132,7 +1133,7 @@ public class DbImpl
     private void openCompactionOutputFile(CompactionState compactionState)
             throws FileNotFoundException
     {
-        Preconditions.checkNotNull(compactionState, "compactionState is null");
+        requireNonNull(compactionState, "compactionState is null");
         Preconditions.checkArgument(compactionState.builder == null, "compactionState builder is not null");
 
         mutex.lock();
@@ -1156,7 +1157,7 @@ public class DbImpl
     private void finishCompactionOutputFile(CompactionState compactionState)
             throws IOException
     {
-        Preconditions.checkNotNull(compactionState, "compactionState is null");
+        requireNonNull(compactionState, "compactionState is null");
         Preconditions.checkArgument(compactionState.outfile != null);
         Preconditions.checkArgument(compactionState.builder != null);
 
@@ -1225,7 +1226,7 @@ public class DbImpl
     @Override
     public long[] getApproximateSizes(Range... ranges)
     {
-        Preconditions.checkNotNull(ranges, "ranges is null");
+        requireNonNull(ranges, "ranges is null");
         long[] sizes = new long[ranges.length];
         for (int i = 0; i < ranges.length; i++) {
             Range range = ranges[i];

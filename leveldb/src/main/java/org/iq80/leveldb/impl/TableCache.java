@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -37,6 +36,8 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ExecutionException;
 
+import static java.util.Objects.requireNonNull;
+
 public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
@@ -44,7 +45,7 @@ public class TableCache
 
     public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
     {
-        Preconditions.checkNotNull(databaseDir, "databaseName is null");
+        requireNonNull(databaseDir, "databaseName is null");
 
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)

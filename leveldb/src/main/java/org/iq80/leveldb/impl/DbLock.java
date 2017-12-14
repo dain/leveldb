@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.iq80.leveldb.util.Closeables;
 
@@ -28,6 +27,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 public class DbLock
 {
@@ -38,7 +38,7 @@ public class DbLock
     public DbLock(File lockFile)
             throws IOException
     {
-        Preconditions.checkNotNull(lockFile, "lockFile is null");
+        requireNonNull(lockFile, "lockFile is null");
         this.lockFile = lockFile;
 
         // open and lock the file

@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 
@@ -51,7 +52,7 @@ public class FileChannelLogWriter
     public FileChannelLogWriter(File file, long fileNumber)
             throws FileNotFoundException
     {
-        Preconditions.checkNotNull(file, "file is null");
+        requireNonNull(file, "file is null");
         Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
 
         this.file = file;

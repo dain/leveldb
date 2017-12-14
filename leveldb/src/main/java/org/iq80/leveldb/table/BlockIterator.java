@@ -28,6 +28,7 @@ import org.iq80.leveldb.util.VariableLengthQuantity;
 import java.util.Comparator;
 import java.util.NoSuchElementException;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 public class BlockIterator
@@ -42,10 +43,10 @@ public class BlockIterator
 
     public BlockIterator(Slice data, Slice restartPositions, Comparator<Slice> comparator)
     {
-        Preconditions.checkNotNull(data, "data is null");
-        Preconditions.checkNotNull(restartPositions, "restartPositions is null");
+        requireNonNull(data, "data is null");
+        requireNonNull(restartPositions, "restartPositions is null");
         Preconditions.checkArgument(restartPositions.length() % SIZE_OF_INT == 0, "restartPositions.readableBytes() must be a multiple of %s", SIZE_OF_INT);
-        Preconditions.checkNotNull(comparator, "comparator is null");
+        requireNonNull(comparator, "comparator is null");
 
         this.data = data.input();
 
@@ -178,7 +179,7 @@ public class BlockIterator
      */
     private static BlockEntry readEntry(SliceInput data, BlockEntry previousEntry)
     {
-        Preconditions.checkNotNull(data, "data is null");
+        requireNonNull(data, "data is null");
 
         // read entry header
         int sharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);

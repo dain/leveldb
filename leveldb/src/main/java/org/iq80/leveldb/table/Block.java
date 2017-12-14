@@ -24,6 +24,7 @@ import org.iq80.leveldb.util.Slices;
 
 import java.util.Comparator;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 /**
@@ -71,9 +72,9 @@ public class Block
 
     public Block(Slice block, Comparator<Slice> comparator)
     {
-        Preconditions.checkNotNull(block, "block is null");
+        requireNonNull(block, "block is null");
         Preconditions.checkArgument(block.length() >= SIZE_OF_INT, "Block is corrupt: size must be at least %s block", SIZE_OF_INT);
-        Preconditions.checkNotNull(comparator, "comparator is null");
+        requireNonNull(comparator, "comparator is null");
 
         block = block.slice();
         this.block = block;

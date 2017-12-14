@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
@@ -47,9 +48,9 @@ public class Level
     public Level(int levelNumber, List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
         Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
-        Preconditions.checkNotNull(files, "files is null");
-        Preconditions.checkNotNull(tableCache, "tableCache is null");
-        Preconditions.checkNotNull(internalKeyComparator, "internalKeyComparator is null");
+        requireNonNull(files, "files is null");
+        requireNonNull(tableCache, "tableCache is null");
+        requireNonNull(internalKeyComparator, "internalKeyComparator is null");
 
         this.files = new ArrayList<>(files);
         this.tableCache = tableCache;

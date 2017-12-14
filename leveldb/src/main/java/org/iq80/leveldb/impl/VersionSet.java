@@ -50,6 +50,7 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
@@ -136,7 +137,7 @@ public class VersionSet
 
     private void appendVersion(Version version)
     {
-        Preconditions.checkNotNull(version, "version is null");
+        requireNonNull(version, "version is null");
         Preconditions.checkArgument(version != current, "version is the current version");
         Version previous = current;
         current = version;
@@ -148,7 +149,7 @@ public class VersionSet
 
     public void removeVersion(Version version)
     {
-        Preconditions.checkNotNull(version, "version is null");
+        requireNonNull(version, "version is null");
         Preconditions.checkArgument(version != current, "version is the current version");
         boolean removed = activeVersions.remove(version) != null;
         assert removed : "Expected the version to still be in the active set";

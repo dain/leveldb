@@ -17,8 +17,9 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
+
+import static java.util.Objects.requireNonNull;
 
 public class LookupResult
 {
@@ -38,7 +39,7 @@ public class LookupResult
 
     private LookupResult(LookupKey key, Slice value, boolean deleted)
     {
-        Preconditions.checkNotNull(key, "key is null");
+        requireNonNull(key, "key is null");
         this.key = key;
         if (value != null) {
             this.value = value.slice();

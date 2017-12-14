@@ -17,12 +17,12 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.Map.Entry;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binary Structure
@@ -78,8 +78,8 @@ public class BlockEntry
 
     public BlockEntry(Slice key, Slice value)
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
         this.key = key;
         this.value = value;
     }

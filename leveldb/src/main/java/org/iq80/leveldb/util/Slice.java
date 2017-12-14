@@ -31,6 +31,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
@@ -57,7 +58,7 @@ public final class Slice
 
     public Slice(byte[] data)
     {
-        Preconditions.checkNotNull(data, "array is null");
+        requireNonNull(data, "array is null");
         this.data = data;
         this.offset = 0;
         this.length = data.length;
@@ -65,7 +66,7 @@ public final class Slice
 
     public Slice(byte[] data, int offset, int length)
     {
-        Preconditions.checkNotNull(data, "array is null");
+        requireNonNull(data, "array is null");
         this.data = data;
         this.offset = offset;
         this.length = length;

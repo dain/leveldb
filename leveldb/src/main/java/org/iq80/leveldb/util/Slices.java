@@ -17,8 +17,6 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.CharBuffer;
@@ -30,6 +28,8 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.util.IdentityHashMap;
 import java.util.Map;
+
+import static java.util.Objects.requireNonNull;
 
 public final class Slices
 {
@@ -99,14 +99,14 @@ public final class Slices
 
     public static Slice copiedBuffer(ByteBuffer source, int sourceOffset, int length)
     {
-        Preconditions.checkNotNull(source, "source is null");
+        requireNonNull(source, "source is null");
         int newPosition = source.position() + sourceOffset;
         return copiedBuffer((ByteBuffer) source.duplicate().order(ByteOrder.LITTLE_ENDIAN).clear().limit(newPosition + length).position(newPosition));
     }
 
     public static Slice copiedBuffer(ByteBuffer source)
     {
-        Preconditions.checkNotNull(source, "source is null");
+        requireNonNull(source, "source is null");
         Slice copy = allocate(source.limit() - source.position());
         copy.setBytes(0, source.duplicate().order(ByteOrder.LITTLE_ENDIAN));
         return copy;
@@ -114,8 +114,8 @@ public final class Slices
 
     public static Slice copiedBuffer(String string, Charset charset)
     {
-        Preconditions.checkNotNull(string, "string is null");
-        Preconditions.checkNotNull(charset, "charset is null");
+        requireNonNull(string, "string is null");
+        requireNonNull(charset, "charset is null");
 
         return wrappedBuffer(string.getBytes(charset));
     }

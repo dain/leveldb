@@ -17,13 +17,14 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Objects.requireNonNull;
 
 public class SeekingIteratorAdapter
         implements DBIterator
@@ -123,8 +124,8 @@ public class SeekingIteratorAdapter
 
         public DbEntry(Slice key, Slice value)
         {
-            Preconditions.checkNotNull(key, "key is null");
-            Preconditions.checkNotNull(value, "value is null");
+            requireNonNull(key, "key is null");
+            requireNonNull(value, "value is null");
             this.key = key;
             this.value = value;
         }

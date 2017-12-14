@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.VersionSet.TARGET_FILE_SIZE;
 
 public class TableBuilder
@@ -72,8 +73,8 @@ public class TableBuilder
 
     public TableBuilder(Options options, FileChannel fileChannel, UserComparator userComparator)
     {
-        Preconditions.checkNotNull(options, "options is null");
-        Preconditions.checkNotNull(fileChannel, "fileChannel is null");
+        requireNonNull(options, "options is null");
+        requireNonNull(fileChannel, "fileChannel is null");
         try {
             Preconditions.checkState(position == fileChannel.position(), "Expected position %s to equal fileChannel.position %s", position, fileChannel.position());
         }
@@ -111,15 +112,15 @@ public class TableBuilder
     public void add(BlockEntry blockEntry)
             throws IOException
     {
-        Preconditions.checkNotNull(blockEntry, "blockEntry is null");
+        requireNonNull(blockEntry, "blockEntry is null");
         add(blockEntry.getKey(), blockEntry.getValue());
     }
 
     public void add(Slice key, Slice value)
             throws IOException
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
 
         Preconditions.checkState(!closed, "table is finished");
 

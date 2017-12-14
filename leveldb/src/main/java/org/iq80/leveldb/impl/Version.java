@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.collect.Ordering.natural;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
@@ -202,8 +203,8 @@ public class Version
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
     {
         Preconditions.checkPositionIndex(level, levels.size(), "Invalid level");
-        Preconditions.checkNotNull(smallestUserKey, "smallestUserKey is null");
-        Preconditions.checkNotNull(largestUserKey, "largestUserKey is null");
+        requireNonNull(smallestUserKey, "smallestUserKey is null");
+        requireNonNull(largestUserKey, "largestUserKey is null");
 
         if (level == 0) {
             return level0.someFileOverlapsRange(smallestUserKey, largestUserKey);

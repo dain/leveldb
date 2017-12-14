@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.util.Slice;
@@ -26,6 +25,8 @@ import org.iq80.leveldb.util.Slices;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
+
+import static java.util.Objects.requireNonNull;
 
 public class WriteBatchImpl
         implements WriteBatch
@@ -46,8 +47,8 @@ public class WriteBatchImpl
     @Override
     public WriteBatchImpl put(byte[] key, byte[] value)
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
         batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), Slices.wrappedBuffer(value)));
         approximateSize += 12 + key.length + value.length;
         return this;
@@ -55,8 +56,8 @@ public class WriteBatchImpl
 
     public WriteBatchImpl put(Slice key, Slice value)
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
         batch.add(Maps.immutableEntry(key, value));
         approximateSize += 12 + key.length() + value.length();
         return this;
@@ -65,7 +66,7 @@ public class WriteBatchImpl
     @Override
     public WriteBatchImpl delete(byte[] key)
     {
-        Preconditions.checkNotNull(key, "key is null");
+        requireNonNull(key, "key is null");
         batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), (Slice) null));
         approximateSize += 6 + key.length;
         return this;
@@ -73,7 +74,7 @@ public class WriteBatchImpl
 
     public WriteBatchImpl delete(Slice key)
     {
-        Preconditions.checkNotNull(key, "key is null");
+        requireNonNull(key, "key is null");
         batch.add(Maps.immutableEntry(key, (Slice) null));
         approximateSize += 6 + key.length();
         return this;

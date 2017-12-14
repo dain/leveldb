@@ -33,6 +33,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
@@ -56,7 +57,7 @@ public class MMapLogWriter
     public MMapLogWriter(File file, long fileNumber)
             throws IOException
     {
-        Preconditions.checkNotNull(file, "file is null");
+        requireNonNull(file, "file is null");
         Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
         this.file = file;
         this.fileNumber = fileNumber;

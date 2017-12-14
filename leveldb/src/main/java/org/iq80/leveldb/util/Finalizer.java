@@ -29,6 +29,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
+
 public class Finalizer<T>
 {
     public static final FinalizerMonitor IGNORE_FINALIZER_MONITOR = new FinalizerMonitor()
@@ -66,8 +68,8 @@ public class Finalizer<T>
 
     public synchronized void addCleanup(T item, Callable<?> cleanup)
     {
-        Preconditions.checkNotNull(item, "item is null");
-        Preconditions.checkNotNull(cleanup, "cleanup is null");
+        requireNonNull(item, "item is null");
+        requireNonNull(cleanup, "cleanup is null");
         Preconditions.checkState(!destroyed.get(), "%s is destroyed", getClass().getName());
 
         if (executor == null) {

@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
@@ -28,6 +27,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
+
+import static java.util.Objects.requireNonNull;
 
 public final class DbIterator
         extends AbstractSeekingIterator<InternalKey, Slice>
@@ -165,7 +166,7 @@ public final class DbIterator
 
     private boolean heapAdd(ComparableIterator newElement)
     {
-        Preconditions.checkNotNull(newElement, "newElement is null");
+        requireNonNull(newElement, "newElement is null");
 
         heap[heapSize] = newElement;
         heapSiftUp(heapSize++);
