@@ -53,6 +53,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
@@ -66,7 +67,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
@@ -93,7 +93,7 @@ public class DbImpl
     private final ReentrantLock mutex = new ReentrantLock();
     private final Condition backgroundCondition = mutex.newCondition();
 
-    private final List<Long> pendingOutputs = newArrayList(); // todo
+    private final List<Long> pendingOutputs = new ArrayList<>(); // todo
 
     private LogWriter log;
 
@@ -191,7 +191,7 @@ public class DbImpl
             long previousLogNumber = versions.getPrevLogNumber();
             List<File> filenames = Filename.listFiles(databaseDir);
 
-            List<Long> logs = newArrayList();
+            List<Long> logs = new ArrayList<>();
             for (File filename : filenames) {
                 FileInfo fileInfo = Filename.parseFileName(filename);
 
@@ -281,7 +281,7 @@ public class DbImpl
         Preconditions.checkState(mutex.isHeldByCurrentThread());
 
         // Make a set of all of the live files
-        List<Long> live = newArrayList(this.pendingOutputs);
+        List<Long> live = new ArrayList<>(this.pendingOutputs);
         for (FileMetaData fileMetaData : versions.getLiveFiles()) {
             live.add(fileMetaData.getNumber());
         }
@@ -1255,7 +1255,7 @@ public class DbImpl
     {
         private final Compaction compaction;
 
-        private final List<FileMetaData> outputs = newArrayList();
+        private final List<FileMetaData> outputs = new ArrayList<>();
 
         private long smallestSnapshot;
 

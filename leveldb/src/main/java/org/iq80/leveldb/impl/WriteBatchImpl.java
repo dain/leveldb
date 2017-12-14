@@ -23,15 +23,14 @@ import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
-
-import static com.google.common.collect.Lists.newArrayList;
 
 public class WriteBatchImpl
         implements WriteBatch
 {
-    private final List<Entry<Slice, Slice>> batch = newArrayList();
+    private final List<Entry<Slice, Slice>> batch = new ArrayList<>();
     private int approximateSize;
 
     public int getApproximateSize()

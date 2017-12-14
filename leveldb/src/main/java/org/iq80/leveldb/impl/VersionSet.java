@@ -49,8 +49,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
@@ -201,7 +199,7 @@ public class VersionSet
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
-        List<InternalIterator> list = newArrayList();
+        List<InternalIterator> list = new ArrayList<>();
         for (int which = 0; which < 2; which++) {
             if (!c.getInputs()[which].isEmpty()) {
                 if (c.getLevel() + which == 0) {
@@ -373,7 +371,7 @@ public class VersionSet
                 lastSequence = coalesce(edit.getLastSequenceNumber(), lastSequence);
             }
 
-            List<String> problems = newArrayList();
+            List<String> problems = new ArrayList<>();
             if (nextFileNumber == null) {
                 problems.add("Descriptor does not contain a meta-nextfile entry");
             }
@@ -513,7 +511,7 @@ public class VersionSet
             Preconditions.checkState(level + 1 < NUM_LEVELS);
 
             // Pick the first file that comes after compact_pointer_[level]
-            levelInputs = newArrayList();
+            levelInputs = new ArrayList<>();
             for (FileMetaData fileMetaData : current.getFiles(level)) {
                 if (!compactPointers.containsKey(level) ||
                         internalKeyComparator.compare(fileMetaData.getLargest(), compactPointers.get(level)) > 0) {
@@ -692,7 +690,7 @@ public class VersionSet
             this.versionSet = versionSet;
             this.baseVersion = baseVersion;
 
-            levels = newArrayListWithCapacity(baseVersion.numberOfLevels());
+            levels = new ArrayList<>(baseVersion.numberOfLevels());
             for (int i = 0; i < baseVersion.numberOfLevels(); i++) {
                 levels.add(new LevelState(versionSet.internalKeyComparator));
             }
@@ -768,7 +766,7 @@ public class VersionSet
                 }
 
                 // files must be added in sorted order so assertion check in maybeAddFile works
-                ArrayList<FileMetaData> sortedFiles = newArrayListWithCapacity(baseFiles.size() + addedFiles.size());
+                ArrayList<FileMetaData> sortedFiles = new ArrayList<>(baseFiles.size() + addedFiles.size());
                 sortedFiles.addAll(baseFiles);
                 sortedFiles.addAll(addedFiles);
                 Collections.sort(sortedFiles, cmp);

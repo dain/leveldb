@@ -18,19 +18,18 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Level0Iterator;
 import org.iq80.leveldb.util.Slice;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
 
 import static com.google.common.base.Charsets.UTF_8;
-import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 
@@ -57,7 +56,7 @@ public class Level0
         Preconditions.checkNotNull(tableCache, "tableCache is null");
         Preconditions.checkNotNull(internalKeyComparator, "internalKeyComparator is null");
 
-        this.files = newArrayList(files);
+        this.files = new ArrayList<>(files);
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
     }
@@ -84,7 +83,7 @@ public class Level0
             return null;
         }
 
-        List<FileMetaData> fileMetaDataList = Lists.newArrayListWithCapacity(files.size());
+        List<FileMetaData> fileMetaDataList = new ArrayList<>(files.size());
         for (FileMetaData fileMetaData : files) {
             if (internalKeyComparator.getUserComparator().compare(key.getUserKey(), fileMetaData.getSmallest().getUserKey()) >= 0 &&
                     internalKeyComparator.getUserComparator().compare(key.getUserKey(), fileMetaData.getLargest().getUserKey()) <= 0) {
