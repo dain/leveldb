@@ -98,7 +98,7 @@ public class DbImplTest
         for (int index = 0; index < 5000000; index++) {
             String key = "Key LOOOOOOOOOOOOOOOOOONG KEY " + index;
             String value = "This is element " + index + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABZASDFASDKLFJASDFKJSDFLKSDJFLKJSDHFLKJHSDJFSDFHJASDFLKJSDF";
-            db.put(key.getBytes("UTF-8"), value.getBytes("UTF-8"));
+            db.put(key.getBytes(UTF_8), value.getBytes(UTF_8));
         }
     }
 

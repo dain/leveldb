@@ -20,6 +20,8 @@ package org.iq80.leveldb.util;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * <p>
  * A Snappy abstraction which attempts uses the iq80 implementation and falls back
@@ -183,7 +185,7 @@ public final class Snappy
         public byte[] compress(String text)
                 throws IOException
         {
-            byte[] uncomressed = text.getBytes("UTF-8");
+            byte[] uncomressed = text.getBytes(UTF_8);
             byte[] compressedOut = new byte[maxCompressedLength(uncomressed.length)];
             int compressedSize = compress(uncomressed, 0, uncomressed.length, compressedOut, 0);
             byte[] trimmedBuffer = new byte[compressedSize];
