@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -76,7 +77,7 @@ public class VersionSet
     private final InternalKeyComparator internalKeyComparator;
 
     private LogWriter descriptorLog;
-    private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
+    private final Map<Integer, InternalKey> compactPointers = new TreeMap<>();
 
     public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
             throws IOException
