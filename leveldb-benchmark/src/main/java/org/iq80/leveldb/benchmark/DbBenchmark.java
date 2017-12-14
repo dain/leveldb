@@ -48,7 +48,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.benchmark.DbBenchmark.DBState.EXISTING;
 import static org.iq80.leveldb.benchmark.DbBenchmark.DBState.FRESH;
 import static org.iq80.leveldb.benchmark.DbBenchmark.Order.RANDOM;

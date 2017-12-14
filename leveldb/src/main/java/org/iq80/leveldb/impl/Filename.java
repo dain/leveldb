@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
@@ -25,6 +24,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public final class Filename
 {
@@ -182,7 +183,7 @@ public final class Filename
             throws IOException
     {
         try (FileOutputStream stream = new FileOutputStream(file)) {
-            stream.write(str.getBytes(Charsets.UTF_8));
+            stream.write(str.getBytes(UTF_8));
             stream.flush();
             stream.getFD().sync();
         }

@@ -22,7 +22,7 @@ import org.iq80.leveldb.util.Slice;
 
 import java.util.Map.Entry;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Binary Structure

@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ComparisonChain;
@@ -50,6 +49,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
@@ -334,7 +334,7 @@ public class VersionSet
         File currentFile = new File(databaseDir, Filename.currentFileName());
         Preconditions.checkState(currentFile.exists(), "CURRENT file does not exist");
 
-        String currentName = Files.toString(currentFile, Charsets.UTF_8);
+        String currentName = Files.toString(currentFile, UTF_8);
         if (currentName.isEmpty() || currentName.charAt(currentName.length() - 1) != '\n') {
             throw new IllegalStateException("CURRENT file does not end with newline");
         }

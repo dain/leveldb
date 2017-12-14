@@ -22,7 +22,7 @@ import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class InternalKey
