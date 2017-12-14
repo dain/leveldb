@@ -20,7 +20,6 @@ package org.iq80.leveldb.util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.Iterables;
-import com.google.common.primitives.Ints;
 import org.iq80.leveldb.impl.FileMetaData;
 import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.SeekingIterator;
@@ -196,7 +195,7 @@ public final class Level0Iterator
         {
             int result = comparator.compare(this.nextElement.getKey(), that.nextElement.getKey());
             if (result == 0) {
-                result = Ints.compare(this.ordinal, that.ordinal);
+                result = Integer.compare(this.ordinal, that.ordinal);
             }
             return result;
         }
