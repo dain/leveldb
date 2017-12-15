@@ -58,7 +58,6 @@
         <air.check.skip-spotbugs>true</air.check.skip-spotbugs>
         <air.check.skip-pmd>true</air.check.skip-pmd>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
-        <air.check.fail-modernizer>false</air.check.fail-modernizer>
 
         <air.check.skip-checkstyle>${air.check.skip-basic}</air.check.skip-checkstyle>
         <air.check.fail-checkstyle>${air.check.fail-basic}</air.check.fail-checkstyle>
