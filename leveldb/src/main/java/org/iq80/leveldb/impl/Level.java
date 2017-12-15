@@ -33,7 +33,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
-import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 
@@ -98,7 +97,7 @@ public class Level
         }
         else {
             // Binary search to find earliest index whose largest key >= ikey.
-            int index = ceilingEntryIndex(Lists.transform(files, GET_LARGEST_USER_KEY), key.getInternalKey(), internalKeyComparator);
+            int index = ceilingEntryIndex(Lists.transform(files, FileMetaData::getLargest), key.getInternalKey(), internalKeyComparator);
 
             // did we find any files that could contain the key?
             if (index >= files.size()) {

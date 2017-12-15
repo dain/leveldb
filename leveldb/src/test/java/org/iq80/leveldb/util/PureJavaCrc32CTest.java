@@ -17,12 +17,12 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Function;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
+import java.util.function.Function;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.iq80.leveldb.util.PureJavaCrc32C.mask;
@@ -44,22 +44,8 @@ public class PureJavaCrc32CTest
         return new Object[][] {
                 new Object[] {0x8a9136aa, arrayOf(32, (byte) 0)},
                 new Object[] {0x62a8ab43, arrayOf(32, (byte) 0xff)},
-                new Object[] {0x46dd794e, arrayOf(32, new Function<Integer, Byte>()
-                {
-                    @Override
-                    public Byte apply(Integer position)
-                    {
-                        return (byte) position.intValue();
-                    }
-                })},
-                new Object[] {0x113fdb5c, arrayOf(32, new Function<Integer, Byte>()
-                {
-                    @Override
-                    public Byte apply(Integer position)
-                    {
-                        return (byte) (31 - position);
-                    }
-                })},
+                new Object[] {0x46dd794e, arrayOf(32, position -> (byte) position.intValue())},
+                new Object[] {0x113fdb5c, arrayOf(32, position -> (byte) (31 - position))},
                 new Object[] {0xd9963a56, arrayOf(new int[] {
                         0x01, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
