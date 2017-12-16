@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
+import org.iq80.leveldb.util.SequentialFile;
 import org.iq80.leveldb.util.DynamicSliceOutput;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
@@ -24,7 +25,6 @@ import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 
 import static org.iq80.leveldb.impl.LogChunkType.BAD_CHUNK;
 import static org.iq80.leveldb.impl.LogChunkType.EOF;
@@ -37,7 +37,7 @@ import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
 
 public class LogReader
 {
-    private final FileChannel fileChannel;
+    private final SequentialFile sequentialFile;
 
     private final LogMonitor monitor;
 
@@ -83,9 +83,9 @@ public class LogReader
      */
     private Slice currentChunk = Slices.EMPTY_SLICE;
 
-    public LogReader(FileChannel fileChannel, LogMonitor monitor, boolean verifyChecksums, long initialOffset)
+    public LogReader(SequentialFile sequentialFile, LogMonitor monitor, boolean verifyChecksums, long initialOffset)
     {
-        this.fileChannel = fileChannel;
+        this.sequentialFile = sequentialFile;
         this.monitor = monitor;
         this.verifyChecksums = verifyChecksums;
         this.initialOffset = initialOffset;
@@ -118,7 +118,7 @@ public class LogReader
         // Skip to start of first block that can contain the initial record
         if (blockStartLocation > 0) {
             try {
-                fileChannel.position(blockStartLocation);
+                sequentialFile.skip(blockStartLocation);
             }
             catch (IOException e) {
                 reportDrop(blockStartLocation, e);
@@ -310,7 +310,7 @@ public class LogReader
         // read the next full block
         while (blockScratch.writableBytes() > 0) {
             try {
-                int bytesRead = blockScratch.writeBytes(fileChannel, blockScratch.writableBytes());
+                int bytesRead = sequentialFile.read(blockScratch.writableBytes(), blockScratch);
                 if (bytesRead < 0) {
                     // no more bytes to read
                     eof = true;

@@ -37,25 +37,25 @@ import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.CustomUserComparator;
-import org.iq80.leveldb.table.FileChannelWritableFile;
 import org.iq80.leveldb.table.FilterPolicy;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.table.UserComparator;
-import org.iq80.leveldb.table.WritableFile;
 import org.iq80.leveldb.util.DbIterator;
 import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.SequentialFile;
+import org.iq80.leveldb.util.SequentialFileImpl;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
+import org.iq80.leveldb.util.UnbufferedWritableFile;
+import org.iq80.leveldb.util.WritableFile;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -553,10 +553,9 @@ public class DbImpl
     {
         Preconditions.checkState(mutex.isHeldByCurrentThread());
         File file = new File(databaseDir, Filename.logFileName(fileNumber));
-        try (FileInputStream fis = new FileInputStream(file);
-             FileChannel channel = fis.getChannel()) {
+        try (SequentialFile in = SequentialFileImpl.open(file);) {
             LogMonitor logMonitor = LogMonitors.logMonitor();
-            LogReader logReader = new LogReader(channel, logMonitor, true, 0);
+            LogReader logReader = new LogReader(in, logMonitor, true, 0);
 
             // Log(options_.info_log, "Recovering log #%llu", (unsigned long long) log_number);
 
@@ -999,7 +998,7 @@ public class DbImpl
                     log.close();
                 }
                 catch (IOException e) {
-                    throw new RuntimeException("Unable to close log file " + log.getFile(), e);
+                    throw new RuntimeException("Unable to close log file " + log, e);
                 }
 
                 // open a new log
@@ -1111,9 +1110,8 @@ public class DbImpl
         try {
             InternalKey smallest = null;
             InternalKey largest = null;
-            WritableFile channel = FileChannelWritableFile.fileChannel(file);
-            try {
-                TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
+            try (WritableFile writableFile = UnbufferedWritableFile.open(file)) {
+                TableBuilder tableBuilder = new TableBuilder(options, writableFile, new InternalUserComparator(internalKeyComparator));
 
                 for (Entry<InternalKey, Slice> entry : data) {
                     // update keys
@@ -1127,14 +1125,7 @@ public class DbImpl
                 }
 
                 tableBuilder.finish();
-            }
-            finally {
-                try {
-                    channel.force();
-                }
-                finally {
-                    channel.close();
-                }
+                writableFile.force();
             }
 
             if (smallest == null) {
@@ -1278,7 +1269,7 @@ public class DbImpl
             compactionState.currentLargest = null;
 
             File file = new File(databaseDir, Filename.tableFileName(fileNumber));
-            compactionState.outfile = FileChannelWritableFile.fileChannel(file);
+            compactionState.outfile = UnbufferedWritableFile.open(file);
             compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
         }
         finally {

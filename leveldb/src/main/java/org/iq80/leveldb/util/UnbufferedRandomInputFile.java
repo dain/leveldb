@@ -15,40 +15,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.util;
 
 import com.google.common.base.Preconditions;
-import org.iq80.leveldb.util.Closeables;
 
-import java.io.Closeable;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.Callable;
 
 /**
  * @author Honore Vasconcelos
  */
-public class FileTableDataSource implements TableDataSource
+public class UnbufferedRandomInputFile implements RandomInputFile
 {
-    private final String name;
+    private final String file;
     private final FileChannel fileChannel;
     private final long size;
 
-    public FileTableDataSource(String name, FileChannel fileChannel) throws IOException
+    private UnbufferedRandomInputFile(String file, FileChannel fileChannel, long size)
     {
-        this.name = name;
+        this.file = file;
         this.fileChannel = fileChannel;
-        this.size = fileChannel.size();
-        Preconditions.checkNotNull(name, "name is null");
+        this.size = size;
     }
 
-    @Override
-    public String name()
+    public static RandomInputFile open(File file) throws IOException
     {
-        return this.name;
+        Preconditions.checkNotNull(file, "file is null");
+        FileChannel channel = new FileInputStream(file).getChannel();
+        return new UnbufferedRandomInputFile(file.getAbsolutePath(), channel, channel.size());
     }
 
     @Override
@@ -70,34 +68,16 @@ public class FileTableDataSource implements TableDataSource
     }
 
     @Override
-    public Callable<?> closer()
+    public void close() throws IOException
     {
-        return new Closer(fileChannel);
-    }
-
-    private static class Closer
-            implements Callable<Void>
-    {
-        private final Closeable closeable;
-
-        Closer(Closeable closeable)
-        {
-            this.closeable = closeable;
-        }
-
-        @Override
-        public Void call()
-        {
-            Closeables.closeQuietly(closeable);
-            return null;
-        }
+        fileChannel.close();
     }
 
     @Override
     public String toString()
     {
         return "FileTableDataSource{" +
-                "name='" + name + '\'' +
+                "file='" + file + '\'' +
                 ", size=" + size +
                 '}';
     }

@@ -15,22 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.util;
 
-import org.iq80.leveldb.util.LRUCache;
-import org.iq80.leveldb.util.Slice;
-
+import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
+import java.nio.ByteBuffer;
 
-public class FileTableDataSourceTest
-        extends TableTest
+/**
+ * Read only data source for table data/blocks.
+ *
+ * @author Honore Vasconcelos
+ */
+public interface RandomInputFile extends Closeable
 {
-    @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
-            throws IOException
-    {
-        return new Table(new FileTableDataSource(name, fileChannel), comparator, verifyChecksums, new LRUCache<>(8 << 5, new BlockHandleSliceWeigher()), filterPolicy);
-    }
+    /**
+     * Source size
+     */
+    long size();
+
+    /**
+     * Read {@code length} bytes from source from {@code source} starting at {@code offset} position.
+     * @param offset position for read start
+     * @param length length of the bytes to read
+     * @return read only view of the data.
+     * @throws IOException on any exception will accessing source media
+     */
+    ByteBuffer read(long offset, int length) throws IOException;
 }

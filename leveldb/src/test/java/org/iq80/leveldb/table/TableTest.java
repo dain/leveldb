@@ -34,10 +34,13 @@ import org.iq80.leveldb.util.AbstractSeekingIterator;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.LRUCache;
+import org.iq80.leveldb.util.RandomInputFile;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
 import org.iq80.leveldb.util.TestUtils;
+import org.iq80.leveldb.util.UnbufferedWritableFile;
+import org.iq80.leveldb.util.WritableFile;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -46,9 +49,7 @@ import org.testng.annotations.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,7 +59,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 import static java.util.Arrays.asList;
@@ -71,17 +71,15 @@ import static org.testng.Assert.assertTrue;
 public abstract class TableTest
 {
     private File file;
-    private RandomAccessFile randomAccessFile;
-    private FileChannel fileChannel;
 
-    protected abstract Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
+    protected abstract Table createTable(File file, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
             throws IOException;
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testEmptyFile()
             throws Exception
     {
-        createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true, null);
+        createTable(file, new BytewiseComparator(), true, null);
     }
 
     @Test
@@ -136,7 +134,7 @@ public abstract class TableTest
     }
 
     @Test
-    public void testZeroRestartPointsInBlock() throws Exception
+    public void testZeroRestartPointsInBlock()
     {
         Block entries = new Block(Slices.allocate(SIZE_OF_INT), new BytewiseComparator());
 
@@ -462,8 +460,7 @@ public abstract class TableTest
     public void testRandomizedLongDB() throws Exception
     {
         Random rnd = new Random(301);
-        Harness<DbConstructor> harness = new Harness<>(rnd, null, DbConstructor.class, 16);
-        try {
+        try (Harness<DbConstructor> harness = new Harness<>(rnd, null, DbConstructor.class, 16)) {
             int numEntries = 100000;
             for (int e = 0; e < numEntries; e++) {
                 harness.add(new Slice(TestUtils.randomKey(rnd, harness.getRandomSkewed(4))),
@@ -476,9 +473,6 @@ public abstract class TableTest
                 files += Integer.valueOf(harness.constructor.db.getProperty("leveldb.num-files-at-level" + level));
             }
             assertTrue(files > 0);
-        }
-        finally {
-            harness.close();
         }
     }
 
@@ -890,7 +884,7 @@ public abstract class TableTest
         }
     }
 
-    private static class StringSource implements TableDataSource
+    private static class StringSource implements RandomInputFile
     {
         byte[] data;
 
@@ -900,34 +894,21 @@ public abstract class TableTest
         }
 
         @Override
-        public String name()
-        {
-            return null;
-        }
-
-        @Override
         public long size()
         {
             return data.length;
         }
 
         @Override
-        public ByteBuffer read(long offset, int length) throws IOException
+        public ByteBuffer read(long offset, int length)
         {
             return Slices.wrappedBuffer(data).copySlice((int) offset, length).toByteBuffer();
         }
 
         @Override
-        public Callable<?> closer()
+        public void close()
         {
-            return new Callable<Object>()
-            {
-                @Override
-                public Object call() throws Exception
-                {
-                    return null;
-                }
-            };
+
         }
     }
 
@@ -969,14 +950,14 @@ public abstract class TableTest
     {
         reopenFile();
         Options options = new Options().blockSize(blockSize).blockRestartInterval(blockRestartInterval);
-        TableBuilder builder = new TableBuilder(options, FileChannelWritableFile.fileChannel(fileChannel), new BytewiseComparator());
+        TableBuilder builder = new TableBuilder(options, UnbufferedWritableFile.open(file), new BytewiseComparator());
 
         for (BlockEntry entry : entries) {
             builder.add(entry);
         }
         builder.finish();
 
-        Table table = createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true, null);
+        Table table = createTable(file, new BytewiseComparator(), true, null);
 
         SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);
@@ -1022,16 +1003,13 @@ public abstract class TableTest
     {
         file = File.createTempFile("table", ".db");
         file.delete();
-        randomAccessFile = new RandomAccessFile(file, "rw");
-        fileChannel = randomAccessFile.getChannel();
+        com.google.common.io.Files.touch(file);
     }
 
     @AfterMethod
     public void tearDown()
             throws Exception
     {
-        Closeables.closeQuietly(fileChannel);
-        Closeables.closeQuietly(randomAccessFile);
         file.delete();
     }
 }

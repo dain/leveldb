@@ -18,6 +18,9 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.collect.ImmutableList;
+import org.iq80.leveldb.util.SequentialFile;
+import org.iq80.leveldb.util.SequentialFileImpl;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
@@ -26,9 +29,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.List;
 
 import static com.google.common.base.Charsets.UTF_8;
@@ -55,6 +56,7 @@ public class LogTest
     };
 
     private LogWriter writer;
+    private File tempFile;
 
     @Test
     public void testEmptyBlock()
@@ -139,9 +141,8 @@ public class LogTest
 
         // test readRecord
 
-        try (FileInputStream fis = new FileInputStream(writer.getFile());
-                FileChannel fileChannel = fis.getChannel()) {
-            LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
+        try (SequentialFile in = SequentialFileImpl.open(tempFile)) {
+            LogReader reader = new LogReader(in, NO_CORRUPTION_MONITOR, true, 0);
             for (Slice expected : records) {
                 Slice actual = reader.readRecord();
                 assertEquals(actual, expected);
@@ -154,15 +155,18 @@ public class LogTest
     public void setUp()
             throws Exception
     {
-        writer = Logs.createLogWriter(File.createTempFile("table", ".log"), 42, Iq80DBFactory.USE_MMAP);
+        tempFile = File.createTempFile("table", ".log");
+        writer = Logs.createLogWriter(tempFile, 42, Iq80DBFactory.USE_MMAP);
     }
 
     @AfterMethod
     public void tearDown()
-            throws Exception
     {
         if (writer != null) {
-            writer.delete();
+            Closeables.closeQuietly(writer);
+        }
+        if (tempFile != null) {
+            tempFile.delete();
         }
     }
 

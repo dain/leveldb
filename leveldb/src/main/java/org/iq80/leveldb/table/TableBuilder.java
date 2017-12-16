@@ -24,6 +24,7 @@ import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
+import org.iq80.leveldb.util.WritableFile;
 
 import java.io.IOException;
 import java.nio.charset.Charset;

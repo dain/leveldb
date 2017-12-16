@@ -26,6 +26,8 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
+import org.iq80.leveldb.util.SequentialFile;
+import org.iq80.leveldb.util.SequentialFileImpl;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.InternalIterator;
 import org.iq80.leveldb.util.Level0Iterator;
@@ -33,9 +35,7 @@ import org.iq80.leveldb.util.MergingIterator;
 import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -346,8 +346,7 @@ public class VersionSet
         currentName = currentName.substring(0, currentName.length() - 1);
 
         // open file channel
-        try (FileInputStream fis = new FileInputStream(new File(databaseDir, currentName));
-             FileChannel fileChannel = fis.getChannel()) {
+        try (SequentialFile in = SequentialFileImpl.open(new File(databaseDir, currentName))) {
             // read log edit log
             Long nextFileNumber = null;
             Long lastSequence = null;
@@ -355,7 +354,7 @@ public class VersionSet
             Long prevLogNumber = null;
             Builder builder = new Builder(this, current);
 
-            LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
+            LogReader reader = new LogReader(in, throwExceptionMonitor(), true, 0);
             for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
                 // read version edit
                 VersionEdit edit = new VersionEdit(record);

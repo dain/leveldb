@@ -15,44 +15,47 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.iq80.leveldb.util;
 
-package org.iq80.leveldb.table;
+import com.google.common.base.Preconditions;
+import com.google.common.io.Files;
 
-import org.iq80.leveldb.util.ByteBufferSupport;
-import org.iq80.leveldb.util.Closeables;
-
-import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.concurrent.Callable;
 
 /**
  * Memory mapped filed table.
  *
  * @author Honore Vasconcelos
  */
-public class MMTableDataSource implements TableDataSource
+public class MMRandomInputFile implements RandomInputFile
 {
-    private final String name;
-    private final FileChannel fileChannel;
+    private final String file;
     private final long size;
     private final MappedByteBuffer data;
 
-    public MMTableDataSource(String name, FileChannel fileChannel) throws IOException
+    private MMRandomInputFile(String file, MappedByteBuffer data, long size)
     {
-        this.name = name;
-        this.fileChannel = fileChannel;
-        this.size = fileChannel.size();
-        this.data = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, size);
+        this.file = file;
+        this.size = size;
+        this.data = data;
     }
 
-    @Override
-    public String name()
+    /**
+     * Open file using memory mapped file access.
+     * @param file file to open
+     * @return readable file
+     * @throws IOException If some other I/O error occurs
+     */
+    public static RandomInputFile open(File file) throws IOException
     {
-        return this.name;
+        Preconditions.checkNotNull(file, "file is null");
+        MappedByteBuffer map = Files.map(file);
+
+        return new MMRandomInputFile(file.getAbsolutePath(), map, map.capacity());
     }
 
     @Override
@@ -69,29 +72,13 @@ public class MMTableDataSource implements TableDataSource
     }
 
     @Override
-    public Callable<?> closer()
+    public void close() throws IOException
     {
-        return new Closer(fileChannel, data);
-    }
-
-    private static class Closer
-            implements Callable<Void>
-    {
-        // private final String name;
-        private final Closeable closeable;
-        private final MappedByteBuffer data;
-
-        Closer(Closeable closeable, MappedByteBuffer data)
-        {
-            this.closeable = closeable;
-            this.data = data;
-        }
-
-        public Void call()
-        {
+        try {
             ByteBufferSupport.unmap(data);
-            Closeables.closeQuietly(closeable);
-            return null;
+        }
+        catch (Exception e) {
+            throw new IOException("Unable to unmap file", e);
         }
     }
 
@@ -99,7 +86,7 @@ public class MMTableDataSource implements TableDataSource
     public String toString()
     {
         return "MMTableDataSource{" +
-                "name='" + name + '\'' +
+                "file='" + file + '\'' +
                 ", size=" + size +
                 '}';
     }

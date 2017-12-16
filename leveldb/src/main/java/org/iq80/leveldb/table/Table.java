@@ -22,6 +22,7 @@ import com.google.common.base.Throwables;
 import com.google.common.cache.CacheLoader;
 import org.iq80.leveldb.impl.SeekingIterable;
 import org.iq80.leveldb.util.LRUCache;
+import org.iq80.leveldb.util.RandomInputFile;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.iq80.leveldb.util.Snappy;
@@ -47,16 +48,16 @@ public final class Table
     private final boolean verifyChecksums;
     private final Block indexBlock;
     private final BlockHandle metaindexBlockHandle;
-    private final TableDataSource source;
+    private final RandomInputFile source;
     private final LRUCache.LRUSubCache<BlockHandle, Slice> blockCache;
     private final FilterBlockReader filter;
 
-    public Table(TableDataSource source, Comparator<Slice> comparator, boolean verifyChecksum, LRUCache<BlockHandle, Slice> blockCache, final FilterPolicy filterPolicy)
+    public Table(RandomInputFile source, Comparator<Slice> comparator, boolean verifyChecksum, LRUCache<BlockHandle, Slice> blockCache, final FilterPolicy filterPolicy)
             throws IOException
     {
         this.source = source;
         this.blockCache = cacheForTable(blockCache);
-        Preconditions.checkNotNull(source, "fileChannel is null");
+        Preconditions.checkNotNull(source, "source is null");
         long size = source.size();
         Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
         Preconditions.checkNotNull(comparator, "comparator is null");
@@ -249,6 +250,23 @@ public final class Table
 
     public Callable<?> closer()
     {
-        return source.closer();
+        return new CloseableToCallable(source);
+    }
+
+    private static class CloseableToCallable implements Callable<Object>
+    {
+        private RandomInputFile source;
+
+        public CloseableToCallable(RandomInputFile source)
+        {
+            this.source = source;
+        }
+
+        @Override
+        public Object call() throws Exception
+        {
+            source.close();
+            return null;
+        }
     }
 }

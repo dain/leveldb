@@ -17,26 +17,171 @@
  */
 package org.iq80.leveldb.impl;
 
+import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.SliceInput;
+import org.iq80.leveldb.util.SliceOutput;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.WritableFile;
 
-import java.io.File;
+import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public interface LogWriter
+import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
+import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
+import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
+
+public class LogWriter
+        implements Closeable
 {
-    boolean isClosed();
+    private static final byte[] SA = new byte[HEADER_SIZE];
+    private final WritableFile writableFile;
+    private final long fileNumber;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
-    void close()
-            throws IOException;
+    /**
+     * Current offset in the current block
+     */
+    private int blockOffset;
 
-    void delete()
-            throws IOException;
+    private LogWriter(long fileNumber, WritableFile file)
+    {
+        Preconditions.checkNotNull(file, "file is null");
+        Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
+        this.fileNumber = fileNumber;
+        this.writableFile = file;
+    }
 
-    File getFile();
+    public static LogWriter createWriter(long fileNumber, WritableFile writableFile)
+    {
+        return new LogWriter(fileNumber, writableFile);
+    }
 
-    long getFileNumber();
+    @Override
+    public void close()
+            throws IOException
+    {
+        closed.set(true);
+        writableFile.close();
+
+    }
+
+    public long getFileNumber()
+    {
+        return fileNumber;
+    }
 
     // Writes a stream of chunks such that no chunk is split across a block boundary
-    void addRecord(Slice record, boolean force)
-            throws IOException;
+    public void addRecord(Slice record, boolean force)
+            throws IOException
+    {
+        Preconditions.checkState(!closed.get(), "Log has been closed");
+
+        SliceInput sliceInput = record.input();
+
+        // used to track first, middle and last blocks
+        boolean begin = true;
+
+        // Fragment the record int chunks as necessary and write it.  Note that if record
+        // is empty, we still want to iterate once to write a single
+        // zero-length chunk.
+        do {
+            int bytesRemainingInBlock = BLOCK_SIZE - blockOffset;
+            Preconditions.checkState(bytesRemainingInBlock >= 0);
+
+            // Switch to a new block if necessary
+            if (bytesRemainingInBlock < HEADER_SIZE) {
+                if (bytesRemainingInBlock > 0) {
+                    // Fill the rest of the block with zeros
+                    // todo lame... need a better way to write zeros
+                    writableFile.append(new Slice(SA, 0, bytesRemainingInBlock));
+                }
+                blockOffset = 0;
+                bytesRemainingInBlock = BLOCK_SIZE - blockOffset;
+            }
+
+            // Invariant: we never leave less than HEADER_SIZE bytes available in a block
+            int bytesAvailableInBlock = bytesRemainingInBlock - HEADER_SIZE;
+            Preconditions.checkState(bytesAvailableInBlock >= 0);
+
+            // if there are more bytes in the record then there are available in the block,
+            // fragment the record; otherwise write to the end of the record
+            boolean end;
+            int fragmentLength;
+            if (sliceInput.available() > bytesAvailableInBlock) {
+                end = false;
+                fragmentLength = bytesAvailableInBlock;
+            }
+            else {
+                end = true;
+                fragmentLength = sliceInput.available();
+            }
+
+            // determine block type
+            LogChunkType type;
+            if (begin && end) {
+                type = LogChunkType.FULL;
+            }
+            else if (begin) {
+                type = LogChunkType.FIRST;
+            }
+            else if (end) {
+                type = LogChunkType.LAST;
+            }
+            else {
+                type = LogChunkType.MIDDLE;
+            }
+
+            // write the chunk
+            writeChunk(type, sliceInput.readBytes(fragmentLength));
+
+            // we are no longer on the first chunk
+            begin = false;
+        } while (sliceInput.isReadable());
+
+        if (force) {
+            writableFile.force();
+        }
+    }
+
+    private void writeChunk(LogChunkType type, Slice slice)
+            throws IOException
+    {
+        Preconditions.checkArgument(slice.length() <= 0xffff, "length %s is larger than two bytes", slice.length());
+        Preconditions.checkArgument(blockOffset + HEADER_SIZE <= BLOCK_SIZE);
+
+        // create header
+        Slice header = newLogRecordHeader(type, slice, slice.length());
+
+        // write the header and the payload
+        writableFile.append(header);
+        writableFile.append(slice);
+
+        blockOffset += HEADER_SIZE + slice.length();
+    }
+
+    private static Slice newLogRecordHeader(LogChunkType type, Slice slice, int length)
+    {
+        int crc = getChunkChecksum(type.getPersistentId(), slice.getRawArray(), slice.getRawOffset(), length);
+
+        // Format the header
+        Slice header = Slices.allocate(HEADER_SIZE);
+        SliceOutput sliceOutput = header.output();
+        sliceOutput.writeInt(crc);
+        sliceOutput.writeByte((byte) (length & 0xff));
+        sliceOutput.writeByte((byte) (length >>> 8));
+        sliceOutput.writeByte((byte) (type.getPersistentId()));
+
+        return header;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "LogWriter{" +
+                "writableFile=" + writableFile +
+                ", fileNumber=" + fileNumber +
+                '}';
+    }
 }

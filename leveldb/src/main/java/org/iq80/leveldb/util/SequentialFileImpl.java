@@ -15,53 +15,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.util;
 
-import org.iq80.leveldb.util.Slice;
+import com.google.common.base.Preconditions;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 
-/**
- * @author Honore Vasconcelos
- */
-public class FileChannelWritableFile implements WritableFile
+public class SequentialFileImpl implements SequentialFile
 {
-    private FileChannel channel;
+    private final FileInputStream inputStream;
 
-    private FileChannelWritableFile(FileChannel channel)
+    private SequentialFileImpl(FileInputStream inputStream)
     {
-        this.channel = channel;
+        this.inputStream = inputStream;
     }
 
-    public static WritableFile fileChannel(FileChannel channel)
+    public static SequentialFile open(File file) throws IOException
     {
-        return new FileChannelWritableFile(channel);
-    }
-
-    public static WritableFile fileChannel(File file) throws FileNotFoundException
-    {
-        return new FileChannelWritableFile(new FileOutputStream(file).getChannel());
+        return new SequentialFileImpl(new FileInputStream(file));
     }
 
     @Override
-    public void append(Slice data) throws IOException
+    public void skip(long n) throws IOException
     {
-        channel.write(data.toByteBuffer());
+        Preconditions.checkState(n >= 0, "n must be positive");
+        if (inputStream.skip(n) != n) {
+            throw new IOException(inputStream + " as not enough bytes to skip");
+        }
     }
 
     @Override
-    public void force() throws IOException
+    public int read(int atMost, SliceOutput destination) throws IOException
     {
-        channel.force(false);
+        return destination.writeBytes(inputStream, atMost);
     }
 
     @Override
     public void close() throws IOException
     {
-        channel.close();
+        inputStream.close();
     }
 }

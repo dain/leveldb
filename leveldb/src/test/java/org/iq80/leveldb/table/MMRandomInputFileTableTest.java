@@ -18,19 +18,20 @@
 package org.iq80.leveldb.table;
 
 import org.iq80.leveldb.util.LRUCache;
+import org.iq80.leveldb.util.MMRandomInputFile;
 import org.iq80.leveldb.util.Slice;
 
+import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
-public class MMTableDataSourceTest
+public class MMRandomInputFileTableTest
         extends TableTest
 {
     @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
+    protected Table createTable(File file, Comparator<Slice> comparator, boolean verifyChecksums, FilterPolicy filterPolicy)
             throws IOException
     {
-        return new Table(new MMTableDataSource(name, fileChannel), comparator, verifyChecksums, new LRUCache<>(8 << 20, new BlockHandleSliceWeigher()), filterPolicy);
+        return new Table(MMRandomInputFile.open(file), comparator, verifyChecksums, new LRUCache<>(8 << 20, new BlockHandleSliceWeigher()), filterPolicy);
     }
 }
