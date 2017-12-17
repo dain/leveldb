@@ -31,6 +31,7 @@ import org.iq80.leveldb.ReadOptions;
 import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.impl.DbImpl;
+import org.iq80.leveldb.table.BloomFilterPolicy;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.PureJavaCrc32C;
@@ -66,6 +67,8 @@ public class DbBenchmark
 
     //    Cache cache_;
     private final List<String> benchmarks;
+    private final int blockCacheSize;
+    private final int bloomFilterBits;
     private DB db;
     private int num;
     private int reads;
@@ -86,6 +89,8 @@ public class DbBenchmark
         writeBufferSize = (Integer) flags.get(Flag.write_buffer_size);
         compressionRatio = (Double) flags.get(Flag.compression_ratio);
         useExisting = (Boolean) flags.get(Flag.use_existing_db);
+        blockCacheSize = (Integer) flags.get(Flag.cache_size);
+        bloomFilterBits = (Integer) flags.get(Flag.bloom_bits);
         num = (Integer) flags.get(Flag.num);
         reads = (Integer) (flags.get(Flag.reads) == null ? flags.get(Flag.num) : flags.get(Flag.reads));
         valueSize = (Integer) flags.get(Flag.value_size);
@@ -405,7 +410,13 @@ public class DbBenchmark
     {
         Options options = new Options();
         options.createIfMissing(!useExisting);
-        // todo block cache
+        if (blockCacheSize >= 0) {
+            options.cacheSize(blockCacheSize);
+        }
+        if (bloomFilterBits >= 0) {
+            options.filterPolicy(new BloomFilterPolicy(bloomFilterBits));
+        }
+        options.cacheSize(blockCacheSize);
         if (writeBufferSize != null) {
             options.writeBufferSize(writeBufferSize);
         }
