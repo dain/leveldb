@@ -10,7 +10,7 @@
 
     <groupId>org.iq80.leveldb</groupId>
     <artifactId>leveldb-project</artifactId>
-    <version>0.10</version>
+    <version>0.11-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <description>Port of LevelDB to Java</description>
@@ -51,7 +51,7 @@
         <connection>scm:git:git://github.com/dain/leveldb.git</connection>
         <developerConnection>scm:git:git@github.com:dain/leveldb.git</developerConnection>
         <url>http://github.com/dain/leveldb/tree/master</url>
-      <tag>0.10</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <properties>
