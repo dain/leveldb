@@ -61,6 +61,8 @@
 
         <air.check.skip-checkstyle>${air.check.skip-basic}</air.check.skip-checkstyle>
         <air.check.fail-checkstyle>${air.check.fail-basic}</air.check.fail-checkstyle>
+
+        <air.javadoc.lint>-missing</air.javadoc.lint>
     </properties>
 
     <dependencyManagement>
