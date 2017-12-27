@@ -17,12 +17,12 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Charsets;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
+
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
 public final class TestUtils
 {
@@ -80,7 +80,7 @@ public final class TestUtils
 
     public static Slice asciiToSlice(String value)
     {
-        return Slices.copiedBuffer(value, Charsets.US_ASCII);
+        return Slices.copiedBuffer(value, US_ASCII);
     }
 
     public static byte[] asciiToBytes(String value)

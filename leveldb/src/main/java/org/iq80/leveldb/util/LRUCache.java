@@ -23,8 +23,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,10 +40,10 @@ public final class LRUCache<K, V>
 {
     private final AtomicLong idGenerator = new AtomicLong();
     private final LoadingCache<CacheKey<K, V>, V> cache;
-    private final CacheLoader<? super CacheKey<K, V>, V> valueLoader = new CacheLoader<CacheKey<K, V>, V>()
+    private final CacheLoader<CacheKey<K, V>, V> valueLoader = new CacheLoader<CacheKey<K, V>, V>()
     {
         @Override
-        public V load(@Nonnull CacheKey<K, V> key) throws Exception
+        public V load(CacheKey<K, V> key) throws Exception
         {
             return key.loader.load(key.key);
         }
@@ -53,22 +51,21 @@ public final class LRUCache<K, V>
 
     public LRUCache(int capacity, final Weigher<K, V> weigher)
     {
-        this.cache = CacheBuilder.<K, V>newBuilder()
+        this.cache = CacheBuilder.<CacheKey<K, V>, V>newBuilder()
                 .maximumWeight(capacity)
                 .weigher(new CacheKeyWeigher<>(weigher))
                 .concurrencyLevel(1 << 4)
                 .build(valueLoader);
     }
 
-    public LRUSubCache<K, V> subCache(@Nonnull final CacheLoader<K, V> loader)
+    public LRUSubCache<K, V> subCache(final CacheLoader<K, V> loader)
     {
         return new LRUSubCache<K, V>()
         {
             private final long id = idGenerator.incrementAndGet();
 
-            @Nullable
             @Override
-            public V load(@Nullable K k) throws ExecutionException
+            public V load(K k) throws ExecutionException
             {
                 return cache.get(new CacheKey<>(id, k, loader));
             }
@@ -77,7 +74,7 @@ public final class LRUCache<K, V>
 
     public interface LRUSubCache<K, V>
     {
-        V load(@Nonnull K key) throws ExecutionException;
+        V load(K key) throws ExecutionException;
     }
 
     public static final class CacheKey<K, M>

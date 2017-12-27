@@ -18,10 +18,10 @@
 
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.table.KeyValueFunction;
 import org.iq80.leveldb.util.Slice;
 
+import static com.google.common.base.Preconditions.checkState;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 
 /**
@@ -40,7 +40,7 @@ public class KeyMatchingLookup implements KeyValueFunction<LookupResult>
     public LookupResult apply(Slice internalKey1, Slice value)
     {
         // parse the key in the block
-        Preconditions.checkState(internalKey1 != null, "Corrupt key for %s", key);
+        checkState(internalKey1 != null, "Corrupt key for %s", key);
 
         final InternalKey internalKey = new InternalKey(internalKey1);
 

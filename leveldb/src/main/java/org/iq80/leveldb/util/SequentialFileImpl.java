@@ -17,11 +17,11 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+
+import static com.google.common.base.Preconditions.checkState;
 
 public class SequentialFileImpl implements SequentialFile
 {
@@ -40,7 +40,7 @@ public class SequentialFileImpl implements SequentialFile
     @Override
     public void skip(long n) throws IOException
     {
-        Preconditions.checkState(n >= 0, "n must be positive");
+        checkState(n >= 0, "n must be positive");
         if (inputStream.skip(n) != n) {
             throw new IOException(inputStream + " as not enough bytes to skip");
         }

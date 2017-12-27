@@ -18,13 +18,13 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.iq80.leveldb.XFilterPolicy;
 import org.iq80.leveldb.util.Slice;
 
-import javax.annotation.Nullable;
 import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Filter policy wrapper that converts from internal keys to user keys
@@ -35,15 +35,7 @@ import java.util.List;
  */
 final class InternalFilterPolicy implements org.iq80.leveldb.table.FilterPolicy
 {
-    private static final Function<Slice, Slice> EXTRACT_USER_KEY = new Function<Slice, Slice>()
-    {
-        @Nullable
-        @Override
-        public Slice apply(@Nullable Slice input)
-        {
-            return extractUserKey(input);
-        }
-    };
+    private static final Function<Slice, Slice> EXTRACT_USER_KEY = InternalFilterPolicy::extractUserKey;
     private org.iq80.leveldb.table.FilterPolicy userPolicy;
 
     private InternalFilterPolicy(org.iq80.leveldb.table.FilterPolicy userPolicy)
@@ -53,7 +45,7 @@ final class InternalFilterPolicy implements org.iq80.leveldb.table.FilterPolicy
 
     static InternalFilterPolicy convert(XFilterPolicy policy)
     {
-        Preconditions.checkArgument(policy == null || policy instanceof org.iq80.leveldb.table.FilterPolicy, "Filter policy must implement Java interface FilterPolicy");
+        checkArgument(policy == null || policy instanceof org.iq80.leveldb.table.FilterPolicy, "Filter policy must implement Java interface FilterPolicy");
         if (policy instanceof InternalFilterPolicy) {
             return (InternalFilterPolicy) policy;
         }
@@ -81,7 +73,7 @@ final class InternalFilterPolicy implements org.iq80.leveldb.table.FilterPolicy
 
     private static Slice extractUserKey(Slice key)
     {
-        Preconditions.checkArgument(key.length() >= 8);
+        checkArgument(key.length() >= 8);
         return key.slice(0, key.length() - 8);
     }
 }

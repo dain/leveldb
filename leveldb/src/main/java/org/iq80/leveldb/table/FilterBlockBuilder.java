@@ -18,13 +18,14 @@
 
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.DynamicSliceOutput;
 import org.iq80.leveldb.util.IntVector;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * The filter block stores a sequence of filters, where filter i contains
@@ -84,7 +85,7 @@ public class FilterBlockBuilder
     public void startBlock(long blockOffset)
     {
         long filterIndex = blockOffset / FILTER_BASE;
-        Preconditions.checkArgument(filterIndex >= filterOffsets.size());
+        checkArgument(filterIndex >= filterOffsets.size());
         while (filterIndex > filterOffsets.size()) {
             generateFilter();
         }
