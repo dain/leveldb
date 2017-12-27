@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 import org.iq80.leveldb.util.InternalIterator;
@@ -27,6 +26,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class MemTable
@@ -52,9 +52,9 @@ public class MemTable
 
     public void add(long sequenceNumber, ValueType valueType, Slice key, Slice value)
     {
-        Preconditions.checkNotNull(valueType, "valueType is null");
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(valueType, "valueType is null");
+        requireNonNull(valueType, "valueType is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(valueType, "valueType is null");
 
         InternalKey internalKey = new InternalKey(key, sequenceNumber, valueType);
         table.put(internalKey, value);
@@ -64,7 +64,7 @@ public class MemTable
 
     public LookupResult get(LookupKey key)
     {
-        Preconditions.checkNotNull(key, "key is null");
+        requireNonNull(key, "key is null");
 
         InternalKey internalKey = key.getInternalKey();
         Entry<InternalKey, Slice> entry = table.ceilingEntry(internalKey);

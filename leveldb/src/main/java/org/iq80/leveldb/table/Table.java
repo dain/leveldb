@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.cache.CacheLoader;
 import org.iq80.leveldb.impl.SeekingIterable;
@@ -38,6 +37,8 @@ import java.util.Comparator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 public final class Table
@@ -57,10 +58,10 @@ public final class Table
     {
         this.source = source;
         this.blockCache = cacheForTable(blockCache);
-        Preconditions.checkNotNull(source, "source is null");
+        requireNonNull(source, "source is null");
         long size = source.size();
-        Preconditions.checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
-        Preconditions.checkNotNull(comparator, "comparator is null");
+        checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
+        requireNonNull(comparator, "comparator is null");
 
         this.verifyChecksums = verifyChecksum;
         this.comparator = comparator;
@@ -105,7 +106,7 @@ public final class Table
      */
     private LRUCache.LRUSubCache<BlockHandle, Slice> cacheForTable(LRUCache<BlockHandle, Slice> blockCache)
     {
-        final LRUCache<BlockHandle, Slice> cache = Preconditions.checkNotNull(blockCache, "Block cache should not be null");
+        final LRUCache<BlockHandle, Slice> cache = requireNonNull(blockCache, "Block cache should not be null");
         return cache.subCache(new CacheLoader<BlockHandle, Slice>()
         {
             @Override

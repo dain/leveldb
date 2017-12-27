@@ -17,16 +17,16 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
 
-import static com.google.common.collect.Lists.newArrayList;
+import static java.util.Objects.requireNonNull;
 
 public class WriteBatchImpl
         implements WriteBatch
@@ -34,7 +34,7 @@ public class WriteBatchImpl
     // WriteBatch header has an 8-byte sequence number followed by a 4-byte count.
     private static final int HEADER_SIZE = 12;
 
-    private final List<Entry<Slice, Slice>> batch = newArrayList();
+    private final List<Entry<Slice, Slice>> batch = new ArrayList<>();
     //TODO fix this count that is wrong!!!
     private int approximateSize;
 
@@ -51,8 +51,8 @@ public class WriteBatchImpl
     @Override
     public WriteBatchImpl put(byte[] key, byte[] value)
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
         batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), Slices.wrappedBuffer(value)));
         approximateSize += HEADER_SIZE + key.length + value.length;
         return this;
@@ -60,8 +60,8 @@ public class WriteBatchImpl
 
     public WriteBatchImpl put(Slice key, Slice value)
     {
-        Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(value, "value is null");
+        requireNonNull(key, "key is null");
+        requireNonNull(value, "value is null");
         batch.add(Maps.immutableEntry(key, value));
         approximateSize += HEADER_SIZE + key.length() + value.length();
         return this;
@@ -70,7 +70,7 @@ public class WriteBatchImpl
     @Override
     public WriteBatchImpl delete(byte[] key)
     {
-        Preconditions.checkNotNull(key, "key is null");
+        requireNonNull(key, "key is null");
         batch.add(Maps.immutableEntry(Slices.wrappedBuffer(key), (Slice) null));
         approximateSize += 6 + key.length;
         return this;
@@ -78,7 +78,7 @@ public class WriteBatchImpl
 
     public WriteBatchImpl delete(Slice key)
     {
-        Preconditions.checkNotNull(key, "key is null");
+        requireNonNull(key, "key is null");
         batch.add(Maps.immutableEntry(key, (Slice) null));
         approximateSize += 6 + key.length();
         return this;

@@ -17,13 +17,13 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 
 import java.util.Map.Entry;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.util.Slices.readLengthPrefixedBytes;
 import static org.iq80.leveldb.util.Slices.writeLengthPrefixedBytes;
 
@@ -38,7 +38,7 @@ public enum VersionEditTag
                 {
                     byte[] bytes = new byte[VariableLengthQuantity.readVariableLengthInt(sliceInput)];
                     sliceInput.readBytes(bytes);
-                    versionEdit.setComparatorName(new String(bytes, Charsets.UTF_8));
+                    versionEdit.setComparatorName(new String(bytes, UTF_8));
                 }
 
                 @Override
@@ -47,7 +47,7 @@ public enum VersionEditTag
                     String comparatorName = versionEdit.getComparatorName();
                     if (comparatorName != null) {
                         VariableLengthQuantity.writeVariableLengthInt(getPersistentId(), sliceOutput);
-                        byte[] bytes = comparatorName.getBytes(Charsets.UTF_8);
+                        byte[] bytes = comparatorName.getBytes(UTF_8);
                         VariableLengthQuantity.writeVariableLengthInt(bytes.length, sliceOutput);
                         sliceOutput.writeBytes(bytes);
                     }

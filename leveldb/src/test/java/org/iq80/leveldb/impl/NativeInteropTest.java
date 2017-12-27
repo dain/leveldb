@@ -29,10 +29,11 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.iq80.leveldb.impl.Iq80DBFactory.asString;
+import static org.iq80.leveldb.impl.Iq80DBFactory.bytes;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -44,32 +45,6 @@ public class NativeInteropTest
     private static final AtomicInteger NEXT_ID = new AtomicInteger();
 
     private final File databaseDir = FileUtils.createTempDir("leveldb");
-
-    public static byte[] bytes(String value)
-    {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return value.getBytes("UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String asString(byte[] value)
-    {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return new String(value, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public static void assertEquals(byte[] arg1, byte[] arg2)
     {

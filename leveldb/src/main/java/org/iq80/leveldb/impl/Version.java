@@ -17,11 +17,9 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import org.iq80.leveldb.util.InternalIterator;
 import org.iq80.leveldb.util.InternalTableIterator;
@@ -29,11 +27,13 @@ import org.iq80.leveldb.util.LevelIterator;
 import org.iq80.leveldb.util.MergingIterator;
 import org.iq80.leveldb.util.Slice;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkPositionIndex;
 import static com.google.common.collect.Ordering.natural;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
@@ -58,13 +58,13 @@ public class Version
     public Version(VersionSet versionSet)
     {
         this.versionSet = versionSet;
-        Preconditions.checkArgument(NUM_LEVELS > 1, "levels must be at least 2");
+        checkArgument(NUM_LEVELS > 1, "levels must be at least 2");
 
-        this.level0 = new Level0(Lists.<FileMetaData>newArrayList(), getTableCache(), getInternalKeyComparator());
+        this.level0 = new Level0(new ArrayList<FileMetaData>(), getTableCache(), getInternalKeyComparator());
 
         Builder<Level> builder = ImmutableList.builder();
         for (int i = 1; i < NUM_LEVELS; i++) {
-            List<FileMetaData> files = newArrayList();
+            List<FileMetaData> files = new ArrayList<>();
             builder.add(new Level(i, files, getTableCache(), getInternalKeyComparator()));
         }
         this.levels = builder.build();
@@ -87,7 +87,7 @@ public class Version
                 InternalKey previousEnd = null;
                 for (FileMetaData fileMetaData : files) {
                     if (previousEnd != null) {
-                        Preconditions.checkArgument(getInternalKeyComparator().compare(
+                        checkArgument(getInternalKeyComparator().compare(
                                 previousEnd,
                                 fileMetaData.getSmallest()
                         ) < 0, "Overlapping files %s and %s in level %s", previousFileNumber, fileMetaData.getNumber(), level);
@@ -200,7 +200,7 @@ public class Version
 
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
     {
-        Preconditions.checkPositionIndex(level, levels.size(), "Invalid level");
+        checkPositionIndex(level, levels.size(), "Invalid level");
 
         if (level == 0) {
             return level0.someFileOverlapsRange(smallestUserKey, largestUserKey);

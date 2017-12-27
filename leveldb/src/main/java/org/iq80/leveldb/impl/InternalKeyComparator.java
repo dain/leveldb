@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.primitives.Longs;
 import org.iq80.leveldb.table.UserComparator;
 
 import java.util.Arrays;
@@ -52,7 +51,7 @@ public class InternalKeyComparator
             return result;
         }
 
-        return Longs.compare(right.getSequenceNumber(), left.getSequenceNumber()); // reverse sorted version numbers
+        return Long.compare(right.getSequenceNumber(), left.getSequenceNumber()); // reverse sorted version numbers
     }
 
     /**

@@ -17,9 +17,9 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Charsets;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.util.SliceComparator.SLICE_COMPARATOR;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -30,8 +30,8 @@ public class SliceComparatorTest
     public void testSliceComparison()
     {
         assertTrue(SLICE_COMPARATOR.compare(
-                Slices.copiedBuffer("beer/ipa", Charsets.UTF_8),
-                Slices.copiedBuffer("beer/ale", Charsets.UTF_8))
+                Slices.copiedBuffer("beer/ipa", UTF_8),
+                Slices.copiedBuffer("beer/ale", UTF_8))
                 > 0);
 
         assertTrue(SLICE_COMPARATOR.compare(
@@ -44,8 +44,8 @@ public class SliceComparatorTest
                 Slices.wrappedBuffer(new byte[] {(byte) 0x00}))
                 > 0);
 
-        assertAllEqual(Slices.copiedBuffer("abcdefghijklmnopqrstuvwxyz", Charsets.UTF_8),
-                Slices.copiedBuffer("abcdefghijklmnopqrstuvwxyz", Charsets.UTF_8));
+        assertAllEqual(Slices.copiedBuffer("abcdefghijklmnopqrstuvwxyz", UTF_8),
+                Slices.copiedBuffer("abcdefghijklmnopqrstuvwxyz", UTF_8));
     }
 
     public static void assertAllEqual(Slice left, Slice right)

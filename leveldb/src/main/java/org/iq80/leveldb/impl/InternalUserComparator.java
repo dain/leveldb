@@ -17,10 +17,10 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Slice;
 
+import static com.google.common.base.Preconditions.checkState;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 
 public class InternalUserComparator
@@ -60,8 +60,8 @@ public class InternalUserComparator
             // User key has become larger.  Tack on the earliest possible
             // number to the shortened user key.
             InternalKey newInternalKey = new InternalKey(shortestSeparator, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            Preconditions.checkState(compare(start, newInternalKey.encode()) < 0); // todo
-            Preconditions.checkState(compare(newInternalKey.encode(), limit) < 0); // todo
+            checkState(compare(start, newInternalKey.encode()) < 0); // todo
+            checkState(compare(newInternalKey.encode(), limit) < 0); // todo
 
             return newInternalKey.encode();
         }
@@ -79,7 +79,7 @@ public class InternalUserComparator
             // User key has become larger.  Tack on the earliest possible
             // number to the shortened user key.
             InternalKey newInternalKey = new InternalKey(shortSuccessor, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            Preconditions.checkState(compare(key, newInternalKey.encode()) < 0); // todo
+            checkState(compare(key, newInternalKey.encode()) < 0); // todo
 
             return newInternalKey.encode();
         }

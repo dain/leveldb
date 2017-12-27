@@ -17,9 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
@@ -46,12 +44,15 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.newArrayListWithCapacity;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.LogMonitors.throwExceptionMonitor;
 
@@ -80,7 +81,7 @@ public class VersionSet
     private final boolean allowMmapWrites;
 
     private LogWriter descriptorLog;
-    private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
+    private final Map<Integer, InternalKey> compactPointers = new TreeMap<>();
 
     public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator, boolean allowMmapWrites)
             throws IOException
@@ -140,8 +141,8 @@ public class VersionSet
 
     private void appendVersion(Version version)
     {
-        Preconditions.checkNotNull(version, "version is null");
-        Preconditions.checkArgument(version != current, "version is the current version");
+        requireNonNull(version, "version is null");
+        checkArgument(version != current, "version is the current version");
         Version previous = current;
         current = version;
         activeVersions.put(version, new Object());
@@ -152,8 +153,8 @@ public class VersionSet
 
     public void removeVersion(Version version)
     {
-        Preconditions.checkNotNull(version, "version is null");
-        Preconditions.checkArgument(version != current, "version is the current version");
+        requireNonNull(version, "version is null");
+        checkArgument(version != current, "version is the current version");
         boolean removed = activeVersions.remove(version) != null;
         assert removed : "Expected the version to still be in the active set";
     }
@@ -204,7 +205,7 @@ public class VersionSet
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
-        List<InternalIterator> list = newArrayList();
+        List<InternalIterator> list = new ArrayList<>();
         for (int which = 0; which < 2; which++) {
             if (!c.getInputs()[which].isEmpty()) {
                 if (c.getLevel() + which == 0) {
@@ -242,7 +243,7 @@ public class VersionSet
 
     public void setLastSequence(long newLastSequence)
     {
-        Preconditions.checkArgument(newLastSequence >= lastSequence, "Expected newLastSequence to be greater than or equal to current lastSequence");
+        checkArgument(newLastSequence >= lastSequence, "Expected newLastSequence to be greater than or equal to current lastSequence");
         this.lastSequence = newLastSequence;
     }
 
@@ -250,8 +251,8 @@ public class VersionSet
             throws IOException
     {
         if (edit.getLogNumber() != null) {
-            Preconditions.checkArgument(edit.getLogNumber() >= logNumber);
-            Preconditions.checkArgument(edit.getLogNumber() < nextFileNumber.get());
+            checkArgument(edit.getLogNumber() >= logNumber);
+            checkArgument(edit.getLogNumber() < nextFileNumber.get());
         }
         else {
             edit.setLogNumber(logNumber);
@@ -337,9 +338,9 @@ public class VersionSet
     {
         // Read "CURRENT" file, which contains a pointer to the current manifest file
         File currentFile = new File(databaseDir, Filename.currentFileName());
-        Preconditions.checkState(currentFile.exists(), "CURRENT file does not exist");
+        checkState(currentFile.exists(), "CURRENT file does not exist");
 
-        String currentName = Files.toString(currentFile, Charsets.UTF_8);
+        String currentName = Files.toString(currentFile, UTF_8);
         if (currentName.isEmpty() || currentName.charAt(currentName.length() - 1) != '\n') {
             throw new IllegalStateException("CURRENT file does not end with newline");
         }
@@ -363,7 +364,7 @@ public class VersionSet
                 // todo implement user comparator
                 String editComparator = edit.getComparatorName();
                 String userComparator = internalKeyComparator.name();
-                Preconditions.checkArgument(editComparator == null || editComparator.equals(userComparator),
+                checkArgument(editComparator == null || editComparator.equals(userComparator),
                         "Expected user comparator %s to match existing database comparator ", userComparator, editComparator);
 
                 // apply edit
@@ -376,7 +377,7 @@ public class VersionSet
                 lastSequence = coalesce(edit.getLastSequenceNumber(), lastSequence);
             }
 
-            List<String> problems = newArrayList();
+            List<String> problems = new ArrayList<>();
             if (nextFileNumber == null) {
                 problems.add("Descriptor does not contain a meta-nextfile entry");
             }
@@ -512,11 +513,11 @@ public class VersionSet
         List<FileMetaData> levelInputs;
         if (sizeCompaction) {
             level = current.getCompactionLevel();
-            Preconditions.checkState(level >= 0);
-            Preconditions.checkState(level + 1 < NUM_LEVELS);
+            checkState(level >= 0);
+            checkState(level + 1 < NUM_LEVELS);
 
             // Pick the first file that comes after compact_pointer_[level]
-            levelInputs = newArrayList();
+            levelInputs = new ArrayList<>();
             for (FileMetaData fileMetaData : current.getFiles(level)) {
                 if (!compactPointers.containsKey(level) ||
                         internalKeyComparator.compare(fileMetaData.getLargest(), compactPointers.get(level)) > 0) {
@@ -545,7 +546,7 @@ public class VersionSet
             // which will include the picked file.
             levelInputs = getOverlappingInputs(0, range.getKey(), range.getValue());
 
-            Preconditions.checkState(!levelInputs.isEmpty());
+            checkState(!levelInputs.isEmpty());
         }
 
         Compaction compaction = setupOtherInputs(level, levelInputs);
@@ -695,7 +696,7 @@ public class VersionSet
             this.versionSet = versionSet;
             this.baseVersion = baseVersion;
 
-            levels = newArrayListWithCapacity(baseVersion.numberOfLevels());
+            levels = new ArrayList<>(baseVersion.numberOfLevels());
             for (int i = 0; i < baseVersion.numberOfLevels(); i++) {
                 levels.add(new LevelState(versionSet.internalKeyComparator));
             }
@@ -771,7 +772,7 @@ public class VersionSet
                 }
 
                 // files must be added in sorted order so assertion check in maybeAddFile works
-                ArrayList<FileMetaData> sortedFiles = newArrayListWithCapacity(baseFiles.size() + addedFiles.size());
+                ArrayList<FileMetaData> sortedFiles = new ArrayList<>(baseFiles.size() + addedFiles.size());
                 sortedFiles.addAll(baseFiles);
                 sortedFiles.addAll(addedFiles);
                 Collections.sort(sortedFiles, cmp);

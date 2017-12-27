@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -43,6 +42,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
+import static java.util.Objects.requireNonNull;
+
 public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
@@ -54,7 +55,7 @@ public class TableCache
                       final UserComparator userComparator,
                       final Options options)
     {
-        Preconditions.checkNotNull(databaseDir, "databaseName is null");
+        requireNonNull(databaseDir, "databaseName is null");
         blockCache = new LRUCache<>(options.cacheSize() > 0 ? (int) options.cacheSize() : 8 << 20, new BlockHandleSliceWeigher()); //TODO add possibility to disable cache?
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)

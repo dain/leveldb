@@ -53,9 +53,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.google.common.base.Charsets.UTF_8;
-import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.immutableEntry;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static org.iq80.leveldb.CompressionType.NONE;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
@@ -171,7 +170,7 @@ public class DbImplTest
         for (int index = 0; index < 5000000; index++) {
             String key = "Key LOOOOOOOOOOOOOOOOOONG KEY " + index;
             String value = "This is element " + index + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABZASDFASDKLFJASDFKJSDFLKSDJFLKJSDHFLKJHSDJFSDFHJASDFLKJSDF";
-            db.put(key.getBytes("UTF-8"), value.getBytes("UTF-8"));
+            db.put(key.getBytes(UTF_8), value.getBytes(UTF_8));
         }
     }
 
@@ -548,7 +547,7 @@ public class DbImplTest
         assertEquals(db.numberOfFilesInLevel(0), 0);
         assertEquals(db.numberOfFilesInLevel(1), 0);
         Random random = new Random(301);
-        List<String> values = newArrayList();
+        List<String> values = new ArrayList<>();
         for (int i = 0; i < 80; i++) {
             String value = randomString(random, 100 * 1024);
             db.put(key(i), value);

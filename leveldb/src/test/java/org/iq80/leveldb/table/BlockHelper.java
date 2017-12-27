@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 import static org.testng.Assert.assertEquals;

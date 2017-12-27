@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
@@ -28,6 +27,10 @@ import org.iq80.leveldb.util.VariableLengthQuantity;
 import java.util.Comparator;
 import java.util.NoSuchElementException;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkPositionIndex;
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 public class BlockIterator
@@ -42,10 +45,10 @@ public class BlockIterator
 
     public BlockIterator(Slice data, Slice restartPositions, Comparator<Slice> comparator)
     {
-        Preconditions.checkNotNull(data, "data is null");
-        Preconditions.checkNotNull(restartPositions, "restartPositions is null");
-        Preconditions.checkArgument(restartPositions.length() % SIZE_OF_INT == 0, "restartPositions.readableBytes() must be a multiple of %s", SIZE_OF_INT);
-        Preconditions.checkNotNull(comparator, "comparator is null");
+        requireNonNull(data, "data is null");
+        requireNonNull(restartPositions, "restartPositions is null");
+        checkArgument(restartPositions.length() % SIZE_OF_INT == 0, "restartPositions.readableBytes() must be a multiple of %s", SIZE_OF_INT);
+        requireNonNull(comparator, "comparator is null");
 
         this.data = data.input();
 
@@ -166,7 +169,7 @@ public class BlockIterator
      */
     private void seekToRestartPosition(int restartPosition)
     {
-        Preconditions.checkPositionIndex(restartPosition, restartCount, "restartPosition");
+        checkPositionIndex(restartPosition, restartCount, "restartPosition");
 
         // seek data readIndex to the beginning of the restart block
         int offset = restartPositions.getInt(restartPosition * SIZE_OF_INT);
@@ -188,7 +191,7 @@ public class BlockIterator
      */
     private static BlockEntry readEntry(SliceInput data, BlockEntry previousEntry)
     {
-        Preconditions.checkNotNull(data, "data is null");
+        requireNonNull(data, "data is null");
 
         // read entry header
         int sharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
@@ -199,7 +202,7 @@ public class BlockIterator
         Slice key = Slices.allocate(sharedKeyLength + nonSharedKeyLength);
         SliceOutput sliceOutput = key.output();
         if (sharedKeyLength > 0) {
-            Preconditions.checkState(previousEntry != null, "Entry has a shared key but no previous entry was provided");
+            checkState(previousEntry != null, "Entry has a shared key but no previous entry was provided");
             sliceOutput.writeBytes(previousEntry.getKey(), 0, sharedKeyLength);
         }
         sliceOutput.writeBytes(data, nonSharedKeyLength);

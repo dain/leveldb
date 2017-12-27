@@ -27,7 +27,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * @author <a href="http://hiramchirino.com">Hiram Chirino</a>
@@ -59,7 +60,7 @@ public class Iq80DBFactory
         String v = "unknown";
         InputStream is = Iq80DBFactory.class.getResourceAsStream("version.txt");
         try {
-            v = new BufferedReader(new InputStreamReader(is, "UTF-8")).readLine();
+            v = new BufferedReader(new InputStreamReader(is, UTF_8)).readLine();
         }
         catch (Throwable e) {
         }
@@ -105,27 +106,11 @@ public class Iq80DBFactory
 
     public static byte[] bytes(String value)
     {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return value.getBytes("UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return (value == null) ? null : value.getBytes(UTF_8);
     }
 
     public static String asString(byte[] value)
     {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return new String(value, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return (value == null) ? null : new String(value, UTF_8);
     }
 }

@@ -17,8 +17,6 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -30,7 +28,10 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import static com.google.common.base.Preconditions.checkPositionIndex;
+import static com.google.common.base.Preconditions.checkPositionIndexes;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_BYTE;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
@@ -57,7 +58,7 @@ public final class Slice
 
     public Slice(byte[] data)
     {
-        Preconditions.checkNotNull(data, "array is null");
+        requireNonNull(data, "array is null");
         this.data = data;
         this.offset = 0;
         this.length = data.length;
@@ -65,7 +66,7 @@ public final class Slice
 
     public Slice(byte[] data, int offset, int length)
     {
-        Preconditions.checkNotNull(data, "array is null");
+        requireNonNull(data, "array is null");
         this.data = data;
         this.offset = offset;
         this.length = length;
@@ -103,7 +104,7 @@ public final class Slice
      */
     public byte getByte(int index)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_BYTE, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_BYTE, this.length);
         index += offset;
         return data[index];
     }
@@ -129,7 +130,7 @@ public final class Slice
      */
     public short getShort(int index)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_SHORT, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_SHORT, this.length);
         index += offset;
         return (short) (data[index] & 0xFF | data[index + 1] << 8);
     }
@@ -143,7 +144,7 @@ public final class Slice
      */
     public int getInt(int index)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_INT, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_INT, this.length);
         index += offset;
         return (data[index] & 0xff) |
                 (data[index + 1] & 0xff) << 8 |
@@ -160,7 +161,7 @@ public final class Slice
      */
     public long getLong(int index)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_LONG, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_LONG, this.length);
         index += offset;
         return ((long) data[index] & 0xff) |
                 ((long) data[index + 1] & 0xff) << 8 |
@@ -205,8 +206,8 @@ public final class Slice
      */
     public void getBytes(int index, byte[] destination, int destinationIndex, int length)
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
-        Preconditions.checkPositionIndexes(destinationIndex, destinationIndex + length, destination.length);
+        checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(destinationIndex, destinationIndex + length, destination.length);
         index += offset;
         System.arraycopy(data, index, destination, destinationIndex, length);
     }
@@ -240,7 +241,7 @@ public final class Slice
      */
     public void getBytes(int index, ByteBuffer destination)
     {
-        Preconditions.checkPositionIndex(index, this.length);
+        checkPositionIndex(index, this.length);
         index += offset;
         destination.put(data, index, Math.min(length, destination.remaining()));
     }
@@ -258,7 +259,7 @@ public final class Slice
     public void getBytes(int index, OutputStream out, int length)
             throws IOException
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         out.write(data, index, length);
     }
@@ -277,7 +278,7 @@ public final class Slice
     public int getBytes(int index, GatheringByteChannel out, int length)
             throws IOException
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         return out.write(ByteBuffer.wrap(data, index, length));
     }
@@ -292,7 +293,7 @@ public final class Slice
      */
     public void setShort(int index, int value)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_SHORT, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_SHORT, this.length);
         index += offset;
         data[index] = (byte) (value);
         data[index + 1] = (byte) (value >>> 8);
@@ -307,7 +308,7 @@ public final class Slice
      */
     public void setInt(int index, int value)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_INT, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_INT, this.length);
         index += offset;
         data[index] = (byte) (value);
         data[index + 1] = (byte) (value >>> 8);
@@ -324,7 +325,7 @@ public final class Slice
      */
     public void setLong(int index, long value)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_LONG, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_LONG, this.length);
         index += offset;
         data[index] = (byte) (value);
         data[index + 1] = (byte) (value >>> 8);
@@ -345,7 +346,7 @@ public final class Slice
      */
     public void setByte(int index, int value)
     {
-        Preconditions.checkPositionIndexes(index, index + SIZE_OF_BYTE, this.length);
+        checkPositionIndexes(index, index + SIZE_OF_BYTE, this.length);
         index += offset;
         data[index] = (byte) value;
     }
@@ -380,8 +381,8 @@ public final class Slice
      */
     public void setBytes(int index, byte[] source, int sourceIndex, int length)
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
-        Preconditions.checkPositionIndexes(sourceIndex, sourceIndex + length, source.length);
+        checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(sourceIndex, sourceIndex + length, source.length);
         index += offset;
         System.arraycopy(source, sourceIndex, data, index, length);
     }
@@ -397,7 +398,7 @@ public final class Slice
      */
     public void setBytes(int index, ByteBuffer source)
     {
-        Preconditions.checkPositionIndexes(index, index + source.remaining(), this.length);
+        checkPositionIndexes(index, index + source.remaining(), this.length);
         index += offset;
         source.get(data, index, source.remaining());
     }
@@ -416,7 +417,7 @@ public final class Slice
     public int setBytes(int index, InputStream in, int length)
             throws IOException
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         int readBytes = 0;
         do {
@@ -451,7 +452,7 @@ public final class Slice
     public int setBytes(int index, ScatteringByteChannel in, int length)
             throws IOException
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         ByteBuffer buf = ByteBuffer.wrap(data, index, length);
         int readBytes = 0;
@@ -484,7 +485,7 @@ public final class Slice
     public int setBytes(int index, FileChannel in, int position, int length)
             throws IOException
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         ByteBuffer buf = ByteBuffer.wrap(data, index, length);
         int readBytes = 0;
@@ -525,7 +526,7 @@ public final class Slice
      */
     public Slice copySlice(int index, int length)
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
 
         index += offset;
         byte[] copiedArray = new byte[length];
@@ -540,7 +541,7 @@ public final class Slice
 
     public byte[] copyBytes(int index, int length)
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         if (index == 0) {
             return Arrays.copyOf(data, length);
@@ -573,7 +574,7 @@ public final class Slice
             return this;
         }
 
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         if (index >= 0 && length == 0) {
             return Slices.EMPTY_SLICE;
         }
@@ -611,7 +612,7 @@ public final class Slice
      */
     public ByteBuffer toByteBuffer(int index, int length)
     {
-        Preconditions.checkPositionIndexes(index, index + length, this.length);
+        checkPositionIndexes(index, index + length, this.length);
         index += offset;
         return ByteBuffer.wrap(data, index, length).order(LITTLE_ENDIAN);
     }

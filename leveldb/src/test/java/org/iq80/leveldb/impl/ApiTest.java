@@ -29,9 +29,10 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 
+import static org.iq80.leveldb.impl.Iq80DBFactory.asString;
+import static org.iq80.leveldb.impl.Iq80DBFactory.bytes;
 import static org.testng.Assert.assertTrue;
 
 /**
@@ -42,32 +43,6 @@ import static org.testng.Assert.assertTrue;
 public class ApiTest
 {
     private final File databaseDir = FileUtils.createTempDir("leveldb");
-
-    public static byte[] bytes(String value)
-    {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return value.getBytes("UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String asString(byte[] value)
-    {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return new String(value, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public void assertEquals(byte[] arg1, byte[] arg2)
     {

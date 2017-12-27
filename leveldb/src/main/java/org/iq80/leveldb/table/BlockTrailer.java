@@ -17,12 +17,13 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
+
+import static java.util.Objects.requireNonNull;
 
 public class BlockTrailer
 {
@@ -33,7 +34,7 @@ public class BlockTrailer
 
     public BlockTrailer(CompressionType compressionType, int crc32c)
     {
-        Preconditions.checkNotNull(compressionType, "compressionType is null");
+        requireNonNull(compressionType, "compressionType is null");
 
         this.compressionType = compressionType;
         this.crc32c = crc32c;

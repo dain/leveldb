@@ -17,12 +17,13 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class InternalKey
@@ -33,9 +34,9 @@ public class InternalKey
 
     public InternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
     {
-        Preconditions.checkNotNull(userKey, "userKey is null");
-        Preconditions.checkArgument(sequenceNumber >= 0, "sequenceNumber is negative");
-        Preconditions.checkNotNull(valueType, "valueType is null");
+        requireNonNull(userKey, "userKey is null");
+        checkArgument(sequenceNumber >= 0, "sequenceNumber is negative");
+        requireNonNull(valueType, "valueType is null");
 
         this.userKey = userKey;
         this.sequenceNumber = sequenceNumber;
@@ -44,8 +45,8 @@ public class InternalKey
 
     public InternalKey(Slice data)
     {
-        Preconditions.checkNotNull(data, "data is null");
-        Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
+        requireNonNull(data, "data is null");
+        checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.userKey = getUserKey(data);
         long packedSequenceAndType = data.getLong(data.length() - SIZE_OF_LONG);
         this.sequenceNumber = SequenceNumber.unpackSequenceNumber(packedSequenceAndType);

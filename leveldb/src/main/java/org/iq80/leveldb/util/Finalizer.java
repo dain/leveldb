@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.lang.ref.PhantomReference;
@@ -28,6 +27,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
 
 public class Finalizer<T>
 {
@@ -60,15 +63,15 @@ public class Finalizer<T>
     public Finalizer(int threads, FinalizerMonitor monitor)
     {
         this.monitor = monitor;
-        Preconditions.checkArgument(threads >= 1, "threads must be at least 1");
+        checkArgument(threads >= 1, "threads must be at least 1");
         this.threads = threads;
     }
 
     public synchronized void addCleanup(T item, Callable<?> cleanup)
     {
-        Preconditions.checkNotNull(item, "item is null");
-        Preconditions.checkNotNull(cleanup, "cleanup is null");
-        Preconditions.checkState(!destroyed.get(), "%s is destroyed", getClass().getName());
+        requireNonNull(item, "item is null");
+        requireNonNull(cleanup, "cleanup is null");
+        checkState(!destroyed.get(), "%s is destroyed", getClass().getName());
 
         if (executor == null) {
             // create executor
