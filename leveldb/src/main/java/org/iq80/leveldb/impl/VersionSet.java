@@ -26,12 +26,12 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
-import org.iq80.leveldb.util.SequentialFile;
-import org.iq80.leveldb.util.SequentialFileImpl;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.InternalIterator;
 import org.iq80.leveldb.util.Level0Iterator;
 import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.SequentialFile;
+import org.iq80.leveldb.util.SequentialFileImpl;
 import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
@@ -625,12 +625,12 @@ public class VersionSet
     List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
     {
         ImmutableList.Builder<FileMetaData> files = ImmutableList.builder();
-        Slice userBegin = begin.getUserKey();
-        Slice userEnd = end.getUserKey();
+        Slice userBegin = begin == null ? null : begin.getUserKey();
+        Slice userEnd = end == null ? null : end.getUserKey();
         UserComparator userComparator = internalKeyComparator.getUserComparator();
         for (FileMetaData fileMetaData : current.getFiles(level)) {
-            if (userComparator.compare(fileMetaData.getLargest().getUserKey(), userBegin) < 0 ||
-                    userComparator.compare(fileMetaData.getSmallest().getUserKey(), userEnd) > 0) {
+            if (userBegin != null && userComparator.compare(fileMetaData.getLargest().getUserKey(), userBegin) < 0 ||
+                    userEnd != null && userComparator.compare(fileMetaData.getSmallest().getUserKey(), userEnd) > 0) {
                 // Either completely before or after range; skip it
             }
             else {

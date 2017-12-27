@@ -201,8 +201,6 @@ public class Version
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
     {
         Preconditions.checkPositionIndex(level, levels.size(), "Invalid level");
-        Preconditions.checkNotNull(smallestUserKey, "smallestUserKey is null");
-        Preconditions.checkNotNull(largestUserKey, "largestUserKey is null");
 
         if (level == 0) {
             return level0.someFileOverlapsRange(smallestUserKey, largestUserKey);

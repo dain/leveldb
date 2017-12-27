@@ -376,7 +376,7 @@ public class DbImpl
             while (immutableMemTable != null) {
                 backgroundCondition.awaitUninterruptibly();
             }
-
+            checkBackgroundException();
         }
         finally {
             mutex.unlock();
@@ -421,6 +421,9 @@ public class DbImpl
         }
         else if (shuttingDown.get()) {
             // DB is being shutdown; no more background compactions
+        }
+        else if (backgroundException != null) {
+            // Already got an error; no more changes
         }
         else if (immutableMemTable == null &&
                 manualCompaction == null &&
@@ -473,20 +476,16 @@ public class DbImpl
             finally {
                 backgroundCompaction = null;
             }
+            // Previous compaction may have produced too many files in a level,
+            // so reschedule another compaction if needed.
+            maybeScheduleCompaction();
         }
         finally {
             try {
-                // Previous compaction may have produced too many files in a level,
-                // so reschedule another compaction if needed.
-                maybeScheduleCompaction();
+                backgroundCondition.signalAll();
             }
             finally {
-                try {
-                    backgroundCondition.signalAll();
-                }
-                finally {
-                    mutex.unlock();
-                }
+                mutex.unlock();
             }
         }
     }
@@ -499,10 +498,15 @@ public class DbImpl
         compactMemTableInternal();
 
         Compaction compaction;
+        InternalKey manualEnd = null;
         if (manualCompaction != null) {
             compaction = versions.compactRange(manualCompaction.level,
                     manualCompaction.begin,
                     manualCompaction.end);
+            manualCompaction.done = compaction == null;
+            if (compaction != null) {
+                manualEnd = compaction.input(0, compaction.getLevelInputs().size() - 1).getLargest();
+            }
         }
         else {
             compaction = versions.pickCompaction();
@@ -528,6 +532,13 @@ public class DbImpl
 
         // manual compaction complete
         if (manualCompaction != null) {
+            ManualCompaction m = manualCompaction;
+            if (backgroundException != null) {
+                m.done = true;
+            }
+            if (!m.done) {
+                m.begin = manualEnd;
+            }
             manualCompaction = null;
         }
     }
@@ -1033,6 +1044,7 @@ public class DbImpl
         finally {
             mutex.unlock();
         }
+        checkBackgroundException();
     }
 
     private void compactMemTableInternal()
@@ -1329,7 +1341,7 @@ public class DbImpl
             versions.logAndApply(compact.compaction.getEdit(), mutex);
             deleteObsoleteFiles();
         }
-        catch (IOException e) {
+        catch (IOException e) { //todo fix the issue causing this exception
             // Compaction failed for some reason.  Simply discard the work and try again later.
 
             // Discard any files we may have created during this failed compaction
@@ -1434,9 +1446,9 @@ public class DbImpl
     private static class ManualCompaction
     {
         private final int level;
-        private final InternalKey begin;
+        private InternalKey begin;
         private final InternalKey end;
-        public boolean done;
+        private boolean done;
 
         private ManualCompaction(int level, InternalKey begin, InternalKey end)
         {
@@ -1568,8 +1580,8 @@ public class DbImpl
     public void compactRange(byte[] begin, byte[] end)
             throws DBException
     {
-        final Slice smallestUserKey = new Slice(begin, 0, begin.length);
-        final Slice largestUserKey = new Slice(end, 0, end.length);
+        final Slice smallestUserKey = begin == null ? null : new Slice(begin, 0, begin.length);
+        final Slice largestUserKey = end == null ? null : new Slice(end, 0, end.length);
         int maxLevelWithFiles = 1;
         mutex.lock();
         try {
@@ -1656,16 +1668,9 @@ public class DbImpl
             this.backgroundCondition = backgroundCondition;
         }
 
-        public void await() throws DBException
+        public void await()
         {
-            try {
-                backgroundCondition.await();
-            }
-            catch (InterruptedException e) {
-                //TODO what will we do here????????????????
-                Thread.currentThread().interrupt();
-                throw new DBException(e);
-            }
+            backgroundCondition.awaitUninterruptibly();
         }
 
         public void signal()

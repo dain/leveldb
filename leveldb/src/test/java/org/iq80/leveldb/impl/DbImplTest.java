@@ -981,6 +981,71 @@ public class DbImplTest
         assertFalse(seekingIterator.hasNext());
     }
 
+    @Test(dataProvider = "options")
+    public void testManualCompaction(final String desc, final Options options) throws Exception
+    {
+        assertEquals(DbConstants.MAX_MEM_COMPACT_LEVEL, 2);
+        DbStringWrapper db = new DbStringWrapper(options, databaseDir);
+        makeTables(db, 3, "p", "q");
+        assertEquals("1,1,1", filesPerLevel(db.db));
+
+        // Compaction range falls before files
+        db.compactRange("", "c");
+        assertEquals("1,1,1", filesPerLevel(db.db));
+
+        // Compaction range falls after files
+        db.compactRange("r", "z");
+        assertEquals("1,1,1", filesPerLevel(db.db));
+
+        // Compaction range overlaps files
+        db.compactRange("p1", "p9");
+        assertEquals("0,0,1", filesPerLevel(db.db));
+
+        // Populate a different range
+        makeTables(db, 3, "c", "e");
+        assertEquals("1,1,2", filesPerLevel(db.db));
+
+        // Compact just the new range
+        db.compactRange("b", "f");
+        assertEquals("0,0,2", filesPerLevel(db.db));
+
+        // Compact all
+        makeTables(db, 1, "a", "z");
+        assertEquals("0,1,2", filesPerLevel(db.db));
+        db.compactRange(null, null);
+        assertEquals("0,0,1", filesPerLevel(db.db));
+    }
+
+    // Do n memtable compactions, each of which produces an sstable
+    // covering the range [small,large].
+    private void makeTables(DbStringWrapper db, int n, String small, String large)
+    {
+        for (int i = 0; i < n; i++) {
+            db.put(small, "begin");
+            db.put(large, "end");
+            db.db.testCompactMemTable();
+        }
+    }
+
+    // Return spread of files per level
+    private String filesPerLevel(DbImpl db)
+    {
+        StringBuilder result = new StringBuilder();
+        int lastNonZeroOffset = 0;
+        for (int level = 0; level < DbConstants.NUM_LEVELS; level++) {
+            int f = db.numberOfFilesInLevel(level);
+            if (result.length() > 0) {
+                result.append(",");
+            }
+            result.append(f);
+            if (f > 0) {
+                lastNonZeroOffset = result.length();
+            }
+        }
+        result.setLength(lastNonZeroOffset);
+        return result.toString();
+    }
+
     @SafeVarargs
     private final void testDb(DbStringWrapper db, Entry<String, String>... entries)
             throws IOException
@@ -1240,9 +1305,14 @@ public class DbImplTest
             db.flushMemTable();
         }
 
+        public void compactRange(String start, String limit)
+        {
+            db.compactRange(start == null ? null : Slices.copiedBuffer(start, UTF_8).getBytes(), limit == null ? null : Slices.copiedBuffer(limit, UTF_8).getBytes());
+        }
+
         public void compactRange(int level, String start, String limit)
         {
-            db.compactRange(level, Slices.copiedBuffer(start, UTF_8), Slices.copiedBuffer(limit, UTF_8));
+            db.compactRange(level, start == null ? null : Slices.copiedBuffer(start, UTF_8), limit == null ? null : Slices.copiedBuffer(limit, UTF_8));
         }
 
         public void compact(String start, String limit)

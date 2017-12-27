@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.iq80.leveldb.table.UserComparator;
@@ -143,15 +144,23 @@ public class Level
 
     public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
     {
-        InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
-        int index = findFile(smallestInternalKey);
+        int index = 0;
+        if (smallestUserKey != null) {
+            InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
+            index = findFile(smallestInternalKey);
+        }
+
+        if (index >= files.size()) {
+            // beginning of range is after all files, so no overlap.
+            return false;
+        }
 
         UserComparator userComparator = internalKeyComparator.getUserComparator();
-        return ((index < files.size()) &&
-                userComparator.compare(largestUserKey, files.get(index).getSmallest().getUserKey()) >= 0);
+        return (largestUserKey == null || userComparator.compare(largestUserKey, files.get(index).getSmallest().getUserKey()) >= 0);
     }
 
-    private int findFile(InternalKey targetKey)
+    @VisibleForTesting
+    int findFile(InternalKey targetKey)
     {
         if (files.isEmpty()) {
             return files.size();
@@ -159,7 +168,7 @@ public class Level
 
         // todo replace with Collections.binarySearch
         int left = 0;
-        int right = files.size() - 1;
+        int right = files.size();
 
         // binary search restart positions to find the restart position immediately before the targetKey
         while (left < right) {
