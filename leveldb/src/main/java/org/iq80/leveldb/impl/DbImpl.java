@@ -18,7 +18,6 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.iq80.leveldb.CompressionType;
@@ -59,6 +58,7 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
@@ -103,7 +103,7 @@ public class DbImpl
     private final Condition backgroundCondition = mutex.newCondition();
 
     private final List<Long> pendingOutputs = new ArrayList<>(); // todo
-    private final Deque<WriteBatchInternal> writers = newLinkedList();
+    private final Deque<WriteBatchInternal> writers = new LinkedList<>();
     private final WriteBatchImpl tmpBatch = new WriteBatchImpl();
 
     private LogWriter log;
@@ -134,7 +134,7 @@ public class DbImpl
         this.databaseDir = databaseDir;
 
         if (this.options.filterPolicy() != null) {
-            Preconditions.checkArgument(this.options.filterPolicy() instanceof FilterPolicy, "Filter policy must implement Java interface FilterPolicy");
+            checkArgument(this.options.filterPolicy() instanceof FilterPolicy, "Filter policy must implement Java interface FilterPolicy");
             this.options.filterPolicy(InternalFilterPolicy.convert(this.options.filterPolicy()));
         }
 
@@ -857,7 +857,7 @@ public class DbImpl
                 if (result == first.batch) {
                     // Switch to temporary batch instead of disturbing caller's batch
                     result = tmpBatch;
-                    Preconditions.checkState(result.size() == 0, "Temp batch should be clean");
+                    checkState(result.size() == 0, "Temp batch should be clean");
                     result.append(first.batch);
                 }
                 else if (first.batch != w.batch) {
@@ -1606,8 +1606,8 @@ public class DbImpl
     @VisibleForTesting
     void testCompactRange(int level, Slice begin, Slice end) throws DBException
     {
-        Preconditions.checkArgument(level >= 0);
-        Preconditions.checkArgument(level + 1 < DbConstants.NUM_LEVELS);
+        checkArgument(level >= 0);
+        checkArgument(level + 1 < DbConstants.NUM_LEVELS);
 
         final InternalKey beginStorage = begin == null ? null : new InternalKey(begin, SequenceNumber.MAX_SEQUENCE_NUMBER, VALUE);
         final InternalKey endStorage = end == null ? null : new InternalKey(end, 0, DELETION);

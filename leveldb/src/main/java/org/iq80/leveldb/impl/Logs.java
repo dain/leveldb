@@ -27,15 +27,13 @@ import java.io.IOException;
 
 public final class Logs
 {
-
     private static final int PAGE_SIZE = 1024 * 1024;
 
     private Logs()
     {
     }
 
-    public static LogWriter createLogWriter(File file, long fileNumber, boolean allowMmapWrites)
-            throws IOException
+    public static LogWriter createLogWriter(File file, long fileNumber, boolean allowMmapWrites) throws IOException
     {
         return LogWriter.createWriter(fileNumber, allowMmapWrites ? MMWritableFile.open(file, PAGE_SIZE) : UnbufferedWritableFile.open(file));
     }

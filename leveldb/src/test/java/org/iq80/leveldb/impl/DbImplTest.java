@@ -390,7 +390,6 @@ public class DbImplTest
                 immutableEntry("c", "vc"));
     }
 
-
     @Test(dataProvider = "options")
     public void testIterSmallAndLargeMix(final String desc, final Options options)
             throws IOException

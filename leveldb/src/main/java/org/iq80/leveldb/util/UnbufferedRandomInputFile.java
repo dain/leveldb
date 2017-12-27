@@ -17,14 +17,14 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author Honore Vasconcelos
@@ -44,7 +44,7 @@ public class UnbufferedRandomInputFile implements RandomInputFile
 
     public static RandomInputFile open(File file) throws IOException
     {
-        Preconditions.checkNotNull(file, "file is null");
+        requireNonNull(file, "file is null");
         FileChannel channel = new FileInputStream(file).getChannel();
         return new UnbufferedRandomInputFile(file.getAbsolutePath(), channel, channel.size());
     }

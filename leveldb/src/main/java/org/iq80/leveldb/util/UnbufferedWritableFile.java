@@ -37,7 +37,6 @@ public class UnbufferedWritableFile implements WritableFile
         this.channel = channel;
     }
 
-
     public static WritableFile open(File file) throws FileNotFoundException
     {
         return new UnbufferedWritableFile(file, new FileOutputStream(file).getChannel());

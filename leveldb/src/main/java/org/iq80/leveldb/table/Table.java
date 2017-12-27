@@ -28,8 +28,6 @@ import org.iq80.leveldb.util.Snappy;
 import org.iq80.leveldb.util.TableIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -110,7 +108,7 @@ public final class Table
         return cache.subCache(new CacheLoader<BlockHandle, Slice>()
         {
             @Override
-            public Slice load(@Nonnull BlockHandle key) throws Exception
+            public Slice load(BlockHandle key) throws Exception
             {
                 return readRawBlock(key);
             }
@@ -123,7 +121,6 @@ public final class Table
         return new TableIterator(this, indexBlock.iterator());
     }
 
-    @Nullable
     public FilterBlockReader getFilter()
     {
         return filter;
@@ -170,7 +167,7 @@ public final class Table
 //            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
 //            int actualCrc32c = checksum.getMaskedValue();
 //
-//            Preconditions.checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
+//            checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
 //        }
 
         // decompress data

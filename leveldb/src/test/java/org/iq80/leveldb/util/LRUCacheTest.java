@@ -21,7 +21,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.Weigher;
 import org.testng.annotations.Test;
 
-import javax.annotation.Nonnull;
 import java.util.concurrent.ExecutionException;
 
 import static org.testng.Assert.assertEquals;
@@ -86,7 +85,7 @@ public class LRUCacheTest
             this.cache = cache.subCache(new CacheLoader<Integer, Integer>()
             {
                 @Override
-                public Integer load(@Nonnull Integer key)
+                public Integer load(Integer key)
                 {
                     count++;
                     return key * (i + 1) * 3;
@@ -104,7 +103,7 @@ public class LRUCacheTest
         }
 
         @Override
-        public Integer load(@Nonnull Integer key) throws ExecutionException
+        public Integer load(Integer key) throws ExecutionException
         {
             return cache.load(key);
         }

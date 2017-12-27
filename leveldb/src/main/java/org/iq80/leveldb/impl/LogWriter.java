@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.impl;
 
-import com.google.common.base.Preconditions;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceInput;
 import org.iq80.leveldb.util.SliceOutput;
@@ -28,6 +27,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.LogConstants.BLOCK_SIZE;
 import static org.iq80.leveldb.impl.LogConstants.HEADER_SIZE;
 import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
@@ -47,8 +49,8 @@ public class LogWriter
 
     private LogWriter(long fileNumber, WritableFile file)
     {
-        Preconditions.checkNotNull(file, "file is null");
-        Preconditions.checkArgument(fileNumber >= 0, "fileNumber is negative");
+        requireNonNull(file, "file is null");
+        checkArgument(fileNumber >= 0, "fileNumber is negative");
         this.fileNumber = fileNumber;
         this.writableFile = file;
     }
@@ -76,7 +78,7 @@ public class LogWriter
     public void addRecord(Slice record, boolean force)
             throws IOException
     {
-        Preconditions.checkState(!closed.get(), "Log has been closed");
+        checkState(!closed.get(), "Log has been closed");
 
         SliceInput sliceInput = record.input();
 
@@ -88,7 +90,7 @@ public class LogWriter
         // zero-length chunk.
         do {
             int bytesRemainingInBlock = BLOCK_SIZE - blockOffset;
-            Preconditions.checkState(bytesRemainingInBlock >= 0);
+            checkState(bytesRemainingInBlock >= 0);
 
             // Switch to a new block if necessary
             if (bytesRemainingInBlock < HEADER_SIZE) {
@@ -103,7 +105,7 @@ public class LogWriter
 
             // Invariant: we never leave less than HEADER_SIZE bytes available in a block
             int bytesAvailableInBlock = bytesRemainingInBlock - HEADER_SIZE;
-            Preconditions.checkState(bytesAvailableInBlock >= 0);
+            checkState(bytesAvailableInBlock >= 0);
 
             // if there are more bytes in the record then there are available in the block,
             // fragment the record; otherwise write to the end of the record
@@ -148,8 +150,8 @@ public class LogWriter
     private void writeChunk(LogChunkType type, Slice slice)
             throws IOException
     {
-        Preconditions.checkArgument(slice.length() <= 0xffff, "length %s is larger than two bytes", slice.length());
-        Preconditions.checkArgument(blockOffset + HEADER_SIZE <= BLOCK_SIZE);
+        checkArgument(slice.length() <= 0xffff, "length %s is larger than two bytes", slice.length());
+        checkArgument(blockOffset + HEADER_SIZE <= BLOCK_SIZE);
 
         // create header
         Slice header = newLogRecordHeader(type, slice, slice.length());

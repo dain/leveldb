@@ -501,7 +501,6 @@ public abstract class TableTest
             desc = cls.getSimpleName() + ", comparator= " + (comparator == null ? null : comparator.getClass().getSimpleName()) + ", restartInterval=" + restartInterval;
         }
 
-
         public Random getRnd()
         {
             return rnd;
@@ -535,7 +534,7 @@ public abstract class TableTest
 
             Iterator<Map.Entry<Slice, Slice>> iterator = data.entrySet().iterator();
             while (iter.hasNext()) {
-                assertEquals(iter.next(), iterator.next());
+                assertEqualsEntries(iter.next(), iterator.next());
             }
             if (iterator.hasNext()) {
                 SeekingIterator<Slice, Slice> iterator1 = constructor.iterator();
@@ -545,6 +544,12 @@ public abstract class TableTest
                 assertFalse(iterator.hasNext());
             }
             assertFalse(iterator.hasNext());
+        }
+
+        private static void assertEqualsEntries(Map.Entry<Slice, Slice> actual, Map.Entry<Slice, Slice> expected)
+        {
+            assertEquals(actual.getKey(), expected.getKey());
+            assertEquals(actual.getValue(), expected.getValue());
         }
 
         private void testRandomAccess(KVMap data)
@@ -561,7 +566,7 @@ public abstract class TableTest
                         if (iter.hasNext()) {
                             Map.Entry<Slice, Slice> itNex = iter.next();
                             Map.Entry<Slice, Slice> modelNex = modelIter.next();
-                            assertEquals(itNex, modelNex);
+                            assertEqualsEntries(itNex, modelNex);
                         }
                         break;
                     }
@@ -572,7 +577,7 @@ public abstract class TableTest
                         if (modelIter.hasNext()) {
                             Map.Entry<Slice, Slice> itNex = iter.next();
                             Map.Entry<Slice, Slice> modelNex = modelIter.next();
-                            assertEquals(itNex, modelNex);
+                            assertEqualsEntries(itNex, modelNex);
                         }
                         break;
                     }
@@ -602,7 +607,7 @@ public abstract class TableTest
             if (modelIter.hasNext()) {
                 Map.Entry<Slice, Slice> itNex = iter.next();
                 Map.Entry<Slice, Slice> modelNex = modelIter.next();
-                assertEquals(itNex, modelNex);
+                assertEqualsEntries(itNex, modelNex);
             }
             return modelIter;
         }
@@ -715,8 +720,6 @@ public abstract class TableTest
 
     private static class MemTableConstructor extends Constructor
     {
-
-
         private MemTable table;
 
         public MemTableConstructor(UserComparator comparator)
@@ -770,8 +773,6 @@ public abstract class TableTest
 
     private static class DbConstructor extends Constructor
     {
-
-
         private DbImpl db;
         private File tmpDir;
 
@@ -908,7 +909,6 @@ public abstract class TableTest
         @Override
         public void close()
         {
-
         }
     }
 

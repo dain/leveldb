@@ -75,7 +75,6 @@ public class ApiTest
     public void testCompaction(String op, Options options)
             throws IOException, DBException
     {
-
         File path = getTestDirectory("testCompaction");
         DB db = factory.open(path, options);
 

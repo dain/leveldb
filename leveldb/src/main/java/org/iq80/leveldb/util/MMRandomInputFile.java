@@ -17,7 +17,6 @@
  */
 package org.iq80.leveldb.util;
 
-import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
 
 import java.io.File;
@@ -25,6 +24,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Memory mapped filed table.
@@ -52,7 +53,7 @@ public class MMRandomInputFile implements RandomInputFile
      */
     public static RandomInputFile open(File file) throws IOException
     {
-        Preconditions.checkNotNull(file, "file is null");
+        requireNonNull(file, "file is null");
         MappedByteBuffer map = Files.map(file);
 
         return new MMRandomInputFile(file.getAbsolutePath(), map, map.capacity());

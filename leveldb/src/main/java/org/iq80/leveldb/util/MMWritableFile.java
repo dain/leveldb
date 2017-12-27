@@ -19,7 +19,6 @@ package org.iq80.leveldb.util;
 
 import com.google.common.io.Files;
 
-import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -50,7 +49,7 @@ public class MMWritableFile implements WritableFile
     }
 
     @Override
-    public void append(@Nonnull Slice data) throws IOException
+    public void append(Slice data) throws IOException
     {
         ensureCapacity(data.length());
         data.getBytes(0, mappedByteBuffer);
@@ -105,7 +104,6 @@ public class MMWritableFile implements WritableFile
     @Override
     public void force() throws IOException
     {
-
     }
 
     @Override
