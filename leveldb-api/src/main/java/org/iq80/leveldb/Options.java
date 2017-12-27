@@ -154,7 +154,18 @@ public class Options
 
     public Logger logger()
     {
-        return logger;
+        if (logger != null) {
+            return logger;
+        }
+        else {
+            return new Logger() {
+                @Override
+                public void log(String message)
+                {
+                    // noop
+                }
+            };
+        }
     }
 
     public Options logger(Logger logger)

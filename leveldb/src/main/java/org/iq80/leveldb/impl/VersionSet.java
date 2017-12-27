@@ -596,9 +596,12 @@ public class VersionSet
 
         // Compute the set of grandparent files that overlap this compaction
         // (parent == level+1; grandparent == level+2)
-        List<FileMetaData> grandparents = null;
+        List<FileMetaData> grandparents;
         if (level + 2 < NUM_LEVELS) {
             grandparents = getOverlappingInputs(level + 2, allStart, allLimit);
+        }
+        else {
+            grandparents = new ArrayList<>();
         }
 
 //        if (false) {

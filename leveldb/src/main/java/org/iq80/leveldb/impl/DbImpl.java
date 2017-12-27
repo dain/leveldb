@@ -324,10 +324,7 @@ public class DbImpl
                 if (fileInfo.getFileType() == FileType.TABLE) {
                     tableCache.evict(number);
                 }
-                // todo info logging system needed
-//                Log(options_.info_log, "Delete type=%d #%lld\n",
-//                int(type),
-//                        static_cast < unsigned long long>(number));
+                options.logger().log(String.format("[deleteObsoleteFiles]: %s %s", file, fileInfo));
                 file.delete();
             }
         }
@@ -584,27 +581,38 @@ public class DbImpl
         checkBackgroundException();
         LookupKey lookupKey;
         mutex.lock();
+        // Retain current version in case the key is not found in memtable and immutable memtable
+        Version currentVersion = versions.getCurrent();
+        currentVersion.retain();
+
+        LookupResult lookupResult = null;
+        byte[] valueBytes = null;
+
         try {
             SnapshotImpl snapshot = getSnapshot(options);
             lookupKey = new LookupKey(Slices.wrappedBuffer(key), snapshot.getLastSequence());
 
             // First look in the memtable, then in the immutable memtable (if any).
-            LookupResult lookupResult = memTable.get(lookupKey);
+            lookupResult = memTable.get(lookupKey);
             if (lookupResult != null) {
                 Slice value = lookupResult.getValue();
                 if (value == null) {
-                    return null;
+                    valueBytes = null;
                 }
-                return value.getBytes();
+                else {
+                    valueBytes = value.getBytes();
+                }
             }
-            if (immutableMemTable != null) {
+            if (immutableMemTable != null && lookupResult == null) {
                 lookupResult = immutableMemTable.get(lookupKey);
                 if (lookupResult != null) {
                     Slice value = lookupResult.getValue();
                     if (value == null) {
-                        return null;
+                        valueBytes = null;
                     }
-                    return value.getBytes();
+                    else {
+                        valueBytes = value.getBytes();
+                    }
                 }
             }
         }
@@ -612,8 +620,19 @@ public class DbImpl
             mutex.unlock();
         }
 
+        // if value has been found, release version and return it
+        if (lookupResult != null) {
+            currentVersion.release();
+            return valueBytes;
+        }
+
         // Not in memTables; try live files in level order
-        LookupResult lookupResult = versions.get(lookupKey);
+        try {
+            lookupResult = currentVersion.get(lookupKey);
+        }
+        finally {
+            currentVersion.release();
+        }
 
         // schedule compaction if necessary
         mutex.lock();
