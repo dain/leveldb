@@ -625,20 +625,40 @@ public class VersionSet
 
     List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
     {
-        ImmutableList.Builder<FileMetaData> files = ImmutableList.builder();
+        List<FileMetaData> inputs = new ArrayList<>();
         Slice userBegin = begin == null ? null : begin.getUserKey();
         Slice userEnd = end == null ? null : end.getUserKey();
         UserComparator userComparator = internalKeyComparator.getUserComparator();
-        for (FileMetaData fileMetaData : current.getFiles(level)) {
-            if (userBegin != null && userComparator.compare(fileMetaData.getLargest().getUserKey(), userBegin) < 0 ||
-                    userEnd != null && userComparator.compare(fileMetaData.getSmallest().getUserKey(), userEnd) > 0) {
-                // Either completely before or after range; skip it
+        List<FileMetaData> filesInLevel = current.getFiles(level);
+        for (int i = 0; i < filesInLevel.size(); i++) {
+            FileMetaData fileMetaData = filesInLevel.get(i);
+            Slice fileStart = fileMetaData.getSmallest().getUserKey();
+            Slice fileLimit = fileMetaData.getLargest().getUserKey();
+            if (begin != null && userComparator.compare(fileLimit, userBegin) < 0) {
+                // "files1" is completely before specified range; skip it
+            }
+            else if (end != null && userComparator.compare(fileStart, userEnd) > 0) {
+                // "files1" is completely after specified range; skip it
             }
             else {
-                files.add(fileMetaData);
+                inputs.add(fileMetaData);
+                if (level == 0) {
+                    // Level-0 files may overlap each other.  So check if the newly
+                    // added file has expanded the range.  If so, restart search.
+                    if (begin != null && userComparator.compare(fileStart, userBegin) < 0) {
+                        userBegin = fileStart;
+                        inputs.clear();
+                        i = -1;
+                    }
+                    else if (end != null && userComparator.compare(fileLimit, userEnd) > 0) {
+                        userEnd = fileLimit;
+                        inputs.clear();
+                        i = -1;
+                    }
+                }
             }
         }
-        return files.build();
+        return inputs;
     }
 
     private Entry<InternalKey, InternalKey> getRange(List<FileMetaData>... inputLists)

@@ -19,6 +19,7 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterators;
 import com.google.common.primitives.UnsignedBytes;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
@@ -788,6 +789,66 @@ public class DbImplTest
         assertEquals(db.allEntriesFor("foo"), asList("tiny"));
 
         assertBetween(db.size("", "pastFoo"), 0, 1000);
+    }
+
+    @Test
+    public void testDeleteEntriesShouldNotAbeamOnIteration() throws Exception
+    {
+        DbStringWrapper db = new DbStringWrapper(new Options().createIfMissing(true), databaseDir);
+        db.put("b", "v");
+        db.delete("b");
+        db.delete("a");
+        assertEquals("[]", Iterators.toString(db.iterator()));
+    }
+
+    @Test
+    public void testL0CompactionGoogleBugIssue44a() throws Exception
+    {
+        DbStringWrapper db = new DbStringWrapper(new Options().createIfMissing(true), databaseDir);
+        db.reopen();
+        db.put("b", "v");
+        db.reopen();
+        db.delete("b");
+        db.delete("a");
+        db.reopen();
+        db.delete("a");
+        db.reopen();
+        db.put("a", "v");
+        db.reopen();
+        db.reopen();
+        assertEquals("[a=v]", Iterators.toString(db.iterator()));
+        Thread.sleep(1000);  // Wait for compaction to finish
+        assertEquals("[a=v]", Iterators.toString(db.iterator()));
+    }
+
+    @Test
+    public void testL0CompactionGoogleBugIssue44b() throws Exception
+    {
+        DbStringWrapper db = new DbStringWrapper(new Options().createIfMissing(true), databaseDir);
+        db.reopen();
+        db.put("", "");
+        db.reopen();
+        db.delete("e");
+        db.put("", "");
+        db.reopen();
+        db.put("c", "cv");
+        db.reopen();
+        assertEquals("[=, c=cv]", Iterators.toString(db.iterator()));
+        db.put("", "");
+        db.reopen();
+        db.put("", "");
+        Thread.sleep(1000);  // Wait for compaction to finish
+        db.reopen();
+        db.put("d", "dv");
+        db.reopen();
+        db.put("", "");
+        db.reopen();
+        db.delete("d");
+        db.delete("b");
+        db.reopen();
+        assertEquals("[=, c=cv]", Iterators.toString(db.iterator()));
+        Thread.sleep(1000);  // Wait for compaction to finish
+        assertEquals("[=, c=cv]", Iterators.toString(db.iterator()));
     }
 
     @Test(dataProvider = "options")

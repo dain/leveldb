@@ -28,7 +28,7 @@ import java.util.Map.Entry;
 public final class SnapshotSeekingIterator
         extends AbstractSeekingIterator<Slice, Slice>
 {
-    private final DbIterator iterator;
+    private final AbstractSeekingIterator<InternalKey, Slice> iterator;
     private final SnapshotImpl snapshot;
     private final Comparator<Slice> userComparator;
 
@@ -42,67 +42,90 @@ public final class SnapshotSeekingIterator
 
     public void close()
     {
+        next = null;
         this.snapshot.getVersion().release();
     }
 
     @Override
     protected void seekToFirstInternal()
     {
+        next = null;
         iterator.seekToFirst();
-        findNextUserEntry(null);
+        findNextUserEntry();
     }
 
     @Override
     protected void seekInternal(Slice targetKey)
     {
+        next = null;
         iterator.seek(new InternalKey(targetKey, snapshot.getLastSequence(), ValueType.VALUE));
-        findNextUserEntry(null);
+        findNextUserEntry();
     }
 
     @Override
     protected Entry<Slice, Slice> getNextElement()
     {
-        if (!iterator.hasNext()) {
+        if (this.next == null && !iterator.hasNext()) {
             return null;
         }
-
-        Entry<InternalKey, Slice> next = iterator.next();
-
         // find the next user entry after the key we are about to return
-        findNextUserEntry(next.getKey().getUserKey());
-
-        return Maps.immutableEntry(next.getKey().getUserKey(), next.getValue());
+        findNextUserEntry();
+        if (next != null) {
+            Entry<InternalKey, Slice> next = this.next;
+            this.next = null;
+            return Maps.immutableEntry(next.getKey().getUserKey(), next.getValue());
+        }
+        return null;
     }
 
-    private void findNextUserEntry(Slice deletedKey)
+    Entry<InternalKey, Slice> next;
+
+    private void findNextUserEntry()
     {
+        if (next != null) {
+            return;
+        }
         // if there are no more entries, we are done
         if (!iterator.hasNext()) {
             return;
         }
-
-        do {
-            // Peek the next entry and parse the key
-            InternalKey internalKey = iterator.peek().getKey();
-
+        //todo optimize algorithm. we should do early load when called from #seekX(y)
+        while (iterator.hasNext()) {
+            Entry<InternalKey, Slice> next = iterator.next();
+            InternalKey key = next.getKey();
             // skip entries created after our snapshot
-            if (internalKey.getSequenceNumber() > snapshot.getLastSequence()) {
-                iterator.next();
+            if (key.getSequenceNumber() > snapshot.getLastSequence()) {
                 continue;
             }
-
-            // if the next entry is a deletion, skip all subsequent entries for that key
-            if (internalKey.getValueType() == ValueType.DELETION) {
-                deletedKey = internalKey.getUserKey();
-            }
-            else if (internalKey.getValueType() == ValueType.VALUE) {
-                // is this value masked by a prior deletion record?
-                if (deletedKey == null || userComparator.compare(internalKey.getUserKey(), deletedKey) > 0) {
-                    return;
+            if (key.getValueType() == ValueType.DELETION) {
+                while (iterator.hasNext()) {
+                    Entry<InternalKey, Slice> peek = iterator.peek();
+                    if (peek.getKey().getValueType() == ValueType.DELETION) {
+                        break; //handled by next loop
+                    }
+                    else if (peek.getKey().getValueType() == ValueType.VALUE && userComparator.compare(key.getUserKey(), peek.getKey().getUserKey()) == 0) {
+                        iterator.next(); // Entry hidden
+                    }
+                    else {
+                        break; //different key
+                    }
                 }
             }
-            iterator.next();
-        } while (iterator.hasNext());
+            else if (key.getValueType() == ValueType.VALUE) {
+                while (iterator.hasNext()) {
+                    Entry<InternalKey, Slice> peek = iterator.peek();
+                    if (peek.getKey().getValueType() == ValueType.VALUE && userComparator.compare(key.getUserKey(), peek.getKey().getUserKey()) == 0) {
+                        iterator.next(); // Entry hidden
+                    }
+                    else {
+                        this.next = next;
+                        return;
+                    }
+                }
+                this.next = next;
+                return;
+            }
+        }
     }
 
     @Override
