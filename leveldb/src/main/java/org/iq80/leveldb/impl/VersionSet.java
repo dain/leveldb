@@ -803,7 +803,7 @@ public class VersionSet
 
                 //#ifndef NDEBUG  todo
                 // Make sure there is no overlap in levels > 0
-                version.assertNoOverlappingFiles();
+                version.assertNoOverlappingFiles(level);
                 //#endif
             }
         }

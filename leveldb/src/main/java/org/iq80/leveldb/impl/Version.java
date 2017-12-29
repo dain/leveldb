@@ -71,17 +71,10 @@ public class Version
 
     }
 
-    public void assertNoOverlappingFiles()
-    {
-        for (int level = 1; level < NUM_LEVELS; level++) {
-            assertNoOverlappingFiles(level);
-        }
-    }
-
     public void assertNoOverlappingFiles(int level)
     {
         if (level > 0) {
-            Collection<FileMetaData> files = getFiles().asMap().get(level);
+            Collection<FileMetaData> files = getFiles(level);
             if (files != null) {
                 long previousFileNumber = 0;
                 InternalKey previousEnd = null;
