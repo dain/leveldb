@@ -89,7 +89,7 @@ public final class SnapshotSeekingIterator
         if (!iterator.hasNext()) {
             return;
         }
-        //todo optimize algorithm. we should do early load when called from #seekX(y)
+        //todo optimize algorithm. we should not do early load when called from #seekX(y)
         while (iterator.hasNext()) {
             Entry<InternalKey, Slice> next = iterator.next();
             InternalKey key = next.getKey();

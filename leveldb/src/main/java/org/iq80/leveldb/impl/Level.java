@@ -18,14 +18,11 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.LevelIterator;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -94,7 +91,7 @@ public class Level
         }
         else {
             // Binary search to find earliest index whose largest key >= ikey.
-            int index = ceilingEntryIndex(Lists.transform(files, FileMetaData::getLargest), key.getInternalKey(), internalKeyComparator);
+            int index = findFile(key.getInternalKey());
 
             // did we find any files that could contain the key?
             if (index >= files.size()) {
@@ -133,15 +130,6 @@ public class Level
         return null;
     }
 
-    private static <T> int ceilingEntryIndex(List<T> list, T key, Comparator<T> comparator)
-    {
-        int insertionPoint = Collections.binarySearch(list, key, comparator);
-        if (insertionPoint < 0) {
-            insertionPoint = -(insertionPoint + 1);
-        }
-        return insertionPoint;
-    }
-
     public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
     {
         int index = 0;
@@ -162,10 +150,6 @@ public class Level
     @VisibleForTesting
     int findFile(InternalKey targetKey)
     {
-        if (files.isEmpty()) {
-            return files.size();
-        }
-
         // todo replace with Collections.binarySearch
         int left = 0;
         int right = files.size();
