@@ -1223,11 +1223,7 @@ public class DbImplTest
 
     private void fillLevels(DbStringWrapper db, String smallest, String largest)
     {
-        for (int level = 0; level < NUM_LEVELS; level++) {
-            db.put(smallest, "begin");
-            db.put(largest, "end");
-            db.compactMemTable();
-        }
+        makeTables(db, NUM_LEVELS, smallest, largest);
     }
 
     private final ArrayList<DbStringWrapper> opened = new ArrayList<>();

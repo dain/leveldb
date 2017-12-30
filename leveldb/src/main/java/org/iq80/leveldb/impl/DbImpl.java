@@ -501,11 +501,11 @@ public class DbImpl
 
         Compaction compaction;
         InternalKey manualEnd = null;
-        if (manualCompaction != null) {
-            compaction = versions.compactRange(manualCompaction.level,
-                    manualCompaction.begin,
-                    manualCompaction.end);
-            manualCompaction.done = compaction == null;
+        boolean isManual = manualCompaction != null;
+        if (isManual) {
+            ManualCompaction m = this.manualCompaction;
+            compaction = versions.compactRange(m.level, m.begin, m.end);
+            m.done = compaction == null;
             if (compaction != null) {
                 manualEnd = compaction.input(0, compaction.getLevelInputs().size() - 1).getLargest();
             }
@@ -517,7 +517,7 @@ public class DbImpl
         if (compaction == null) {
             // no compaction
         }
-        else if (manualCompaction == null && compaction.isTrivialMove()) {
+        else if (!isManual && compaction.isTrivialMove()) {
             // Move file to next level
             checkState(compaction.getLevelInputs().size() == 1);
             FileMetaData fileMetaData = compaction.getLevelInputs().get(0);
@@ -533,7 +533,7 @@ public class DbImpl
         }
 
         // manual compaction complete
-        if (manualCompaction != null) {
+        if (isManual) {
             ManualCompaction m = manualCompaction;
             if (backgroundException != null) {
                 m.done = true;
