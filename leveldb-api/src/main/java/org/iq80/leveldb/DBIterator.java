@@ -62,4 +62,7 @@ public interface DBIterator
      * Repositions the iterator so it is at the end of of the Database.
      */
     void seekToLast();
+
+    @Override
+    void close();
 }

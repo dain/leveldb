@@ -26,24 +26,24 @@ import java.util.Comparator;
 import java.util.Map.Entry;
 
 public final class SnapshotSeekingIterator
-        extends AbstractSeekingIterator<Slice, Slice>
+        extends AbstractSeekingIterator<Slice, Slice> implements AutoCloseable
 {
-    private final AbstractSeekingIterator<InternalKey, Slice> iterator;
-    private final SnapshotImpl snapshot;
+    private final DbIterator iterator;
+    private final long sequence;
     private final Comparator<Slice> userComparator;
 
-    public SnapshotSeekingIterator(DbIterator iterator, SnapshotImpl snapshot, Comparator<Slice> userComparator)
+    public SnapshotSeekingIterator(DbIterator iterator, long sequence, Comparator<Slice> userComparator)
     {
         this.iterator = iterator;
-        this.snapshot = snapshot;
+        this.sequence = sequence;
         this.userComparator = userComparator;
-        this.snapshot.getVersion().retain();
     }
 
+    @Override
     public void close()
     {
         next = null;
-        this.snapshot.getVersion().release();
+        iterator.close();
     }
 
     @Override
@@ -58,7 +58,7 @@ public final class SnapshotSeekingIterator
     protected void seekInternal(Slice targetKey)
     {
         next = null;
-        iterator.seek(new InternalKey(targetKey, snapshot.getLastSequence(), ValueType.VALUE));
+        iterator.seek(new InternalKey(targetKey, sequence, ValueType.VALUE));
         findNextUserEntry();
     }
 
@@ -94,7 +94,7 @@ public final class SnapshotSeekingIterator
             Entry<InternalKey, Slice> next = iterator.next();
             InternalKey key = next.getKey();
             // skip entries created after our snapshot
-            if (key.getSequenceNumber() > snapshot.getLastSequence()) {
+            if (key.getSequenceNumber() > sequence) {
                 continue;
             }
             if (key.getValueType() == ValueType.DELETION) {
@@ -133,7 +133,7 @@ public final class SnapshotSeekingIterator
     {
         final StringBuilder sb = new StringBuilder();
         sb.append("SnapshotSeekingIterator");
-        sb.append("{snapshot=").append(snapshot);
+        sb.append("{sequence=").append(sequence);
         sb.append(", iterator=").append(iterator);
         sb.append('}');
         return sb.toString();

@@ -32,6 +32,7 @@ import org.iq80.leveldb.Snapshot;
 import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.table.BloomFilterPolicy;
+import org.iq80.leveldb.util.DbIterator;
 import org.iq80.leveldb.util.FileUtils;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
@@ -40,6 +41,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -339,13 +341,14 @@ public class DbImplTest
             throws Exception
     {
         DbStringWrapper db = new DbStringWrapper(options, databaseDir);
-        SeekingIterator<String, String> iterator = db.iterator();
+        StringDbIterator iterator = db.iterator();
 
         iterator.seekToFirst();
         assertNoNextElement(iterator);
 
         iterator.seek("foo");
         assertNoNextElement(iterator);
+        iterator.close();
     }
 
     @Test(dataProvider = "options")
@@ -355,7 +358,9 @@ public class DbImplTest
         DbStringWrapper db = new DbStringWrapper(options, databaseDir);
         db.put("a", "va");
 
-        assertSequence(db.iterator(), immutableEntry("a", "va"));
+        StringDbIterator iterator = db.iterator();
+        assertSequence(iterator, immutableEntry("a", "va"));
+        iterator.close();
     }
 
     @Test(dataProvider = "options")
@@ -367,7 +372,7 @@ public class DbImplTest
         db.put("b", "vb");
         db.put("c", "vc");
 
-        SeekingIterator<String, String> iterator = db.iterator();
+        StringDbIterator iterator = db.iterator();
         assertSequence(iterator,
                 immutableEntry("a", "va"),
                 immutableEntry("b", "vb"),
@@ -389,6 +394,7 @@ public class DbImplTest
                 immutableEntry("a", "va"),
                 immutableEntry("b", "vb"),
                 immutableEntry("c", "vc"));
+        iterator.close();
     }
 
     @Test(dataProvider = "options")
@@ -401,13 +407,14 @@ public class DbImplTest
         db.put("c", "vc");
         db.put("d", Strings.repeat("d", 100000));
         db.put("e", Strings.repeat("e", 100000));
-        SeekingIterator<String, String> iterator = db.iterator();
+        StringDbIterator iterator = db.iterator();
         assertSequence(iterator,
                 immutableEntry("a", "va"),
                 immutableEntry("b", Strings.repeat("b", 100000)),
                 immutableEntry("c", "vc"),
                 immutableEntry("d", Strings.repeat("d", 100000)),
                 immutableEntry("e", Strings.repeat("e", 100000)));
+        iterator.close();
 
     }
 
@@ -421,11 +428,12 @@ public class DbImplTest
         db.put("a", "va");
         db.delete("b");
         assertNull(db.get("b"));
-        SeekingIterator<String, String> iterator = db.iterator();
+        StringDbIterator iterator = db.iterator();
         iterator.seek("c");
         assertSequence(iterator,
                 immutableEntry("c", "vc")
         );
+        iterator.close();
     }
 
     @Test(dataProvider = "options")
@@ -714,7 +722,7 @@ public class DbImplTest
         DbStringWrapper db = new DbStringWrapper(options, databaseDir);
         db.put("foo", "hello");
 
-        SeekingIterator<String, String> iterator = db.iterator();
+        StringDbIterator iterator = db.iterator();
 
         db.put("foo", "newvalue1");
         for (int i = 0; i < 100; i++) {
@@ -723,6 +731,7 @@ public class DbImplTest
         db.put("foo", "newvalue1");
 
         assertSequence(iterator, immutableEntry("foo", "hello"));
+        iterator.close();
     }
 
     @Test(dataProvider = "options")
@@ -798,7 +807,7 @@ public class DbImplTest
         db.put("b", "v");
         db.delete("b");
         db.delete("a");
-        assertEquals("[]", Iterators.toString(db.iterator()));
+        assertEquals("[]", toString(db));
     }
 
     @Test
@@ -816,9 +825,17 @@ public class DbImplTest
         db.put("a", "v");
         db.reopen();
         db.reopen();
-        assertEquals("[a=v]", Iterators.toString(db.iterator()));
+        assertEquals("[a=v]", toString(db));
         Thread.sleep(1000);  // Wait for compaction to finish
-        assertEquals("[a=v]", Iterators.toString(db.iterator()));
+        assertEquals("[a=v]", toString(db));
+    }
+
+    private String toString(DbStringWrapper db)
+    {
+        StringDbIterator iterator = db.iterator();
+        String s = Iterators.toString(iterator);
+        iterator.close();
+        return s;
     }
 
     @Test
@@ -833,7 +850,7 @@ public class DbImplTest
         db.reopen();
         db.put("c", "cv");
         db.reopen();
-        assertEquals("[=, c=cv]", Iterators.toString(db.iterator()));
+        assertEquals("[=, c=cv]", toString(db));
         db.put("", "");
         db.reopen();
         db.put("", "");
@@ -846,9 +863,9 @@ public class DbImplTest
         db.delete("d");
         db.delete("b");
         db.reopen();
-        assertEquals("[=, c=cv]", Iterators.toString(db.iterator()));
+        assertEquals("[=, c=cv]", toString(db));
         Thread.sleep(1000);  // Wait for compaction to finish
-        assertEquals("[=, c=cv]", Iterators.toString(db.iterator()));
+        assertEquals("[=, c=cv]", toString(db));
     }
 
     @Test(dataProvider = "options")
@@ -1030,7 +1047,7 @@ public class DbImplTest
             db.put(entry.getKey(), entry.getValue());
         }
 
-        SeekingIterator<String, String> seekingIterator = db.iterator();
+        StringDbIterator seekingIterator = db.iterator();
         for (Entry<String, String> entry : entries) {
             assertTrue(seekingIterator.hasNext());
             assertEquals(seekingIterator.peek(), entry);
@@ -1038,6 +1055,7 @@ public class DbImplTest
         }
 
         assertFalse(seekingIterator.hasNext());
+        seekingIterator.close();
     }
 
     @Test(dataProvider = "options")
@@ -1124,7 +1142,7 @@ public class DbImplTest
             assertEquals(actual, entry.getValue(), "Key: " + entry.getKey());
         }
 
-        SeekingIterator<String, String> seekingIterator = db.iterator();
+        StringDbIterator seekingIterator = db.iterator();
         assertSequence(seekingIterator, entries);
 
         seekingIterator.seekToFirst();
@@ -1144,7 +1162,8 @@ public class DbImplTest
 
         Slice endKey = Slices.wrappedBuffer(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
         seekingIterator.seek(endKey.toString(UTF_8));
-        assertSequence(seekingIterator, Collections.<Entry<String, String>>emptyList());
+        assertSequence(seekingIterator, Collections.emptyList());
+        seekingIterator.close();
     }
 
     @BeforeMethod
@@ -1340,7 +1359,7 @@ public class DbImplTest
             db.delete(toByteArray(key));
         }
 
-        public SeekingIterator<String, String> iterator()
+        public StringDbIterator iterator()
         {
             return new StringDbIterator(db.iterator());
         }
@@ -1425,7 +1444,9 @@ public class DbImplTest
         private List<String> allEntriesFor(String userKey)
         {
             ImmutableList.Builder<String> result = ImmutableList.builder();
-            for (Entry<InternalKey, Slice> entry : db.internalIterable()) {
+            DbIterator iterator = db.internalIterator();
+            while (iterator.hasNext()) {
+                Entry<InternalKey, Slice> entry = iterator.next();
                 String entryKey = entry.getKey().getUserKey().toString(UTF_8);
                 if (entryKey.equals(userKey)) {
                     if (entry.getKey().getValueType() == ValueType.VALUE) {
@@ -1436,13 +1457,14 @@ public class DbImplTest
                     }
                 }
             }
+            iterator.close();
             return result.build();
         }
 
     }
 
     private static class StringDbIterator
-            implements SeekingIterator<String, String>
+            implements SeekingIterator<String, String>, Closeable
     {
         private final DBIterator iterator;
 
@@ -1467,6 +1489,12 @@ public class DbImplTest
         public void seek(String targetKey)
         {
             iterator.seek(targetKey.getBytes(UTF_8));
+        }
+
+        @Override
+        public void close()
+        {
+            iterator.close();
         }
 
         @Override

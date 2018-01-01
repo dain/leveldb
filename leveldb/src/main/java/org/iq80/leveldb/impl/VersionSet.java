@@ -144,7 +144,7 @@ public class VersionSet
         requireNonNull(version, "version is null");
         checkArgument(version != current, "version is the current version");
         Version previous = current;
-        current = version;
+        current = version; //version already retained, create with retained = 1
         activeVersions.put(version, new Object());
         if (previous != null) {
             previous.release();
@@ -266,9 +266,10 @@ public class VersionSet
         edit.setLastSequenceNumber(lastSequence);
 
         Version version = new Version(this);
-        Builder builder = new Builder(this, current);
-        builder.apply(edit);
-        builder.saveTo(version);
+        try (Builder builder = new Builder(this, current)) {
+            builder.apply(edit);
+            builder.saveTo(version);
+        }
 
         finalizeVersion(version);
 
@@ -397,6 +398,7 @@ public class VersionSet
 
             Version newVersion = new Version(this);
             builder.saveTo(newVersion);
+            builder.close();
 
             // Install recovered version
             finalizeVersion(newVersion);
@@ -705,7 +707,7 @@ public class VersionSet
      * of edits to a particular state without creating intermediate
      * Versions that contain full copies of the intermediate state.
      */
-    private static class Builder
+    private static class Builder implements AutoCloseable
     {
         private final VersionSet versionSet;
         private final Version baseVersion;
@@ -715,6 +717,7 @@ public class VersionSet
         {
             this.versionSet = versionSet;
             this.baseVersion = baseVersion;
+            baseVersion.retain();
 
             levels = new ArrayList<>(baseVersion.numberOfLevels());
             for (int i = 0; i < baseVersion.numberOfLevels(); i++) {
@@ -782,7 +785,7 @@ public class VersionSet
                 // Merge the set of added files with the set of pre-existing files.
                 // Drop any deleted files.  Store the result in *v.
 
-                Collection<FileMetaData> baseFiles = baseVersion.getFiles().asMap().get(level);
+                Collection<FileMetaData> baseFiles = baseVersion.getFiles(level);
                 if (baseFiles == null) {
                     baseFiles = ImmutableList.of();
                 }
@@ -830,6 +833,12 @@ public class VersionSet
                 }
                 version.addFile(level, fileMetaData);
             }
+        }
+
+        @Override
+        public void close()
+        {
+            baseVersion.release();
         }
 
         private static class FileMetaDataBySmallestKey

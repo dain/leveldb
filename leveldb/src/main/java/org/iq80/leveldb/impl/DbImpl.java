@@ -18,7 +18,6 @@
 package org.iq80.leveldb.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
@@ -104,6 +103,7 @@ public class DbImpl
 
     private final List<Long> pendingOutputs = new ArrayList<>(); // todo
     private final Deque<WriteBatchInternal> writers = new LinkedList<>();
+    private final SnapshotList snapshots = new SnapshotList(mutex);
     private final WriteBatchImpl tmpBatch = new WriteBatchImpl();
 
     private LogWriter log;
@@ -529,7 +529,11 @@ public class DbImpl
         else {
             CompactionState compactionState = new CompactionState(compaction);
             doCompactionWork(compactionState);
+            compaction.close(); //release resources
             cleanupCompaction(compactionState);
+        }
+        if (compaction != null) {
+            compaction.close();
         }
 
         // manual compaction complete
@@ -632,14 +636,15 @@ public class DbImpl
         LookupResult lookupResult;
         mutex.lock();
         try {
-            long lastSequence = options.snapshot() instanceof SnapshotImpl ?
-                    ((SnapshotImpl) options.snapshot()).getLastSequence() : versions.getLastSequence();
+            long lastSequence = options.snapshot() != null ?
+                    snapshots.getSequenceFrom(options.snapshot()) : versions.getLastSequence();
             lookupKey = new LookupKey(Slices.wrappedBuffer(key), lastSequence);
 
             // First look in the memtable, then in the immutable memtable (if any).
             final MemTable memTable = this.memTable;
             final MemTable immutableMemTable = this.immutableMemTable;
             final Version current = versions.getCurrent();
+            current.retain();
             ReadStats readStats = null;
             mutex.unlock();
             try {
@@ -662,6 +667,7 @@ public class DbImpl
             if (readStats != null && current.updateStats(readStats)) {
                 maybeScheduleCompaction();
             }
+            current.release();
         }
         finally {
             mutex.unlock();
@@ -764,7 +770,7 @@ public class DbImpl
                             log.addRecord(record, options.sync());
                         }
                         catch (IOException e) {
-                            throw Throwables.propagate(e);
+                            throw new DBException(e);
                         }
 
                         // Update memtable
@@ -780,9 +786,6 @@ public class DbImpl
                 }
                 // Reserve this sequence in the version set
                 versions.setLastSequence(sequenceEnd);
-            }
-            else {
-                sequenceEnd = versions.getLastSequence();
             }
 
             final WriteBatchInternal lastWriteV = lastWriter.getValue();
@@ -804,7 +807,7 @@ public class DbImpl
             }
 
             if (options.snapshot()) {
-                return new SnapshotImpl(versions.getCurrent(), sequenceEnd);
+                return snapshots.newSnapshot(versions.getLastSequence());
             }
             else {
                 return null;
@@ -891,25 +894,13 @@ public class DbImpl
             DbIterator rawIterator = internalIterator();
 
             // filter any entries not visible in our snapshot
-            SnapshotImpl snapshot = getSnapshot(options);
+            long snapshot = getSnapshot(options);
             SnapshotSeekingIterator snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
             return new SeekingIteratorAdapter(snapshotIterator);
         }
         finally {
             mutex.unlock();
         }
-    }
-
-    SeekingIterable<InternalKey, Slice> internalIterable()
-    {
-        return new SeekingIterable<InternalKey, Slice>()
-        {
-            @Override
-            public DbIterator iterator()
-            {
-                return internalIterator();
-            }
-        };
     }
 
     DbIterator internalIterator()
@@ -922,7 +913,16 @@ public class DbImpl
                 iterator = immutableMemTable.iterator();
             }
             Version current = versions.getCurrent();
-            return new DbIterator(memTable.iterator(), iterator, current.getLevel0Files(), current.getLevelIterators(), internalKeyComparator);
+            current.retain();
+            return new DbIterator(memTable.iterator(), iterator, current.getLevel0Files(), current.getLevelIterators(), internalKeyComparator, () -> {
+                mutex.lock();
+                try {
+                    current.release();
+                }
+                finally {
+                    mutex.unlock();
+                }
+            });
         }
         finally {
             mutex.unlock();
@@ -935,22 +935,21 @@ public class DbImpl
         checkBackgroundException();
         mutex.lock();
         try {
-            return new SnapshotImpl(versions.getCurrent(), versions.getLastSequence());
+            return snapshots.newSnapshot(versions.getLastSequence());
         }
         finally {
             mutex.unlock();
         }
     }
 
-    private SnapshotImpl getSnapshot(ReadOptions options)
+    private long getSnapshot(ReadOptions options)
     {
-        SnapshotImpl snapshot;
+        long snapshot;
         if (options.snapshot() != null) {
-            snapshot = (SnapshotImpl) options.snapshot();
+            snapshot = snapshots.getSequenceFrom(options.snapshot());
         }
         else {
-            snapshot = new SnapshotImpl(versions.getCurrent(), versions.getLastSequence());
-            snapshot.close(); // To avoid holding the snapshot active..
+            snapshot = versions.getLastSequence();
         }
         return snapshot;
     }
@@ -1061,7 +1060,9 @@ public class DbImpl
             // Save the contents of the memtable as a new Table
             VersionEdit edit = new VersionEdit();
             Version base = versions.getCurrent();
+            base.retain();
             writeLevel0Table(immutableMemTable, edit, base);
+            base.release();
 
             if (shuttingDown.get()) {
                 throw new DatabaseShutdownException("Database shutdown during memtable compaction");
@@ -1167,8 +1168,7 @@ public class DbImpl
         checkArgument(compactionState.builder == null);
         checkArgument(compactionState.outfile == null);
 
-        // todo track snapshots
-        compactionState.smallestSnapshot = versions.getLastSequence();
+        compactionState.smallestSnapshot = snapshots.isEmpty() ? versions.getLastSequence() : snapshots.getOldest();
 
         // Release mutex while we're actually doing the compaction work
         mutex.unlock();
@@ -1355,9 +1355,6 @@ public class DbImpl
         }
     }
 
-    /**
-     * Only for testing
-     */
     @VisibleForTesting
     int numberOfFilesInLevel(int level)
     {
@@ -1390,6 +1387,7 @@ public class DbImpl
         Version v;
         try {
             v = versions.getCurrent();
+            v.retain();
         }
         finally {
             mutex.unlock();
@@ -1399,7 +1397,13 @@ public class DbImpl
         InternalKey limitKey = new InternalKey(Slices.wrappedBuffer(range.limit()), MAX_SEQUENCE_NUMBER, VALUE);
         long startOffset = v.getApproximateOffsetOf(startKey);
         long limitOffset = v.getApproximateOffsetOf(limitKey);
-
+        mutex.lock();
+        try {
+            v.release();
+        }
+        finally {
+            mutex.unlock();
+        }
         return (limitOffset >= startOffset ? limitOffset - startOffset : 0);
     }
 
