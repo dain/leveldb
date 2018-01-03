@@ -530,6 +530,7 @@ public class DbImpl
             CompactionState compactionState = new CompactionState(compaction);
             doCompactionWork(compactionState);
             cleanupCompaction(compactionState);
+            deleteObsoleteFiles();
         }
 
         // manual compaction complete
@@ -1339,20 +1340,7 @@ public class DbImpl
             pendingOutputs.remove(output.getNumber());
         }
 
-        try {
-            versions.logAndApply(compact.compaction.getEdit(), mutex);
-            deleteObsoleteFiles();
-        }
-        catch (IOException e) { //todo fix the issue causing this exception
-            // Compaction failed for some reason.  Simply discard the work and try again later.
-
-            // Discard any files we may have created during this failed compaction
-            for (FileMetaData output : compact.outputs) {
-                File file = new File(databaseDir, Filename.tableFileName(output.getNumber()));
-                file.delete();
-            }
-            compact.outputs.clear();
-        }
+        versions.logAndApply(compact.compaction.getEdit(), mutex);
     }
 
     /**

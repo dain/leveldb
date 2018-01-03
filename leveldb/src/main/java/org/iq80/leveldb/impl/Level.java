@@ -130,8 +130,22 @@ public class Level
         return null;
     }
 
-    public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
+    public boolean someFileOverlapsRange(boolean disjointSortedFiles, Slice smallestUserKey, Slice largestUserKey)
     {
+        UserComparator userComparator = internalKeyComparator.getUserComparator();
+        if (!disjointSortedFiles) {
+            // Need to check against all files
+            for (FileMetaData file : files) {
+                if (afterFile(userComparator, smallestUserKey, file) ||
+                        beforeFile(userComparator, largestUserKey, file)) {
+                    // No overlap
+                }
+                else {
+                    return true;  // Overlap
+                }
+            }
+            return false;
+        }
         int index = 0;
         if (smallestUserKey != null) {
             InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
@@ -143,8 +157,21 @@ public class Level
             return false;
         }
 
-        UserComparator userComparator = internalKeyComparator.getUserComparator();
-        return (largestUserKey == null || userComparator.compare(largestUserKey, files.get(index).getSmallest().getUserKey()) >= 0);
+        return !beforeFile(userComparator, largestUserKey, files.get(index));
+    }
+
+    private boolean beforeFile(UserComparator userComparator, Slice userKey, FileMetaData file)
+    {
+        // null userKey occurs after all keys and is therefore never before *f
+        return (userKey != null &&
+                userComparator.compare(userKey, file.getSmallest().getUserKey()) < 0);
+    }
+
+    private boolean afterFile(UserComparator userComparator, Slice userKey, FileMetaData file)
+    {
+        // NULL user_key occurs before all keys and is therefore never after *f
+        return (userKey != null &&
+                userComparator.compare(userKey, file.getLargest().getUserKey()) > 0);
     }
 
     @VisibleForTesting

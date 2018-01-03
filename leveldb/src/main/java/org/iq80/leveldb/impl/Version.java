@@ -176,7 +176,7 @@ public class Version
             // Push to next level if there is no overlap in next level,
             // and the #bytes overlapping in the level after that are limited.
             InternalKey start = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            InternalKey limit = new InternalKey(largestUserKey, 0, ValueType.VALUE);
+            InternalKey limit = new InternalKey(largestUserKey, 0, ValueType.DELETION);
             while (level < MAX_MEM_COMPACT_LEVEL) {
                 if (overlapInLevel(level + 1, smallestUserKey, largestUserKey)) {
                     break;
@@ -196,9 +196,9 @@ public class Version
         checkPositionIndex(level, levels.size(), "Invalid level");
 
         if (level == 0) {
-            return level0.someFileOverlapsRange(smallestUserKey, largestUserKey);
+            return level0.someFileOverlapsRange(false, smallestUserKey, largestUserKey);
         }
-        return levels.get(level - 1).someFileOverlapsRange(smallestUserKey, largestUserKey);
+        return levels.get(level - 1).someFileOverlapsRange(true, smallestUserKey, largestUserKey);
     }
 
     public int numberOfLevels()

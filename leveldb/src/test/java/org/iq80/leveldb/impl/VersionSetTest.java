@@ -65,7 +65,7 @@ public class VersionSetTest
     {
         Slice s = smallest != null ? TestUtils.asciiToSlice(smallest) : null;
         Slice l = largest != null ? TestUtils.asciiToSlice(largest) : null;
-        return newLevel().someFileOverlapsRange(s, l);
+        return newLevel().someFileOverlapsRange(true, s, l);
     }
 
     @Test

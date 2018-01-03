@@ -782,7 +782,7 @@ public class VersionSet
                 // Merge the set of added files with the set of pre-existing files.
                 // Drop any deleted files.  Store the result in *v.
 
-                Collection<FileMetaData> baseFiles = baseVersion.getFiles().asMap().get(level);
+                Collection<FileMetaData> baseFiles = baseVersion.getFiles(level);
                 if (baseFiles == null) {
                     baseFiles = ImmutableList.of();
                 }
