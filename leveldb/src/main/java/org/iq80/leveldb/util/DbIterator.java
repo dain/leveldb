@@ -21,6 +21,7 @@ import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.SeekingIterator;
 
+import java.io.Closeable;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -31,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class DbIterator
         extends AbstractSeekingIterator<InternalKey, Slice>
-        implements InternalIterator
+        implements InternalIterator, Closeable
 {
     /*
      * NOTE: This code has been specifically tuned for performance of the DB
@@ -55,21 +56,23 @@ public final class DbIterator
     private final List<LevelIterator> levels;
 
     private final Comparator<InternalKey> comparator;
+    private final Runnable cleanup;
 
     private final ComparableIterator[] heap;
     private int heapSize;
 
     public DbIterator(MemTableIterator memTableIterator,
-            MemTableIterator immutableMemTableIterator,
-            List<InternalTableIterator> level0Files,
-            List<LevelIterator> levels,
-            Comparator<InternalKey> comparator)
+                      MemTableIterator immutableMemTableIterator,
+                      List<InternalTableIterator> level0Files,
+                      List<LevelIterator> levels,
+                      Comparator<InternalKey> comparator, Runnable cleanup)
     {
         this.memTableIterator = memTableIterator;
         this.immutableMemTableIterator = immutableMemTableIterator;
         this.level0Files = level0Files;
         this.levels = levels;
         this.comparator = comparator;
+        this.cleanup = cleanup;
 
         this.heap = new ComparableIterator[3 + level0Files.size() + levels.size()];
         resetPriorityQueue();
@@ -218,6 +221,12 @@ public final class DbIterator
         sb.append(", comparator=").append(comparator);
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public void close()
+    {
+        cleanup.run();
     }
 
     private static class ComparableIterator
