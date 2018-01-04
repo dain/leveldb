@@ -60,7 +60,6 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -109,7 +108,7 @@ public class DbImpl
     private LogWriter log;
 
     private MemTable memTable;
-    private MemTable immutableMemTable;
+    private volatile MemTable immutableMemTable;
 
     private final InternalKeyComparator internalKeyComparator;
 
@@ -433,23 +432,7 @@ public class DbImpl
             // No work to be done
         }
         else {
-            backgroundCompaction = compactionExecutor.submit(new Callable<Void>()
-            {
-                @Override
-                public Void call()
-                        throws Exception
-                {
-                    try {
-                        backgroundCall();
-                    }
-                    catch (DatabaseShutdownException ignored) {
-                    }
-                    catch (Throwable e) {
-                        backgroundException = e;
-                    }
-                    return null;
-                }
-            });
+            backgroundCompaction = compactionExecutor.submit(this::backgroundCall);
         }
     }
 
@@ -462,16 +445,13 @@ public class DbImpl
     }
 
     private void backgroundCall()
-            throws IOException
     {
         mutex.lock();
         try {
-            if (backgroundCompaction == null) {
-                return;
-            }
+            checkState(backgroundCompaction != null, "Compaction was not correctly scheduled");
 
             try {
-                if (!shuttingDown.get()) {
+                if (!shuttingDown.get() && backgroundException == null) {
                     backgroundCompaction();
                 }
             }
@@ -481,6 +461,14 @@ public class DbImpl
             // Previous compaction may have produced too many files in a level,
             // so reschedule another compaction if needed.
             maybeScheduleCompaction();
+        }
+        catch (DatabaseShutdownException ignored) {
+        }
+        catch (Throwable throwable) {
+            backgroundException = throwable;
+            if (throwable instanceof Error) {
+                throw (Error) throwable;
+            }
         }
         finally {
             try {
@@ -497,7 +485,9 @@ public class DbImpl
     {
         checkState(mutex.isHeldByCurrentThread());
 
-        compactMemTableInternal();
+        if (immutableMemTable != null) {
+            compactMemTable();
+        }
 
         Compaction compaction;
         InternalKey manualEnd = null;
@@ -1036,26 +1026,11 @@ public class DbImpl
         }
     }
 
-    public void compactMemTable()
-            throws IOException
-    {
-        mutex.lock();
-        try {
-            compactMemTableInternal();
-        }
-        finally {
-            mutex.unlock();
-        }
-        checkBackgroundException();
-    }
-
-    private void compactMemTableInternal()
+    private void compactMemTable()
             throws IOException
     {
         checkState(mutex.isHeldByCurrentThread());
-        if (immutableMemTable == null) {
-            return;
-        }
+        checkState(immutableMemTable != null);
 
         try {
             // Save the contents of the memtable as a new Table
@@ -1182,12 +1157,14 @@ public class DbImpl
             long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
             while (iterator.hasNext() && !shuttingDown.get()) {
                 // always give priority to compacting the current mem table
-                mutex.lock();
-                try {
-                    compactMemTableInternal();
-                }
-                finally {
-                    mutex.unlock();
+                if (immutableMemTable != null) {
+                    mutex.lock();
+                    try {
+                        compactMemTable();
+                    }
+                    finally {
+                        mutex.unlock();
+                    }
                 }
 
                 InternalKey key = iterator.peek().getKey();
@@ -1626,7 +1603,7 @@ public class DbImpl
     }
 
     @VisibleForTesting
-    void testCompactMemTable() throws DBException
+    public void testCompactMemTable() throws DBException
     {
         // NULL batch means just wait for earlier writes to be done
         writeInternal(null, new WriteOptions());

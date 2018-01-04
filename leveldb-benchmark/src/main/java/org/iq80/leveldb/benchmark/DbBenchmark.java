@@ -571,7 +571,7 @@ public class DbBenchmark
             throws IOException
     {
         if (db instanceof DbImpl) {
-            ((DbImpl) db).compactMemTable();
+            ((DbImpl) db).testCompactMemTable();
             for (int level = 0; level < NUM_LEVELS - 1; level++) {
                 ((DbImpl) db).compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
             }
