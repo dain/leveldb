@@ -915,7 +915,7 @@ public class DbImpl
             }
             Version current = versions.getCurrent();
             current.retain();
-            return new DbIterator(memTable.iterator(), iterator, current.getLevel0Files(), current.getLevelIterators(), internalKeyComparator, () -> {
+            return new DbIterator(memTable.iterator(), iterator, current.getLevelIterators(), internalKeyComparator, () -> {
                 mutex.lock();
                 try {
                     current.release();

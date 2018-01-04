@@ -19,10 +19,14 @@ package org.iq80.leveldb.impl;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.InternalIterator;
+import org.iq80.leveldb.util.Level0Iterator;
 import org.iq80.leveldb.util.LevelIterator;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -34,12 +38,13 @@ import static org.iq80.leveldb.impl.ValueType.VALUE;
 public class Level
         implements SeekingIterable<InternalKey, Slice>
 {
+    private static final Comparator<FileMetaData> NEWEST_FIRST = (fileMetaData, fileMetaData1) -> (int) (fileMetaData1.getNumber() - fileMetaData.getNumber());
     private final int levelNumber;
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
     private final List<FileMetaData> files;
 
-    public Level(int levelNumber, List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public Level(int levelNumber, Collection<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
     {
         checkArgument(levelNumber >= 0, "levelNumber is negative");
         requireNonNull(files, "files is null");
@@ -49,7 +54,6 @@ public class Level
         this.files = new ArrayList<>(files);
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
-        checkArgument(levelNumber >= 0, "levelNumber is negative");
         this.levelNumber = levelNumber;
     }
 
@@ -64,9 +68,14 @@ public class Level
     }
 
     @Override
-    public LevelIterator iterator()
+    public InternalIterator iterator()
     {
-        return createLevelConcatIterator(tableCache, files, internalKeyComparator);
+        if (levelNumber == 0) {
+            return new Level0Iterator(tableCache, files, internalKeyComparator);
+        }
+        else {
+            return createLevelConcatIterator(tableCache, files, internalKeyComparator);
+        }
     }
 
     public static LevelIterator createLevelConcatIterator(TableCache tableCache, List<FileMetaData> files, InternalKeyComparator internalKeyComparator)
@@ -88,6 +97,10 @@ public class Level
                     fileMetaDataList.add(fileMetaData);
                 }
             }
+            if (fileMetaDataList.isEmpty()) {
+                return null;
+            }
+            fileMetaDataList.sort(NEWEST_FIRST);
         }
         else {
             // Binary search to find earliest index whose largest key >= ikey.
