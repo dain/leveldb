@@ -1251,22 +1251,22 @@ public class DbImpl
         requireNonNull(compactionState, "compactionState is null");
         checkArgument(compactionState.builder == null, "compactionState builder is not null");
 
+        long fileNumber;
         mutex.lock();
         try {
-            long fileNumber = versions.getNextFileNumber();
+            fileNumber = versions.getNextFileNumber();
             pendingOutputs.add(fileNumber);
             compactionState.currentFileNumber = fileNumber;
             compactionState.currentFileSize = 0;
             compactionState.currentSmallest = null;
             compactionState.currentLargest = null;
-
-            File file = new File(databaseDir, Filename.tableFileName(fileNumber));
-            compactionState.outfile = UnbufferedWritableFile.open(file);
-            compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
         }
         finally {
             mutex.unlock();
         }
+        File file = new File(databaseDir, Filename.tableFileName(fileNumber));
+        compactionState.outfile = UnbufferedWritableFile.open(file);
+        compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
     }
 
     private void finishCompactionOutputFile(CompactionState compactionState)
