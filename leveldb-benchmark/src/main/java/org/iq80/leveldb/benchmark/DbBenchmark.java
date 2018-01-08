@@ -29,7 +29,6 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.ReadOptions;
 import org.iq80.leveldb.WriteBatch;
 import org.iq80.leveldb.WriteOptions;
-import org.iq80.leveldb.impl.DbImpl;
 import org.iq80.leveldb.table.BloomFilterPolicy;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.FileUtils;
@@ -55,7 +54,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 
 public class DbBenchmark
 {
@@ -214,7 +212,7 @@ public class DbBenchmark
                 heapProfile();
             }
             else if (benchmark.equals("stats")) {
-                printStats();
+                printStats("leveldb.stats");
             }
             else {
                 System.err.println("Unknown benchmark: " + benchmark);
@@ -570,12 +568,7 @@ public class DbBenchmark
     private void compact(ThreadState thread)
             throws IOException
     {
-        if (db instanceof DbImpl) {
-            ((DbImpl) db).testCompactMemTable();
-            for (int level = 0; level < NUM_LEVELS - 1; level++) {
-                ((DbImpl) db).compactRange(level, Slices.copiedBuffer("", UTF_8), Slices.copiedBuffer("~", UTF_8));
-            }
-        }
+        db.compactRange(null, null);
     }
 
     private void crc32c(final ThreadState thread)
@@ -727,8 +720,12 @@ public class DbBenchmark
         FileUtils.deleteRecursively(databaseDir);
     }
 
-    private void printStats()
+    private void printStats(String name)
     {
+        final String property = db.getProperty(name);
+        if (property != null) {
+            System.out.print(property);
+        }
         //To change body of created methods use File | Settings | File Templates.
     }
 
@@ -783,12 +780,9 @@ public class DbBenchmark
         //      heapprofile -- Dump a heap profile (if supported by this port)
         benchmarks(ImmutableList.of(
                 "fillseq",
-                "fillseq",
-                "fillseq",
                 "fillsync",
                 "fillrandom",
                 "overwrite",
-                "fillseq",
                 "readrandom",
                 "readrandom",  // Extra run to allow previous compactions to quiesce
                 "readseq",
@@ -801,7 +795,8 @@ public class DbBenchmark
                 // "crc32c",
                 "snappycomp",
                 "unsnap-array",
-                "unsnap-direct"
+                "unsnap-direct",
+                "stats"
                 // "acquireload"
         )) {
             @Override
