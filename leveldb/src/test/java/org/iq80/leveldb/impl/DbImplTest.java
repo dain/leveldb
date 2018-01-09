@@ -96,7 +96,7 @@ public class DbImplTest
     {
         options.maxOpenFiles(100);
         options.createIfMissing(true);
-        DbImpl db = new DbImpl(options, this.databaseDir);
+        DbImpl db = new DbImpl(options, this.databaseDir, new EnvImpl());
         Random random = new Random(301);
         for (int i = 0; i < 200000 * STRESS_FACTOR; i++) {
             db.put(randomString(random, 64).getBytes(), new byte[] {0x01}, new WriteOptions().sync(false));
@@ -113,7 +113,7 @@ public class DbImplTest
         Options options = new Options();
         options.maxOpenFiles(50);
         options.createIfMissing(true);
-        final DbImpl db = new DbImpl(options, this.databaseDir);
+        final DbImpl db = new DbImpl(options, this.databaseDir, new EnvImpl());
         ExecutorService ex = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 4);
         try {
             final int numEntries = 1000000;
@@ -169,7 +169,7 @@ public class DbImplTest
             throws Exception
     {
         options.createIfMissing(true);
-        DbImpl db = new DbImpl(options, databaseDir);
+        DbImpl db = new DbImpl(options, databaseDir, new EnvImpl());
         for (int index = 0; index < 5000000; index++) {
             String key = "Key LOOOOOOOOOOOOOOOOOONG KEY " + index;
             String value = "This is element " + index + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABZASDFASDKLFJASDFKJSDFLKSDJFLKJSDHFLKJHSDJFSDFHJASDFLKJSDF";
@@ -1327,7 +1327,7 @@ public class DbImplTest
         {
             this.options = options.verifyChecksums(true).createIfMissing(true).errorIfExists(true);
             this.databaseDir = databaseDir;
-            this.db = new DbImpl(options, databaseDir);
+            this.db = new DbImpl(options, databaseDir, new EnvImpl());
             opened.add(this);
         }
 
@@ -1438,7 +1438,7 @@ public class DbImplTest
                 throws IOException
         {
             db.close();
-            db = new DbImpl(options.verifyChecksums(true).createIfMissing(false).errorIfExists(false), databaseDir);
+            db = new DbImpl(options.verifyChecksums(true).createIfMissing(false).errorIfExists(false), databaseDir, new EnvImpl());
         }
 
         private List<String> allEntriesFor(String userKey)

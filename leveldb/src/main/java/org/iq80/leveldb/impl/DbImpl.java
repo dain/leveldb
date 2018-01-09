@@ -76,7 +76,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
-import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
@@ -104,6 +103,7 @@ public class DbImpl
     private final Deque<WriteBatchInternal> writers = new LinkedList<>();
     private final SnapshotList snapshots = new SnapshotList(mutex);
     private final WriteBatchImpl tmpBatch = new WriteBatchImpl();
+    private final Env env;
 
     private LogWriter log;
 
@@ -118,9 +118,12 @@ public class DbImpl
 
     private ManualCompaction manualCompaction;
 
-    public DbImpl(Options options, File databaseDir)
+    private CompactionStats[] stats = new CompactionStats[DbConstants.NUM_LEVELS];
+
+    public DbImpl(Options options, File databaseDir, Env env)
             throws IOException
     {
+        this.env = env;
         requireNonNull(options, "options is null");
         requireNonNull(databaseDir, "databaseDir is null");
         this.options = options;
@@ -175,6 +178,10 @@ public class DbImpl
         databaseDir.mkdirs();
         checkArgument(databaseDir.exists(), "Database directory '%s' does not exist and could not be created", databaseDir);
         checkArgument(databaseDir.isDirectory(), "Database directory '%s' is not a directory", databaseDir);
+
+        for (int i = 0; i < DbConstants.NUM_LEVELS; i++) {
+            stats[i] = new CompactionStats();
+        }
 
         mutex.lock();
         try {
@@ -301,7 +308,28 @@ public class DbImpl
                 final int level = Integer.valueOf(matcher.group(1));
                 return String.valueOf(versions.numberOfFilesInLevel(level));
             }
-            //TODO implement stats
+            matcher = Pattern.compile("stats")
+                    .matcher(key);
+            if (matcher.matches()) {
+                final StringBuilder stringBuilder = new StringBuilder();
+                stringBuilder.append("                               Compactions\n");
+                stringBuilder.append("Level  Files Size(MB) Time(sec) Read(MB) Write(MB)\n");
+                stringBuilder.append("--------------------------------------------------\n");
+                for (int level = 0; level < DbConstants.NUM_LEVELS; level++) {
+                    int files = versions.numberOfFilesInLevel(level);
+                    if (stats[level].micros > 0 || files > 0) {
+                        stringBuilder.append(String.format(
+                                "%3d %8d %8.0f %9.0f %8.0f %9.0f\n",
+                                level,
+                                files,
+                                versions.numberOfBytesInLevel(level) / 1048576.0,
+                                stats[level].micros / 1e6,
+                                stats[level].bytesRead / 1048576.0,
+                                stats[level].bytesWritten / 1048576.0));
+                    }
+                }
+                return stringBuilder.toString();
+            }
             //TODO implement sstables
             //TODO implement approximate-memory-usage
         }
@@ -387,7 +415,7 @@ public class DbImpl
     public void compactRange(int level, Slice start, Slice end)
     {
         checkArgument(level >= 0, "level is negative");
-        checkArgument(level + 1 < NUM_LEVELS, "level is greater than or equal to %s", NUM_LEVELS);
+        checkArgument(level + 1 < DbConstants.NUM_LEVELS, "level is greater than or equal to %s", DbConstants.NUM_LEVELS);
         requireNonNull(start, "start is null");
         requireNonNull(end, "end is null");
 
@@ -1050,7 +1078,6 @@ public class DbImpl
             versions.logAndApply(edit, mutex);
 
             immutableMemTable = null;
-
             deleteObsoleteFiles();
         }
         finally {
@@ -1061,6 +1088,7 @@ public class DbImpl
     private void writeLevel0Table(MemTable mem, VersionEdit edit, Version base)
             throws IOException
     {
+        final long startMicros = env.nowMicros();
         checkState(mutex.isHeldByCurrentThread());
 
         // skip empty mem table
@@ -1092,6 +1120,7 @@ public class DbImpl
             }
             edit.addFile(level, meta);
         }
+        this.stats[level].Add(env.nowMicros() - startMicros, 0, meta.getFileSize());
     }
 
     private FileMetaData buildTable(SeekingIterable<InternalKey, Slice> data, long fileNumber)
@@ -1139,6 +1168,8 @@ public class DbImpl
     private void doCompactionWork(CompactionState compactionState)
             throws IOException
     {
+        final long startMicros = env.nowMicros();
+        long immMicros = 0;  // Micros spent doing imm_ compactions
         checkState(mutex.isHeldByCurrentThread());
         checkArgument(versions.numberOfBytesInLevel(compactionState.getCompaction().getLevel()) > 0);
         checkArgument(compactionState.builder == null);
@@ -1157,6 +1188,7 @@ public class DbImpl
             long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
             while (iterator.hasNext() && !shuttingDown.get()) {
                 // always give priority to compacting the current mem table
+                long immStart = env.nowMicros();
                 if (immutableMemTable != null) {
                     mutex.lock();
                     try {
@@ -1166,7 +1198,7 @@ public class DbImpl
                         mutex.unlock();
                     }
                 }
-
+                immMicros += (env.nowMicros() - immStart);
                 InternalKey key = iterator.peek().getKey();
                 if (compactionState.compaction.shouldStopBefore(key) && compactionState.builder != null) {
                     finishCompactionOutputFile(compactionState);
@@ -1237,11 +1269,20 @@ public class DbImpl
             }
         }
         finally {
+            long micros = env.nowMicros() - startMicros - immMicros;
+            long bytesRead = 0;
+            for (int which = 0; which < 2; which++) {
+                for (int i = 0; i < compactionState.compaction.input(which).size(); i++) {
+                    bytesRead += compactionState.compaction.input(which, i).getFileSize();
+                }
+            }
+            long bytesWritten = 0;
+            for (int i = 0; i < compactionState.outputs.size(); i++) {
+                bytesWritten += compactionState.outputs.get(i).getFileSize();
+            }
             mutex.lock();
+            this.stats[compactionState.compaction.getLevel() + 1].Add(micros, bytesRead, bytesWritten);
         }
-
-        // todo port CompactionStats code
-
         installCompactionResults(compactionState);
     }
 
@@ -1426,6 +1467,29 @@ public class DbImpl
             this.level = level;
             this.begin = begin;
             this.end = end;
+        }
+    }
+
+    // Per level compaction stats.  stats[level] stores the stats for
+    // compactions that produced data for the specified "level".
+    private static class CompactionStats
+    {
+        long micros;
+        long bytesRead;
+        long bytesWritten;
+
+        CompactionStats()
+        {
+            this.micros = 0;
+            this.bytesRead = 0;
+            this.bytesWritten = 0;
+        }
+
+        public void Add(long micros, long bytesRead, long bytesWritten)
+        {
+            this.micros += micros;
+            this.bytesRead += bytesRead;
+            this.bytesWritten += bytesWritten;
         }
     }
 

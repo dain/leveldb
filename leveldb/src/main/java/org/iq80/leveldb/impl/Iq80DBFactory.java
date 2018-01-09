@@ -80,7 +80,7 @@ public class Iq80DBFactory
     public DB open(File path, Options options)
             throws IOException
     {
-        return new DbImpl(options, path);
+        return new DbImpl(options, path, new EnvImpl());
     }
 
     @Override

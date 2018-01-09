@@ -197,11 +197,6 @@ public class Compaction implements AutoCloseable
         }
     }
 
-    public List<FileMetaData>[] getInputs()
-    {
-        return inputs;
-    }
-
     @Override
     public void close()
     {
@@ -209,5 +204,10 @@ public class Compaction implements AutoCloseable
             inputVersion.release();
             inputVersion = null;
         }
+    }
+
+    public List<FileMetaData> input(int which)
+    {
+        return inputs[which];
     }
 }

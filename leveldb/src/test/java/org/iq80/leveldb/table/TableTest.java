@@ -23,6 +23,7 @@ import org.iq80.leveldb.DBComparator;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.DbConstants;
 import org.iq80.leveldb.impl.DbImpl;
+import org.iq80.leveldb.impl.EnvImpl;
 import org.iq80.leveldb.impl.InternalEntry;
 import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.InternalKeyComparator;
@@ -789,7 +790,7 @@ public abstract class TableTest
                     .errorIfExists(true)
                     .writeBufferSize(10000);  // Something small to force merging
             tmpDir = FileUtils.createTempDir("leveldb");
-            this.db = new DbImpl(options, tmpDir);
+            this.db = new DbImpl(options, tmpDir, new EnvImpl());
             for (Map.Entry<Slice, Slice> entry : kvMap.entrySet()) {
                 db.put(entry.getKey().getBytes(), entry.getValue().getBytes());
             }

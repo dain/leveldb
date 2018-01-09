@@ -207,14 +207,14 @@ public class VersionSet
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
         List<InternalIterator> list = new ArrayList<>();
         for (int which = 0; which < 2; which++) {
-            if (!c.getInputs()[which].isEmpty()) {
+            List<FileMetaData> files = c.input(which);
+            if (!files.isEmpty()) {
                 if (c.getLevel() + which == 0) {
-                    List<FileMetaData> files = c.getInputs()[which];
                     list.add(new Level0Iterator(tableCache, files, internalKeyComparator));
                 }
                 else {
                     // Create concatenating iterator for the files from this level
-                    list.add(Level.createLevelConcatIterator(tableCache, c.getInputs()[which], internalKeyComparator));
+                    list.add(Level.createLevelConcatIterator(tableCache, files, internalKeyComparator));
                 }
             }
         }
