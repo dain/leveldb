@@ -1188,8 +1188,8 @@ public class DbImpl
             long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
             while (iterator.hasNext() && !shuttingDown.get()) {
                 // always give priority to compacting the current mem table
-                long immStart = env.nowMicros();
                 if (immutableMemTable != null) {
+                    long immStart = env.nowMicros();
                     mutex.lock();
                     try {
                         compactMemTable();
@@ -1197,8 +1197,8 @@ public class DbImpl
                     finally {
                         mutex.unlock();
                     }
+                    immMicros += (env.nowMicros() - immStart);
                 }
-                immMicros += (env.nowMicros() - immStart);
                 InternalKey key = iterator.peek().getKey();
                 if (compactionState.compaction.shouldStopBefore(key) && compactionState.builder != null) {
                     finishCompactionOutputFile(compactionState);

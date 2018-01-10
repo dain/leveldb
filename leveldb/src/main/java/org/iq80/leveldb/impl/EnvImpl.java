@@ -24,6 +24,6 @@ public class EnvImpl implements Env
     @Override
     public long nowMicros()
     {
-        return TimeUnit.NANOSECONDS.convert(System.nanoTime(), TimeUnit.MICROSECONDS);
+        return TimeUnit.NANOSECONDS.toMicros(System.nanoTime());
     }
 }
