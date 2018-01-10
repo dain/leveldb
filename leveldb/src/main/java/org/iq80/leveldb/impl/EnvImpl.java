@@ -15,21 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.impl;
 
-import org.iq80.leveldb.util.Slice;
+import java.util.concurrent.TimeUnit;
 
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
-
-public class FileChannelTableTest
-        extends TableTest
+public class EnvImpl implements Env
 {
     @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
-            throws IOException
+    public long nowMicros()
     {
-        return new FileChannelTable(name, fileChannel, comparator, verifyChecksums);
+        return TimeUnit.NANOSECONDS.toMicros(System.nanoTime());
     }
 }

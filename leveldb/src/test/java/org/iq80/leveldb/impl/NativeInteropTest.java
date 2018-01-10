@@ -24,6 +24,7 @@ import org.iq80.leveldb.Options;
 import org.iq80.leveldb.ReadOptions;
 import org.iq80.leveldb.WriteOptions;
 import org.iq80.leveldb.util.FileUtils;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -139,5 +140,11 @@ public class NativeInteropTest
         assertNull(db.get(bytes("New York"), ro));
 
         db.close();
+    }
+
+    @AfterMethod
+    public void tearDown() throws Exception
+    {
+        FileUtils.deleteRecursively(databaseDir);
     }
 }

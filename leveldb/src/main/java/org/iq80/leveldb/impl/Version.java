@@ -22,8 +22,6 @@ import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import org.iq80.leveldb.util.InternalIterator;
-import org.iq80.leveldb.util.InternalTableIterator;
-import org.iq80.leveldb.util.LevelIterator;
 import org.iq80.leveldb.util.MergingIterator;
 import org.iq80.leveldb.util.Slice;
 
@@ -35,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkPositionIndex;
 import static com.google.common.collect.Ordering.natural;
-import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
@@ -47,7 +44,6 @@ public class Version
 {
     private final AtomicInteger retained = new AtomicInteger(1);
     private final VersionSet versionSet;
-    private final Level0 level0;
     private final List<Level> levels;
 
     // move these mutable fields somewhere else
@@ -60,11 +56,8 @@ public class Version
     {
         this.versionSet = versionSet;
         checkArgument(NUM_LEVELS > 1, "levels must be at least 2");
-
-        this.level0 = new Level0(new ArrayList<FileMetaData>(), getTableCache(), getInternalKeyComparator());
-
         Builder<Level> builder = ImmutableList.builder();
-        for (int i = 1; i < NUM_LEVELS; i++) {
+        for (int i = 0; i < NUM_LEVELS; i++) {
             List<FileMetaData> files = new ArrayList<>();
             builder.add(new Level(i, files, getTableCache(), getInternalKeyComparator()));
         }
@@ -72,17 +65,10 @@ public class Version
 
     }
 
-    public void assertNoOverlappingFiles()
-    {
-        for (int level = 1; level < NUM_LEVELS; level++) {
-            assertNoOverlappingFiles(level);
-        }
-    }
-
     public void assertNoOverlappingFiles(int level)
     {
         if (level > 0) {
-            Collection<FileMetaData> files = getFiles().asMap().get(level);
+            Collection<FileMetaData> files = getFiles(level);
             if (files != null) {
                 long previousFileNumber = 0;
                 InternalKey previousEnd = null;
@@ -111,22 +97,22 @@ public class Version
         return versionSet.getInternalKeyComparator();
     }
 
-    public synchronized int getCompactionLevel()
+    public int getCompactionLevel()
     {
         return compactionLevel;
     }
 
-    public synchronized void setCompactionLevel(int compactionLevel)
+    public void setCompactionLevel(int compactionLevel)
     {
         this.compactionLevel = compactionLevel;
     }
 
-    public synchronized double getCompactionScore()
+    public double getCompactionScore()
     {
         return compactionScore;
     }
 
-    public synchronized void setCompactionScore(double compactionScore)
+    public void setCompactionScore(double compactionScore)
     {
         this.compactionScore = compactionScore;
     }
@@ -134,24 +120,13 @@ public class Version
     @Override
     public MergingIterator iterator()
     {
+        ImmutableList<InternalIterator> it = ImmutableList.copyOf(getLevelIterators());
+        return new MergingIterator(it, getInternalKeyComparator());
+    }
+
+    List<InternalIterator> getLevelIterators()
+    {
         Builder<InternalIterator> builder = ImmutableList.builder();
-        builder.add(level0.iterator());
-        builder.addAll(getLevelIterators());
-        return new MergingIterator(builder.build(), getInternalKeyComparator());
-    }
-
-    List<InternalTableIterator> getLevel0Files()
-    {
-        Builder<InternalTableIterator> builder = ImmutableList.builder();
-        for (FileMetaData file : level0.getFiles()) {
-            builder.add(getTableCache().newIterator(file));
-        }
-        return builder.build();
-    }
-
-    List<LevelIterator> getLevelIterators()
-    {
-        Builder<LevelIterator> builder = ImmutableList.builder();
         for (Level level : levels) {
             if (!level.getFiles().isEmpty()) {
                 builder.add(level.iterator());
@@ -160,22 +135,18 @@ public class Version
         return builder.build();
     }
 
-    public LookupResult get(LookupKey key)
+    public LookupResult get(LookupKey key, ReadStats readStats)
     {
         // We can search level-by-level since entries never hop across
         // levels.  Therefore we are guaranteed that if we find data
         // in an smaller level, later levels are irrelevant.
-        ReadStats readStats = new ReadStats();
-        LookupResult lookupResult = level0.get(key, readStats);
-        if (lookupResult == null) {
-            for (Level level : levels) {
-                lookupResult = level.get(key, readStats);
-                if (lookupResult != null) {
-                    break;
-                }
+        LookupResult lookupResult = null;
+        for (Level level : levels) {
+            lookupResult = level.get(key, readStats);
+            if (lookupResult != null) {
+                break;
             }
         }
-        updateStats(readStats.getSeekFileLevel(), readStats.getSeekFile());
         return lookupResult;
     }
 
@@ -186,7 +157,7 @@ public class Version
             // Push to next level if there is no overlap in next level,
             // and the #bytes overlapping in the level after that are limited.
             InternalKey start = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            InternalKey limit = new InternalKey(largestUserKey, 0, ValueType.VALUE);
+            InternalKey limit = new InternalKey(largestUserKey, 0, ValueType.DELETION);
             while (level < MAX_MEM_COMPACT_LEVEL) {
                 if (overlapInLevel(level + 1, smallestUserKey, largestUserKey)) {
                     break;
@@ -204,37 +175,23 @@ public class Version
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
     {
         checkPositionIndex(level, levels.size(), "Invalid level");
-        requireNonNull(smallestUserKey, "smallestUserKey is null");
-        requireNonNull(largestUserKey, "largestUserKey is null");
-
-        if (level == 0) {
-            return level0.someFileOverlapsRange(smallestUserKey, largestUserKey);
-        }
-        return levels.get(level - 1).someFileOverlapsRange(smallestUserKey, largestUserKey);
+        return levels.get(level).someFileOverlapsRange(level > 0, smallestUserKey, largestUserKey);
     }
 
     public int numberOfLevels()
     {
-        return levels.size() + 1;
+        return levels.size();
     }
 
     public int numberOfFilesInLevel(int level)
     {
-        if (level == 0) {
-            return level0.getFiles().size();
-        }
-        else {
-            return levels.get(level - 1).getFiles().size();
-        }
+        return getFiles(level).size();
     }
 
     public Multimap<Integer, FileMetaData> getFiles()
     {
         ImmutableMultimap.Builder<Integer, FileMetaData> builder = ImmutableMultimap.builder();
         builder = builder.orderKeysBy(natural());
-
-        builder.putAll(0, level0.getFiles());
-
         for (Level level : levels) {
             builder.putAll(level.getLevelNumber(), level.getFiles());
         }
@@ -243,26 +200,19 @@ public class Version
 
     public List<FileMetaData> getFiles(int level)
     {
-        if (level == 0) {
-            return level0.getFiles();
-        }
-        else {
-            return levels.get(level - 1).getFiles();
-        }
+        return levels.get(level).getFiles();
     }
 
     public void addFile(int level, FileMetaData fileMetaData)
     {
-        if (level == 0) {
-            level0.addFile(fileMetaData);
-        }
-        else {
-            levels.get(level - 1).addFile(fileMetaData);
-        }
+        levels.get(level).addFile(fileMetaData);
     }
 
-    private boolean updateStats(int seekFileLevel, FileMetaData seekFile)
+    public boolean updateStats(ReadStats readStats)
     {
+        final int seekFileLevel = readStats.getSeekFileLevel();
+        final FileMetaData seekFile = readStats.getSeekFile();
+
         if (seekFile == null) {
             return false;
         }

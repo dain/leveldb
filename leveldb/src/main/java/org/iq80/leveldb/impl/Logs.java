@@ -17,27 +17,25 @@
  */
 package org.iq80.leveldb.impl;
 
+import org.iq80.leveldb.util.MMWritableFile;
 import org.iq80.leveldb.util.PureJavaCrc32C;
 import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.UnbufferedWritableFile;
 
 import java.io.File;
 import java.io.IOException;
 
 public final class Logs
 {
+    private static final int PAGE_SIZE = 1024 * 1024;
+
     private Logs()
     {
     }
 
-    public static LogWriter createLogWriter(File file, long fileNumber)
-            throws IOException
+    public static LogWriter createLogWriter(File file, long fileNumber, boolean allowMmapWrites) throws IOException
     {
-        if (Iq80DBFactory.USE_MMAP) {
-            return new MMapLogWriter(file, fileNumber);
-        }
-        else {
-            return new FileChannelLogWriter(file, fileNumber);
-        }
+        return LogWriter.createWriter(fileNumber, allowMmapWrites ? MMWritableFile.open(file, PAGE_SIZE) : UnbufferedWritableFile.open(file));
     }
 
     public static int getChunkChecksum(int chunkTypeId, Slice slice)

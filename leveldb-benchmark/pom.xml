@@ -30,6 +30,7 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+        <air.check.fail-checkstyle>false</air.check.fail-checkstyle>
     </properties>
 
     <dependencies>

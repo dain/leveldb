@@ -88,10 +88,17 @@ public interface DB
     void resumeCompactions();
 
     /**
-     * Force a compaction of the specified key range.
+     * Compact the underlying storage for the key range [begin, end].
+     * In particular, deleted and overwritten versions are discarded,
+     * and the data is rearranged to reduce the cost of operations
+     * needed to access the data.  This operation should typically only
+     * be invoked by users who understand the underlying implementation.
+     * <p>
+     * Call to {@code db.compactRange(null, null);} will compact the
+     * entire database.
      *
      * @param begin if null then compaction start from the first key
-     * @param end if null then compaction ends at the last key
+     * @param end   if null then compaction ends at the last key
      */
     void compactRange(byte[] begin, byte[] end)
             throws DBException;

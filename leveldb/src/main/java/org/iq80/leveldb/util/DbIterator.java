@@ -21,6 +21,7 @@ import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.SeekingIterator;
 
+import java.io.Closeable;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -31,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class DbIterator
         extends AbstractSeekingIterator<InternalKey, Slice>
-        implements InternalIterator
+        implements InternalIterator, Closeable
 {
     /*
      * NOTE: This code has been specifically tuned for performance of the DB
@@ -51,27 +52,26 @@ public final class DbIterator
 
     private final MemTableIterator memTableIterator;
     private final MemTableIterator immutableMemTableIterator;
-    private final List<InternalTableIterator> level0Files;
-    private final List<LevelIterator> levels;
+    private final List<InternalIterator> levels;
 
     private final Comparator<InternalKey> comparator;
+    private final Runnable cleanup;
 
     private final ComparableIterator[] heap;
     private int heapSize;
 
     public DbIterator(MemTableIterator memTableIterator,
-            MemTableIterator immutableMemTableIterator,
-            List<InternalTableIterator> level0Files,
-            List<LevelIterator> levels,
-            Comparator<InternalKey> comparator)
+                      MemTableIterator immutableMemTableIterator,
+                      List<InternalIterator> levels,
+                      Comparator<InternalKey> comparator, Runnable cleanup)
     {
         this.memTableIterator = memTableIterator;
         this.immutableMemTableIterator = immutableMemTableIterator;
-        this.level0Files = level0Files;
         this.levels = levels;
         this.comparator = comparator;
+        this.cleanup = cleanup;
 
-        this.heap = new ComparableIterator[3 + level0Files.size() + levels.size()];
+        this.heap = new ComparableIterator[3 + levels.size()];
         resetPriorityQueue();
     }
 
@@ -84,10 +84,7 @@ public final class DbIterator
         if (immutableMemTableIterator != null) {
             immutableMemTableIterator.seekToFirst();
         }
-        for (InternalTableIterator level0File : level0Files) {
-            level0File.seekToFirst();
-        }
-        for (LevelIterator level : levels) {
+        for (InternalIterator level : levels) {
             level.seekToFirst();
         }
         resetPriorityQueue();
@@ -102,10 +99,7 @@ public final class DbIterator
         if (immutableMemTableIterator != null) {
             immutableMemTableIterator.seek(targetKey);
         }
-        for (InternalTableIterator level0File : level0Files) {
-            level0File.seek(targetKey);
-        }
-        for (LevelIterator level : levels) {
+        for (InternalIterator level : levels) {
             level.seek(targetKey);
         }
         resetPriorityQueue();
@@ -151,12 +145,7 @@ public final class DbIterator
         if (immutableMemTableIterator != null && immutableMemTableIterator.hasNext()) {
             heapAdd(new ComparableIterator(immutableMemTableIterator, comparator, i++, immutableMemTableIterator.next()));
         }
-        for (InternalTableIterator level0File : level0Files) {
-            if (level0File.hasNext()) {
-                heapAdd(new ComparableIterator(level0File, comparator, i++, level0File.next()));
-            }
-        }
-        for (LevelIterator level : levels) {
+        for (InternalIterator level : levels) {
             if (level.hasNext()) {
                 heapAdd(new ComparableIterator(level, comparator, i++, level.next()));
             }
@@ -213,11 +202,16 @@ public final class DbIterator
         sb.append("DbIterator");
         sb.append("{memTableIterator=").append(memTableIterator);
         sb.append(", immutableMemTableIterator=").append(immutableMemTableIterator);
-        sb.append(", level0Files=").append(level0Files);
         sb.append(", levels=").append(levels);
         sb.append(", comparator=").append(comparator);
         sb.append('}');
         return sb.toString();
+    }
+
+    @Override
+    public void close()
+    {
+        cleanup.run();
     }
 
     private static class ComparableIterator

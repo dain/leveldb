@@ -18,58 +18,112 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Throwables;
+import com.google.common.cache.CacheLoader;
 import org.iq80.leveldb.impl.SeekingIterable;
-import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.LRUCache;
+import org.iq80.leveldb.util.RandomInputFile;
 import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
 import org.iq80.leveldb.util.TableIterator;
 import org.iq80.leveldb.util.VariableLengthQuantity;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.util.Comparator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
+import static org.iq80.leveldb.CompressionType.SNAPPY;
 
-public abstract class Table
+public final class Table
         implements SeekingIterable<Slice, Slice>
 {
-    protected final String name;
-    protected final FileChannel fileChannel;
-    protected final Comparator<Slice> comparator;
-    protected final boolean verifyChecksums;
-    protected final Block indexBlock;
-    protected final BlockHandle metaindexBlockHandle;
+    private static final Charset CHARSET = Charset.forName("UTF-8");
+    private final Comparator<Slice> comparator;
+    private final boolean verifyChecksums;
+    private final Block indexBlock;
+    private final BlockHandle metaindexBlockHandle;
+    private final RandomInputFile source;
+    private final LRUCache.LRUSubCache<BlockHandle, Slice> blockCache;
+    private final FilterBlockReader filter;
 
-    public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    public Table(RandomInputFile source, Comparator<Slice> comparator, boolean verifyChecksum, LRUCache<BlockHandle, Slice> blockCache, final FilterPolicy filterPolicy)
             throws IOException
     {
-        requireNonNull(name, "name is null");
-        requireNonNull(fileChannel, "fileChannel is null");
-        long size = fileChannel.size();
+        this.source = source;
+        this.blockCache = cacheForTable(blockCache);
+        requireNonNull(source, "source is null");
+        long size = source.size();
         checkArgument(size >= Footer.ENCODED_LENGTH, "File is corrupt: size must be at least %s bytes", Footer.ENCODED_LENGTH);
         requireNonNull(comparator, "comparator is null");
 
-        this.name = name;
-        this.fileChannel = fileChannel;
-        this.verifyChecksums = verifyChecksums;
+        this.verifyChecksums = verifyChecksum;
         this.comparator = comparator;
+        final ByteBuffer footerData = source.read(size - Footer.ENCODED_LENGTH, Footer.ENCODED_LENGTH);
 
-        Footer footer = init();
-        indexBlock = readBlock(footer.getIndexBlockHandle());
+        Footer footer = Footer.readFooter(Slices.avoidCopiedBuffer(footerData));
+        indexBlock = new Block(readRawBlock(footer.getIndexBlockHandle()), comparator); //no need for cache
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
+        this.filter = readMeta(filterPolicy);
+
     }
 
-    protected abstract Footer init()
-            throws IOException;
+    private FilterBlockReader readMeta(FilterPolicy filterPolicy) throws IOException
+    {
+        if (filterPolicy == null) {
+            return null;  // Do not need any metadata
+        }
+
+        final Block meta = new Block(readRawBlock(metaindexBlockHandle), new BytewiseComparator());
+        final BlockIterator iterator = meta.iterator();
+        final Slice targetKey = new Slice(("filter." + filterPolicy.name()).getBytes(CHARSET));
+        iterator.seek(targetKey);
+        if (iterator.hasNext() && iterator.peek().getKey().equals(targetKey)) {
+            return readFilter(filterPolicy, iterator.next().getValue());
+        }
+        else {
+            return null;
+        }
+    }
+
+    protected FilterBlockReader readFilter(FilterPolicy filterPolicy, Slice filterHandle) throws IOException
+    {
+        final Slice filterBlock = readRawBlock(BlockHandle.readBlockHandle(filterHandle.input()));
+        return new FilterBlockReader(filterPolicy, filterBlock);
+    }
+
+    /**
+     * Get reference to a new sub cache to current table.
+     *
+     * @param blockCache global cache
+     * @return cache scoped to current table
+     */
+    private LRUCache.LRUSubCache<BlockHandle, Slice> cacheForTable(LRUCache<BlockHandle, Slice> blockCache)
+    {
+        final LRUCache<BlockHandle, Slice> cache = requireNonNull(blockCache, "Block cache should not be null");
+        return cache.subCache(new CacheLoader<BlockHandle, Slice>()
+        {
+            @Override
+            public Slice load(BlockHandle key) throws Exception
+            {
+                return readRawBlock(key);
+            }
+        });
+    }
 
     @Override
     public TableIterator iterator()
     {
         return new TableIterator(this, indexBlock.iterator());
+    }
+
+    public FilterBlockReader getFilter()
+    {
+        return filter;
     }
 
     public Block openBlock(Slice blockEntry)
@@ -85,16 +139,78 @@ public abstract class Table
         return dataBlock;
     }
 
-    protected static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
-
-    protected abstract Block readBlock(BlockHandle blockHandle)
-            throws IOException;
-
-    protected int uncompressedLength(ByteBuffer data)
+    private Block readBlock(BlockHandle blockHandle)
             throws IOException
     {
-        int length = VariableLengthQuantity.readVariableLengthInt(data.duplicate());
-        return length;
+        try {
+            final Slice rawBlock = blockCache.load(blockHandle);
+            return new Block(rawBlock, comparator);
+        }
+        catch (ExecutionException e) {
+            Throwables.propagateIfPossible(e.getCause(), IOException.class);
+            throw new IOException(e.getCause());
+        }
+    }
+
+    protected Slice readRawBlock(BlockHandle blockHandle)
+            throws IOException
+    {
+        // read block trailer
+        final ByteBuffer trailerData = source.read(blockHandle.getOffset() + blockHandle.getDataSize(), BlockTrailer.ENCODED_LENGTH);
+        final BlockTrailer blockTrailer = BlockTrailer.readBlockTrailer(Slices.avoidCopiedBuffer(trailerData));
+
+// todo re-enable crc check when ported to support direct buffers
+//        // only verify check sums if explicitly asked by the user
+//        if (verifyChecksums) {
+//            // checksum data and the compression type in the trailer
+//            PureJavaCrc32C checksum = new PureJavaCrc32C();
+//            checksum.update(data.getRawArray(), data.getRawOffset(), blockHandle.getDataSize() + 1);
+//            int actualCrc32c = checksum.getMaskedValue();
+//
+//            checkState(blockTrailer.getCrc32c() == actualCrc32c, "Block corrupted: checksum mismatch");
+//        }
+
+        // decompress data
+        Slice uncompressedData;
+        ByteBuffer uncompressedBuffer = source.read(blockHandle.getOffset(), blockHandle.getDataSize());
+        if (blockTrailer.getCompressionType() == SNAPPY) {
+            int uncompressedLength = uncompressedLength(uncompressedBuffer);
+            final ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(uncompressedLength);
+            Snappy.uncompress(uncompressedBuffer, uncompressedScratch);
+            uncompressedData = Slices.copiedBuffer(uncompressedScratch);
+        }
+        else {
+            uncompressedData = Slices.avoidCopiedBuffer(uncompressedBuffer);
+        }
+
+        return uncompressedData;
+    }
+
+    public <T> T internalGet(Slice key, KeyValueFunction<T> keyValueFunction)
+    {
+        final BlockIterator iterator = indexBlock.iterator();
+        iterator.seek(key);
+        if (iterator.hasNext()) {
+            final BlockEntry peek = iterator.peek();
+            final Slice handleValue = peek.getValue();
+            if (filter != null && !filter.keyMayMatch(BlockHandle.readBlockHandle(handleValue.input()).getOffset(), key)) {
+                return null;
+            }
+            else {
+                final BlockIterator iterator1 = openBlock(handleValue).iterator();
+                iterator1.seek(key);
+                if (iterator1.hasNext()) {
+                    final BlockEntry next = iterator1.next();
+                    return keyValueFunction.apply(next.getKey(), next.getValue());
+                }
+            }
+        }
+        return null;
+    }
+
+    private int uncompressedLength(ByteBuffer data)
+    {
+        return VariableLengthQuantity.readVariableLengthInt(data.duplicate());
     }
 
     /**
@@ -123,34 +239,31 @@ public abstract class Table
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Table");
-        sb.append("{name='").append(name).append('\'');
-        sb.append(", comparator=").append(comparator);
-        sb.append(", verifyChecksums=").append(verifyChecksums);
-        sb.append('}');
-        return sb.toString();
+        return "Table" +
+                "{source='" + source + '\'' +
+                ", comparator=" + comparator +
+                ", verifyChecksums=" + verifyChecksums +
+                '}';
     }
 
     public Callable<?> closer()
     {
-        return new Closer(fileChannel);
+        return new CloseableToCallable(source);
     }
 
-    private static class Closer
-            implements Callable<Void>
+    private static class CloseableToCallable implements Callable<Object>
     {
-        private final Closeable closeable;
+        private RandomInputFile source;
 
-        public Closer(Closeable closeable)
+        public CloseableToCallable(RandomInputFile source)
         {
-            this.closeable = closeable;
+            this.source = source;
         }
 
         @Override
-        public Void call()
+        public Object call() throws Exception
         {
-            Closeables.closeQuietly(closeable);
+            source.close();
             return null;
         }
     }

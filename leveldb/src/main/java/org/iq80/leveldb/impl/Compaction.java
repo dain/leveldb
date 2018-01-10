@@ -27,9 +27,9 @@ import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
 // A Compaction encapsulates information about a compaction.
-public class Compaction
+public class Compaction implements AutoCloseable
 {
-    private final Version inputVersion;
+    private Version inputVersion;
     private final int level;
 
     // Each compaction reads inputs from "level" and "level+1"
@@ -70,6 +70,7 @@ public class Compaction
         this.grandparents = grandparents;
         this.maxOutputFileSize = VersionSet.maxFileSizeForLevel(level);
         this.inputs = new List[] {levelInputs, levelUpInputs};
+        inputVersion.retain();
     }
 
     public int getLevel()
@@ -196,8 +197,17 @@ public class Compaction
         }
     }
 
-    public List<FileMetaData>[] getInputs()
+    @Override
+    public void close()
     {
-        return inputs;
+        if (inputVersion != null) {
+            inputVersion.release();
+            inputVersion = null;
+        }
+    }
+
+    public List<FileMetaData> input(int which)
+    {
+        return inputs[which];
     }
 }

@@ -28,12 +28,12 @@ import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.InternalIterator;
 import org.iq80.leveldb.util.Level0Iterator;
 import org.iq80.leveldb.util.MergingIterator;
+import org.iq80.leveldb.util.SequentialFile;
+import org.iq80.leveldb.util.SequentialFileImpl;
 import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -47,6 +47,7 @@ import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -77,16 +78,18 @@ public class VersionSet
     private final File databaseDir;
     private final TableCache tableCache;
     private final InternalKeyComparator internalKeyComparator;
+    private final boolean allowMmapWrites;
 
     private LogWriter descriptorLog;
     private final Map<Integer, InternalKey> compactPointers = new TreeMap<>();
 
-    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator, boolean allowMmapWrites)
             throws IOException
     {
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
         this.internalKeyComparator = internalKeyComparator;
+        this.allowMmapWrites = allowMmapWrites;
         appendVersion(new Version(this));
 
         initializeIfNeeded();
@@ -104,7 +107,7 @@ public class VersionSet
             edit.setNextFileNumber(nextFileNumber.get());
             edit.setLastSequenceNumber(lastSequence);
 
-            LogWriter log = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
+            LogWriter log = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber, allowMmapWrites);
             try {
                 writeSnapshot(log);
                 log.addRecord(edit.encode(), false);
@@ -141,7 +144,7 @@ public class VersionSet
         requireNonNull(version, "version is null");
         checkArgument(version != current, "version is the current version");
         Version previous = current;
-        current = version;
+        current = version; //version already retained, create with retained = 1
         activeVersions.put(version, new Object());
         if (previous != null) {
             previous.release();
@@ -204,23 +207,18 @@ public class VersionSet
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
         List<InternalIterator> list = new ArrayList<>();
         for (int which = 0; which < 2; which++) {
-            if (!c.getInputs()[which].isEmpty()) {
+            List<FileMetaData> files = c.input(which);
+            if (!files.isEmpty()) {
                 if (c.getLevel() + which == 0) {
-                    List<FileMetaData> files = c.getInputs()[which];
                     list.add(new Level0Iterator(tableCache, files, internalKeyComparator));
                 }
                 else {
                     // Create concatenating iterator for the files from this level
-                    list.add(Level.createLevelConcatIterator(tableCache, c.getInputs()[which], internalKeyComparator));
+                    list.add(Level.createLevelConcatIterator(tableCache, files, internalKeyComparator));
                 }
             }
         }
         return new MergingIterator(list, internalKeyComparator);
-    }
-
-    public LookupResult get(LookupKey key)
-    {
-        return current.get(key);
     }
 
     public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey)
@@ -249,7 +247,7 @@ public class VersionSet
         this.lastSequence = newLastSequence;
     }
 
-    public void logAndApply(VersionEdit edit)
+    public void logAndApply(VersionEdit edit, ReentrantLock mutex)
             throws IOException
     {
         if (edit.getLogNumber() != null) {
@@ -268,31 +266,38 @@ public class VersionSet
         edit.setLastSequenceNumber(lastSequence);
 
         Version version = new Version(this);
-        Builder builder = new Builder(this, current);
-        builder.apply(edit);
-        builder.saveTo(version);
+        try (Builder builder = new Builder(this, current)) {
+            builder.apply(edit);
+            builder.saveTo(version);
+        }
 
         finalizeVersion(version);
 
         boolean createdNewManifest = false;
+        final long mFileNumber = manifestFileNumber;
         try {
             // Initialize new descriptor log file if necessary by creating
             // a temporary file that contains a snapshot of the current version.
             if (descriptorLog == null) {
                 edit.setNextFileNumber(nextFileNumber.get());
-                descriptorLog = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(manifestFileNumber)), manifestFileNumber);
+                descriptorLog = Logs.createLogWriter(new File(databaseDir, Filename.descriptorFileName(mFileNumber)), mFileNumber, allowMmapWrites);
                 writeSnapshot(descriptorLog);
                 createdNewManifest = true;
             }
+            mutex.unlock();
+            try {
+                // Write new record to MANIFEST log
+                Slice record = edit.encode();
+                descriptorLog.addRecord(record, true);
 
-            // Write new record to MANIFEST log
-            Slice record = edit.encode();
-            descriptorLog.addRecord(record, true);
-
-            // If we just created a new descriptor file, install it by writing a
-            // new CURRENT file that points to it.
-            if (createdNewManifest) {
-                Filename.setCurrentFile(databaseDir, descriptorLog.getFileNumber());
+                // If we just created a new descriptor file, install it by writing a
+                // new CURRENT file that points to it.
+                if (createdNewManifest) {
+                    Filename.setCurrentFile(databaseDir, mFileNumber);
+                }
+            }
+            finally {
+                mutex.lock();
             }
         }
         catch (IOException e) {
@@ -300,7 +305,7 @@ public class VersionSet
             if (createdNewManifest) {
                 descriptorLog.close();
                 // todo add delete method to LogWriter
-                new File(databaseDir, Filename.logFileName(descriptorLog.getFileNumber())).delete();
+                new File(databaseDir, Filename.logFileName(mFileNumber)).delete();
                 descriptorLog = null;
             }
             throw e;
@@ -343,8 +348,7 @@ public class VersionSet
         currentName = currentName.substring(0, currentName.length() - 1);
 
         // open file channel
-        try (FileInputStream fis = new FileInputStream(new File(databaseDir, currentName));
-             FileChannel fileChannel = fis.getChannel()) {
+        try (SequentialFile in = SequentialFileImpl.open(new File(databaseDir, currentName))) {
             // read log edit log
             Long nextFileNumber = null;
             Long lastSequence = null;
@@ -352,7 +356,7 @@ public class VersionSet
             Long prevLogNumber = null;
             Builder builder = new Builder(this, current);
 
-            LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
+            LogReader reader = new LogReader(in, throwExceptionMonitor(), true, 0);
             for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
                 // read version edit
                 VersionEdit edit = new VersionEdit(record);
@@ -394,6 +398,7 @@ public class VersionSet
 
             Version newVersion = new Version(this);
             builder.saveTo(newVersion);
+            builder.close();
 
             // Install recovered version
             finalizeVersion(newVersion);
@@ -622,20 +627,40 @@ public class VersionSet
 
     List<FileMetaData> getOverlappingInputs(int level, InternalKey begin, InternalKey end)
     {
-        ImmutableList.Builder<FileMetaData> files = ImmutableList.builder();
-        Slice userBegin = begin.getUserKey();
-        Slice userEnd = end.getUserKey();
+        List<FileMetaData> inputs = new ArrayList<>();
+        Slice userBegin = begin == null ? null : begin.getUserKey();
+        Slice userEnd = end == null ? null : end.getUserKey();
         UserComparator userComparator = internalKeyComparator.getUserComparator();
-        for (FileMetaData fileMetaData : current.getFiles(level)) {
-            if (userComparator.compare(fileMetaData.getLargest().getUserKey(), userBegin) < 0 ||
-                    userComparator.compare(fileMetaData.getSmallest().getUserKey(), userEnd) > 0) {
-                // Either completely before or after range; skip it
+        List<FileMetaData> filesInLevel = current.getFiles(level);
+        for (int i = 0; i < filesInLevel.size(); i++) {
+            FileMetaData fileMetaData = filesInLevel.get(i);
+            Slice fileStart = fileMetaData.getSmallest().getUserKey();
+            Slice fileLimit = fileMetaData.getLargest().getUserKey();
+            if (begin != null && userComparator.compare(fileLimit, userBegin) < 0) {
+                // "files1" is completely before specified range; skip it
+            }
+            else if (end != null && userComparator.compare(fileStart, userEnd) > 0) {
+                // "files1" is completely after specified range; skip it
             }
             else {
-                files.add(fileMetaData);
+                inputs.add(fileMetaData);
+                if (level == 0) {
+                    // Level-0 files may overlap each other.  So check if the newly
+                    // added file has expanded the range.  If so, restart search.
+                    if (begin != null && userComparator.compare(fileStart, userBegin) < 0) {
+                        userBegin = fileStart;
+                        inputs.clear();
+                        i = -1;
+                    }
+                    else if (end != null && userComparator.compare(fileLimit, userEnd) > 0) {
+                        userEnd = fileLimit;
+                        inputs.clear();
+                        i = -1;
+                    }
+                }
             }
         }
-        return files.build();
+        return inputs;
     }
 
     private Entry<InternalKey, InternalKey> getRange(List<FileMetaData>... inputLists)
@@ -682,7 +707,7 @@ public class VersionSet
      * of edits to a particular state without creating intermediate
      * Versions that contain full copies of the intermediate state.
      */
-    private static class Builder
+    private static class Builder implements AutoCloseable
     {
         private final VersionSet versionSet;
         private final Version baseVersion;
@@ -692,6 +717,7 @@ public class VersionSet
         {
             this.versionSet = versionSet;
             this.baseVersion = baseVersion;
+            baseVersion.retain();
 
             levels = new ArrayList<>(baseVersion.numberOfLevels());
             for (int i = 0; i < baseVersion.numberOfLevels(); i++) {
@@ -759,7 +785,7 @@ public class VersionSet
                 // Merge the set of added files with the set of pre-existing files.
                 // Drop any deleted files.  Store the result in *v.
 
-                Collection<FileMetaData> baseFiles = baseVersion.getFiles().asMap().get(level);
+                Collection<FileMetaData> baseFiles = baseVersion.getFiles(level);
                 if (baseFiles == null) {
                     baseFiles = ImmutableList.of();
                 }
@@ -780,7 +806,7 @@ public class VersionSet
 
                 //#ifndef NDEBUG  todo
                 // Make sure there is no overlap in levels > 0
-                version.assertNoOverlappingFiles();
+                version.assertNoOverlappingFiles(level);
                 //#endif
             }
         }
@@ -807,6 +833,12 @@ public class VersionSet
                 }
                 version.addFile(level, fileMetaData);
             }
+        }
+
+        @Override
+        public void close()
+        {
+            baseVersion.release();
         }
 
         private static class FileMetaDataBySmallestKey

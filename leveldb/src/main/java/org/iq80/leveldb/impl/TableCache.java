@@ -22,18 +22,24 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-import org.iq80.leveldb.table.FileChannelTable;
-import org.iq80.leveldb.table.MMapTable;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.table.BlockHandle;
+import org.iq80.leveldb.table.BlockHandleSliceWeigher;
+import org.iq80.leveldb.table.FilterPolicy;
+import org.iq80.leveldb.table.KeyValueFunction;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Closeables;
+import org.iq80.leveldb.util.UnbufferedRandomInputFile;
 import org.iq80.leveldb.util.Finalizer;
 import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.LRUCache;
+import org.iq80.leveldb.util.MMRandomInputFile;
+import org.iq80.leveldb.util.RandomInputFile;
 import org.iq80.leveldb.util.Slice;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.concurrent.ExecutionException;
 
 import static java.util.Objects.requireNonNull;
@@ -42,11 +48,15 @@ public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<>(1);
+    private final LRUCache<BlockHandle, Slice> blockCache;
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
+    public TableCache(final File databaseDir,
+                      int tableCacheSize,
+                      final UserComparator userComparator,
+                      final Options options)
     {
         requireNonNull(databaseDir, "databaseName is null");
-
+        blockCache = new LRUCache<>(options.cacheSize() > 0 ? (int) options.cacheSize() : 8 << 20, new BlockHandleSliceWeigher()); //TODO add possibility to disable cache?
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
                 .removalListener(new RemovalListener<Long, TableAndFile>()
@@ -54,8 +64,11 @@ public class TableCache
                     @Override
                     public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
                     {
-                        Table table = notification.getValue().getTable();
-                        finalizer.addCleanup(table, table.closer());
+                        final TableAndFile value = notification.getValue();
+                        if (value != null) {
+                            final Table table = value.getTable();
+                            finalizer.addCleanup(table, table.closer());
+                        }
                     }
                 })
                 .build(new CacheLoader<Long, TableAndFile>()
@@ -64,7 +77,7 @@ public class TableCache
                     public TableAndFile load(Long fileNumber)
                             throws IOException
                     {
-                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
+                        return new TableAndFile(databaseDir, fileNumber, userComparator, options, blockCache);
                     }
                 });
     }
@@ -77,6 +90,13 @@ public class TableCache
     public InternalTableIterator newIterator(long number)
     {
         return new InternalTableIterator(getTable(number).iterator());
+    }
+
+    public <T> T get(Slice key, FileMetaData fileMetaData, KeyValueFunction<T> resultBuilder)
+    {
+        final Table table = getTable(fileMetaData.getNumber());
+        return table.internalGet(key, resultBuilder);
+
     }
 
     public long getApproximateOffsetOf(FileMetaData file, Slice key)
@@ -115,20 +135,41 @@ public class TableCache
     {
         private final Table table;
 
-        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
+        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, Options options, LRUCache<BlockHandle, Slice> blockCache)
                 throws IOException
         {
-            String tableFileName = Filename.tableFileName(fileNumber);
-            File tableFile = new File(databaseDir, tableFileName);
-            try (FileInputStream fis = new FileInputStream(tableFile);
-                    FileChannel fileChannel = fis.getChannel()) {
-                if (Iq80DBFactory.USE_MMAP) {
-                    table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+            final File tableFile = tableFileName(databaseDir, fileNumber);
+            RandomInputFile source = null;
+            try {
+                if (options.allowMmapReads()) {
+                    source = MMRandomInputFile.open(tableFile);
                 }
                 else {
-                    table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                    source = UnbufferedRandomInputFile.open(tableFile);
+                }
+                final FilterPolicy filterPolicy = (FilterPolicy) options.filterPolicy();
+                table = new Table(source, userComparator,
+                        options.verifyChecksums(), blockCache, filterPolicy);
+            }
+            catch (IOException e) {
+                Closeables.closeQuietly(source);
+                throw e;
+            }
+        }
+
+        private File tableFileName(File databaseDir, long fileNumber)
+        {
+            final String tableFileName = Filename.tableFileName(fileNumber);
+            File tableFile = new File(databaseDir, tableFileName);
+            if (!tableFile.canRead()) {
+                // attempt to open older .sst extension
+                final String sstFileName = Filename.sstTableFileName(fileNumber);
+                final File sstPath = new File(databaseDir, sstFileName);
+                if (sstPath.canRead()) {
+                    tableFile = sstPath;
                 }
             }
+            return tableFile;
         }
 
         public Table getTable()

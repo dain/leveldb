@@ -19,7 +19,6 @@ Recommended Package imports:
 
 ```java
 import org.iq80.leveldb.*;
-import static org.iq80.leveldb.impl.Iq80DBFactory.*;
 import java.io.*;
 ```
 
