@@ -126,8 +126,10 @@ public class Compaction
     public static long totalFileSize(List<FileMetaData> files)
     {
         long sum = 0;
-        for (FileMetaData file : files) {
-            sum += file.getFileSize();
+        if (files != null) {
+            for (FileMetaData file : files) {
+                sum += file.getFileSize();
+            }
         }
         return sum;
     }
