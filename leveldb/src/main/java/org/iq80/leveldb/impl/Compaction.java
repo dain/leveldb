@@ -17,12 +17,14 @@
  */
 package org.iq80.leveldb.impl;
 
+import com.google.common.collect.ImmutableList;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.Slice;
 
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
@@ -67,7 +69,7 @@ public class Compaction
         this.level = level;
         this.levelInputs = levelInputs;
         this.levelUpInputs = levelUpInputs;
-        this.grandparents = grandparents;
+        this.grandparents = ImmutableList.copyOf(requireNonNull(grandparents, "grandparents is null"));
         this.maxOutputFileSize = VersionSet.maxFileSizeForLevel(level);
         this.inputs = new List[] {levelInputs, levelUpInputs};
     }
@@ -172,10 +174,6 @@ public class Compaction
     // before processing "internal_key".
     public boolean shouldStopBefore(InternalKey internalKey)
     {
-        if (grandparents == null) {
-            return false;
-        }
-
         // Scan to find earliest grandparent file that contains key.
         InternalKeyComparator internalKeyComparator = inputVersion.getInternalKeyComparator();
         while (grandparentIndex < grandparents.size() && internalKeyComparator.compare(internalKey, grandparents.get(grandparentIndex).getLargest()) > 0) {
