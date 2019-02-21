@@ -28,7 +28,6 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -139,9 +138,8 @@ public class LogTest
 
         // test readRecord
 
-        try (FileInputStream fis = new FileInputStream(writer.getFile());
-                FileChannel fileChannel = fis.getChannel()) {
-            LogReader reader = new LogReader(fileChannel, NO_CORRUPTION_MONITOR, true, 0);
+        try (FileInputStream fis = new FileInputStream(writer.getFile())) {
+            LogReader reader = new LogReader(fis, NO_CORRUPTION_MONITOR, true, 0);
             for (Slice expected : records) {
                 Slice actual = reader.readRecord();
                 assertEquals(actual, expected);

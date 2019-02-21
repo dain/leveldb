@@ -519,10 +519,9 @@ public class DbImpl
     {
         checkState(mutex.isHeldByCurrentThread());
         File file = new File(databaseDir, Filename.logFileName(fileNumber));
-        try (FileInputStream fis = new FileInputStream(file);
-                FileChannel channel = fis.getChannel()) {
+        try (FileInputStream fis = new FileInputStream(file)) {
             LogMonitor logMonitor = LogMonitors.logMonitor();
-            LogReader logReader = new LogReader(channel, logMonitor, true, 0);
+            LogReader logReader = new LogReader(fis, logMonitor, true, 0);
 
             // Log(options_.info_log, "Recovering log #%llu", (unsigned long long) log_number);
 

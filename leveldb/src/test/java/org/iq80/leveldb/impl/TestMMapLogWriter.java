@@ -22,7 +22,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.nio.channels.FileChannel;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
@@ -44,9 +43,9 @@ public class TestMMapLogWriter
 
             LogMonitor logMonitor = new AssertNoCorruptionLogMonitor();
 
-            FileChannel channel = new FileInputStream(file).getChannel();
+            FileInputStream fis = new FileInputStream(file);
 
-            LogReader logReader = new LogReader(channel, logMonitor, true, 0);
+            LogReader logReader = new LogReader(fis, logMonitor, true, 0);
 
             int count = 0;
             for (Slice slice = logReader.readRecord(); slice != null; slice = logReader.readRecord()) {

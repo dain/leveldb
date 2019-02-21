@@ -24,7 +24,7 @@ import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
 import java.io.IOException;
-import java.nio.channels.FileChannel;
+import java.io.InputStream;
 
 import static org.iq80.leveldb.impl.LogChunkType.BAD_CHUNK;
 import static org.iq80.leveldb.impl.LogChunkType.EOF;
@@ -37,8 +37,7 @@ import static org.iq80.leveldb.impl.Logs.getChunkChecksum;
 
 public class LogReader
 {
-    private final FileChannel fileChannel;
-
+    private final InputStream inputStream;
     private final LogMonitor monitor;
 
     private final boolean verifyChecksums;
@@ -49,7 +48,7 @@ public class LogReader
     private final long initialOffset;
 
     /**
-     * Have we read to the end of the file?
+     * Have we read to the end of the stream?
      */
     private boolean eof;
 
@@ -83,9 +82,9 @@ public class LogReader
      */
     private Slice currentChunk = Slices.EMPTY_SLICE;
 
-    public LogReader(FileChannel fileChannel, LogMonitor monitor, boolean verifyChecksums, long initialOffset)
+    public LogReader(InputStream inputStream, LogMonitor monitor, boolean verifyChecksums, long initialOffset)
     {
-        this.fileChannel = fileChannel;
+        this.inputStream = inputStream;
         this.monitor = monitor;
         this.verifyChecksums = verifyChecksums;
         this.initialOffset = initialOffset;
@@ -118,7 +117,7 @@ public class LogReader
         // Skip to start of first block that can contain the initial record
         if (blockStartLocation > 0) {
             try {
-                fileChannel.position(blockStartLocation);
+                inputStream.skip(blockStartLocation);
             }
             catch (IOException e) {
                 reportDrop(blockStartLocation, e);
@@ -310,7 +309,7 @@ public class LogReader
         // read the next full block
         while (blockScratch.writableBytes() > 0) {
             try {
-                int bytesRead = blockScratch.writeBytes(fileChannel, blockScratch.writableBytes());
+                int bytesRead = blockScratch.writeBytes(inputStream, blockScratch.writableBytes());
                 if (bytesRead < 0) {
                     // no more bytes to read
                     eof = true;
