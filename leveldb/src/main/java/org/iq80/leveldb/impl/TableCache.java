@@ -26,6 +26,7 @@ import org.iq80.leveldb.table.FileChannelTable;
 import org.iq80.leveldb.table.MMapTable;
 import org.iq80.leveldb.table.Table;
 import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Finalizer;
 import org.iq80.leveldb.util.InternalTableIterator;
 import org.iq80.leveldb.util.Slice;
@@ -120,14 +121,20 @@ public class TableCache
         {
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
-            try (FileInputStream fis = new FileInputStream(tableFile);
-                    FileChannel fileChannel = fis.getChannel()) {
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(tableFile);
+                FileChannel fileChannel = fis.getChannel();
                 if (Iq80DBFactory.USE_MMAP) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
                 }
                 else {
                     table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
                 }
+            }
+            catch (IOException ioe) {
+              Closeables.closeQuietly(fis);
+              throw ioe;
             }
         }
 
