@@ -127,6 +127,8 @@ public class TableCache
                 FileChannel fileChannel = fis.getChannel();
                 if (Iq80DBFactory.USE_MMAP) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                    // We can close the channel and input stream as the mapping does not need them
+                    Closeables.closeQuietly(fis);
                 }
                 else {
                     table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
