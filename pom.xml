@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.airlift</groupId>
         <artifactId>airbase</artifactId>
-        <version>77</version>
+        <version>95</version>
     </parent>
 
     <groupId>org.iq80.leveldb</groupId>
@@ -63,6 +63,8 @@
         <air.check.fail-checkstyle>${air.check.fail-basic}</air.check.fail-checkstyle>
 
         <air.javadoc.lint>-missing</air.javadoc.lint>
+        <air.license.header-file>src/license/LICENSE-HEADER.txt</air.license.header-file>
+        <air.checkstyle.config-file>${air.main.basedir}/src/checkstyle/checks.xml</air.checkstyle.config-file>
     </properties>
 
     <dependencyManagement>
@@ -86,7 +88,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.17</version>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
                         <phase>validate</phase>
