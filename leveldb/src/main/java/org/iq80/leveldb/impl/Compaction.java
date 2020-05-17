@@ -198,4 +198,7 @@ public class Compaction
     {
         return inputs;
     }
+    public static void main(String[] args) {
+		
+	}
 }
