@@ -54,11 +54,7 @@ import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.table.BlockHelper.afterString;
 import static org.iq80.leveldb.table.BlockHelper.assertSequence;
 import static org.iq80.leveldb.table.BlockHelper.beforeString;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 public class DbImplTest
 {
@@ -186,6 +182,35 @@ public class DbImplTest
         db.put("foo", "v1");
         db.compactMemTable();
         assertEquals(db.get("foo"), "v1");
+    }
+
+    @Test
+    public void testFileExtensionCompatible()
+            throws Exception
+    {
+        DbStringWrapper db = new DbStringWrapper(new Options(), databaseDir);
+        db.put("foo", "v1");
+        db.compactMemTable();
+        db.put("bar", "v1");
+        db.compactMemTable();
+        db.put("xvf", "v1");
+        db.compactMemTable();
+        ImmutableList<File> files = FileUtils.listFiles(databaseDir);
+        for (File file : files) {
+            Filename.FileInfo fileInfo = Filename.parseFileName(file);
+            assertNotNull(fileInfo);
+
+            if (fileInfo.getFileType().equals(Filename.FileType.TABLE)) {
+                assertTrue(file.getName().endsWith(".ldb"));
+                long fileNumber = fileInfo.getFileNumber();
+                File newFile = new File(databaseDir, Filename.sstTableFileName(fileNumber));
+                file.renameTo(newFile);
+            }
+        }
+        db.reopen();
+        assertEquals(db.get("foo"), "v1");
+        assertEquals(db.get("bar"), "v1");
+        assertEquals(db.get("xvf"), "v1");
     }
 
     @Test

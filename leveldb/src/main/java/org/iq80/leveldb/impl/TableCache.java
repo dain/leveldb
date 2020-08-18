@@ -121,6 +121,10 @@ public class TableCache
         {
             String tableFileName = Filename.tableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
+            if (!tableFile.exists()) {
+                tableFileName = Filename.sstTableFileName(fileNumber);
+                tableFile = new File(databaseDir, tableFileName);
+            }
             FileInputStream fis = null;
             try {
                 fis = new FileInputStream(tableFile);
