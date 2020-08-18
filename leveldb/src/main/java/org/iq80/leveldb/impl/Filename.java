@@ -61,7 +61,8 @@ public final class Filename
         return makeFileName(number, "ldb");
     }
 
-    public static String sstTableFileName(long number) {
+    public static String sstTableFileName(long number)
+    {
         return makeFileName(number, "sst");
     }
 
