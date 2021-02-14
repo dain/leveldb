@@ -172,3 +172,11 @@ factory.destroy(new File("example"), options);
 
 * [ActiveMQ Apollo](http://activemq.apache.org/apollo/): Defaults to using leveldbjni, but falls 
   back to this port if the jni port is not available on your platform.
+
+## Notes
+### Snappy compression
+
+In order to use this library with leveldb databases using Snappy compression,
+you need to also include one of the following libraries:
+* `org.xerial.snappy:snappy-java:1.1.8.4`
+* `org.iq80.snappy:snappy:0.4`
