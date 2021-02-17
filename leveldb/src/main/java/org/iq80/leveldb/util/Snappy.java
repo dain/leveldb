@@ -231,6 +231,10 @@ public final class Snappy
     public static void uncompress(ByteBuffer compressed, ByteBuffer uncompressed)
             throws IOException
     {
+        if (SNAPPY == null) {
+            throw new RuntimeException("This is a compressed database, and snappy library is not found in your classpath!" +
+                                               "See more: https://github.com/dain/leveldb/#snappy-compression");
+        }
         SNAPPY.uncompress(compressed, uncompressed);
     }
 
