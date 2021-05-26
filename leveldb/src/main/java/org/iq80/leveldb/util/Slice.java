@@ -43,6 +43,10 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_SHORT;
 public final class Slice
         implements Comparable<Slice>
 {
+    // compressed will return compressed slice when data.length - length >= 1kb
+    // this will avoid oom ex when append too large file metadata
+    static final int COMPRESSION_THRESHOLD = 1024 ;
+
     private final byte[] data;
     private final int offset;
     private final int length;
@@ -716,5 +720,14 @@ public final class Slice
         return getClass().getSimpleName() + '(' +
                 "length=" + length() +
                 ')';
+    }
+
+    // get compressed slice
+    public Slice compressed() {
+        if(this.data.length - length < COMPRESSION_THRESHOLD)
+            return this;
+        byte[] tmp = new byte[this.length];
+        System.arraycopy(data, offset, tmp, 0, length);
+        return new Slice(tmp);
     }
 }

@@ -48,8 +48,8 @@ public class FileMetaData
     {
         this.number = number;
         this.fileSize = fileSize;
-        this.smallest = smallest;
-        this.largest = largest;
+        this.smallest = smallest.compressed();
+        this.largest = largest.compressed();
     }
 
     public long getFileSize()
