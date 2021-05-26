@@ -140,4 +140,9 @@ public class InternalKey
     {
         return data.slice(0, data.length() - SIZE_OF_LONG);
     }
+
+    public InternalKey compressed()
+    {
+        return new InternalKey(this.userKey.compressed(), sequenceNumber, valueType);
+    }
 }
