@@ -43,7 +43,7 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_SHORT;
 public final class Slice
         implements Comparable<Slice>
 {
-    static final int COMPRESSION_THRESHOLD = 1024 ;
+    static final int COMPRESSION_THRESHOLD = 1024;
 
     private final byte[] data;
     private final int offset;
@@ -720,9 +720,12 @@ public final class Slice
                 ')';
     }
 
-    // get compressed slice
-    public Slice compressed() {
-        if(this.data.length - length < COMPRESSION_THRESHOLD) {
+    /**
+     * get compressed slice if data.length - length >= 1kb
+     */
+    public Slice compressed()
+    {
+        if (this.data.length - length < COMPRESSION_THRESHOLD) {
             return this;
         }
         return new Slice(getBytes());
