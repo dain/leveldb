@@ -726,8 +726,6 @@ public final class Slice
     public Slice compressed() {
         if(this.data.length - length < COMPRESSION_THRESHOLD)
             return this;
-        byte[] tmp = new byte[this.length];
-        System.arraycopy(data, offset, tmp, 0, length);
-        return new Slice(tmp);
+        return new Slice(getBytes());
     }
 }
