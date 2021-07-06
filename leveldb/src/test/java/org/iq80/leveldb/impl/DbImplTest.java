@@ -20,6 +20,9 @@ package org.iq80.leveldb.impl;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.UnsignedBytes;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBComparator;
 import org.iq80.leveldb.DBIterator;
@@ -49,6 +52,7 @@ import java.util.Random;
 import static com.google.common.collect.Maps.immutableEntry;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
+import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
 import static org.iq80.leveldb.CompressionType.NONE;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
 import static org.iq80.leveldb.table.BlockHelper.afterString;
@@ -860,6 +864,44 @@ public class DbImplTest
         }
 
         assertFalse(seekingIterator.hasNext());
+    }
+
+    //@Test
+    // test for local
+    public void testHugeManifest()
+    {
+        DB database;
+        Path db = Paths.get("/data/halibobo", "account");
+        File file = db.toFile();
+        org.iq80.leveldb.Options dbOptions = new org.iq80.leveldb.Options();
+        dbOptions.createIfMissing(true);
+        dbOptions.paranoidChecks(true);
+        dbOptions.verifyChecksums(true);
+        dbOptions.compressionType(CompressionType.SNAPPY);
+        dbOptions.blockSize(4 * 1024);
+        dbOptions.writeBufferSize(10 * 1024 * 1024);
+        dbOptions.cacheSize(10 * 1024 * 1024L);
+        dbOptions.maxOpenFiles(1000);
+        try {
+            long s = System.currentTimeMillis();
+            database = factory.open(file, dbOptions);
+            long e = System.currentTimeMillis();
+            System.out.println("open cost :" + (e -s) );
+            int sum = 0;
+            DBIterator iterable = database.iterator();
+            iterable.seekToFirst();
+            while (iterable.hasNext()) {
+                iterable.next();
+                sum++;
+            }
+            long ee = System.currentTimeMillis();
+            System.out.println("ite cost: " +(ee -e));
+            iterable.close();
+            database.close();
+            System.out.println(sum);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @SafeVarargs
