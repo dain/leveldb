@@ -866,17 +866,18 @@ public class DbImplTest
         assertFalse(seekingIterator.hasNext());
     }
 
-    //@Test
+    @Test
     // test for local
     public void testHugeManifest()
     {
         DB database;
-        Path db = Paths.get("/data/halibobo", "account");
+        Path db = Paths.get("/tmp/leveldb", "account");
         File file = db.toFile();
         org.iq80.leveldb.Options dbOptions = new org.iq80.leveldb.Options();
         dbOptions.createIfMissing(true);
         dbOptions.paranoidChecks(true);
         dbOptions.verifyChecksums(true);
+        //dbOptions.maxBatchSize(-1);
         dbOptions.compressionType(CompressionType.SNAPPY);
         dbOptions.blockSize(4 * 1024);
         dbOptions.writeBufferSize(10 * 1024 * 1024);
@@ -898,7 +899,7 @@ public class DbImplTest
             System.out.println("ite cost: " +(ee -e));
             iterable.close();
             database.close();
-            System.out.println(sum);
+            System.out.println("record:" + sum);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
+import org.iq80.leveldb.Options;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.InternalIterator;
 import org.iq80.leveldb.util.Level0Iterator;
@@ -43,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -61,7 +63,7 @@ public class VersionSet
     private static final int L0_COMPACTION_TRIGGER = 4;
 
     public static final int TARGET_FILE_SIZE = 2 * 1048576;
-    public static final int BATCH_SIZE = 1_000_000;
+    // public static final int BATCH_SIZE = 1_000_000;
 
     // Maximum bytes of overlaps in grandparent (i.e., level+2) before we
     // stop building a single file in a level.level+1 compaction.
@@ -82,11 +84,14 @@ public class VersionSet
     private LogWriter descriptorLog;
     private final Map<Integer, InternalKey> compactPointers = new TreeMap<>();
 
-    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    private final Options options;
+
+    public VersionSet(File databaseDir, TableCache tableCache, Options options, InternalKeyComparator internalKeyComparator)
         throws IOException
     {
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
+        this.options = options;
         this.internalKeyComparator = internalKeyComparator;
         appendVersion(new Version(this));
 
@@ -133,7 +138,7 @@ public class VersionSet
         }
 
         Set<Version> versions = activeVersions.keySet();
-        // TODO:
+        // TODO: yes this is good idea snapshots
         // log("DB closed with "+versions.size()+" open snapshots. This could mean your application has a resource leak.");
     }
 
@@ -354,9 +359,10 @@ public class VersionSet
             Builder builder = new Builder(this, current);
 
             LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
+            VersionEdit edit;
             for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
                 // read version edit
-                VersionEdit edit = new VersionEdit(record);
+                edit = new VersionEdit(record);
 
                 // verify comparator
                 // todo implement user comparator
@@ -367,7 +373,7 @@ public class VersionSet
 
                 // apply edit
                 builder.apply(edit);
-                if (builder.batchSize > BATCH_SIZE) {
+                if (builder.batchSize > options.maxBatchSize()) {
                     Version version = new Version(this);
                     builder.saveTo(version);
 
@@ -726,8 +732,12 @@ public class VersionSet
             for (Entry<Integer, Long> entry : edit.getDeletedFiles().entries()) {
                 Integer level = entry.getKey();
                 Long fileNumber = entry.getValue();
-                levels.get(level).deletedFiles.add(fileNumber);
-                // todo missing update to addedFiles?
+                LevelState levelState = levels.get(level);
+                //levelState.deletedFiles.add(fileNumber);
+                if (levelState.addedFiles_.remove(fileNumber) !=null){
+                    batchSize--;
+                }
+                ;
             }
 
             // Add new files
@@ -754,8 +764,8 @@ public class VersionSet
                 }
                 fileMetaData.setAllowedSeeks(allowedSeeks);
 
-                levels.get(level).deletedFiles.remove(fileMetaData.getNumber());
-                levels.get(level).addedFiles.add(fileMetaData);
+                //levels.get(level).deletedFiles.remove(fileMetaData.getNumber());
+                levels.get(level).addedFiles_.put(fileMetaData.getNumber(),fileMetaData);
                 batchSize++;
             }
         }
@@ -775,6 +785,7 @@ public class VersionSet
                 if (baseFiles == null) {
                     baseFiles = ImmutableList.of();
                 }
+                levels.get(level).addedFiles.addAll(levels.get(level).addedFiles_.values());
                 SortedSet<FileMetaData> addedFiles = levels.get(level).addedFiles;
                 if (addedFiles == null) {
                     addedFiles = ImmutableSortedSet.of();
@@ -845,11 +856,13 @@ public class VersionSet
         private static class LevelState
         {
             private final SortedSet<FileMetaData> addedFiles;
+            private final SortedMap<Long, FileMetaData> addedFiles_;
             private final Set<Long> deletedFiles = new HashSet<Long>();
 
             public LevelState(InternalKeyComparator internalKeyComparator)
             {
                 addedFiles = new TreeSet<FileMetaData>(new FileMetaDataBySmallestKey(internalKeyComparator));
+                addedFiles_ = new TreeMap<>();
             }
 
             @Override

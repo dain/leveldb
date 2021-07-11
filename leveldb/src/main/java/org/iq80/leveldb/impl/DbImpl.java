@@ -177,7 +177,7 @@ public class DbImpl
                 checkArgument(!options.errorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
 
-            versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
+            versions = new VersionSet(databaseDir, tableCache, options, internalKeyComparator);
 
             // load  (and recover) current version
             versions.recover();
