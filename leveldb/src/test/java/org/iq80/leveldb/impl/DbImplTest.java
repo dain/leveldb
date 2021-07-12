@@ -877,12 +877,13 @@ public class DbImplTest
         dbOptions.createIfMissing(true);
         dbOptions.paranoidChecks(true);
         dbOptions.verifyChecksums(true);
-        //dbOptions.maxBatchSize(-1);
+        dbOptions.maxBatchSize(7500);
         dbOptions.compressionType(CompressionType.SNAPPY);
         dbOptions.blockSize(4 * 1024);
         dbOptions.writeBufferSize(10 * 1024 * 1024);
         dbOptions.cacheSize(10 * 1024 * 1024L);
         dbOptions.maxOpenFiles(1000);
+        dbOptions.fast(true);
         try {
             long s = System.currentTimeMillis();
             database = factory.open(file, dbOptions);
@@ -897,9 +898,10 @@ public class DbImplTest
             }
             long ee = System.currentTimeMillis();
             System.out.println("ite cost: " +(ee -e));
+
+            System.out.println("record:" + sum);
             iterable.close();
             database.close();
-            System.out.println("record:" + sum);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -34,7 +34,9 @@ public class Options
     private Logger logger;
     private long cacheSize;
 
-    private int maxBatchSize = 1_000_000;
+    private int maxBatchSize = 52_000;
+
+    private boolean fast;
 
     static void checkArgNotNull(Object value, String name)
     {
@@ -187,6 +189,18 @@ public class Options
             maxBatchSize = Integer.MAX_VALUE;
         }
         this.maxBatchSize = maxBatchSize;
+        return this;
+    }
+
+    public boolean fast()
+    {
+        return fast;
+    }
+
+    public Options fast(boolean fast)
+    {
+        maxBatchSize = Integer.MAX_VALUE;
+        this.fast = fast;
         return this;
     }
 }

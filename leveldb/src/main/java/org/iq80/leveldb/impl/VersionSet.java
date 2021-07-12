@@ -732,7 +732,11 @@ public class VersionSet
             for (Entry<Integer, Long> entry : edit.getDeletedFiles().entries()) {
                 Integer level = entry.getKey();
                 Long fileNumber = entry.getValue();
-                levels.get(level).deletedFiles.add(fileNumber);
+                if (!versionSet.options.fast()) {
+                    levels.get(level).deletedFiles.add(fileNumber);
+                    batchSize++;
+                }
+
                 // todo missing update to addedFiles?
             }
 
@@ -760,8 +764,13 @@ public class VersionSet
                 }
                 fileMetaData.setAllowedSeeks(allowedSeeks);
 
-                levels.get(level).deletedFiles.remove(fileMetaData.getNumber());
-                levels.get(level).addedFiles.add(fileMetaData);
+                if (!versionSet.options.fast()) {
+                    if (levels.get(level).deletedFiles.remove(fileMetaData.getNumber())) {
+                        batchSize--;
+                    }
+                }
+                //levels.get(level).addedFiles.add(fileMetaData);
+                levels.get(level).addedFiles_.put(fileMetaData.getNumber(),fileMetaData);
                 batchSize++;
             }
         }
