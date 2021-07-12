@@ -888,7 +888,7 @@ public class DbImplTest
             long s = System.currentTimeMillis();
             database = factory.open(file, dbOptions);
             long e = System.currentTimeMillis();
-            System.out.println("open cost :" + (e -s) );
+            System.out.println("open cost :" + (e - s));
             int sum = 0;
             DBIterator iterable = database.iterator();
             iterable.seekToFirst();
@@ -897,12 +897,13 @@ public class DbImplTest
                 sum++;
             }
             long ee = System.currentTimeMillis();
-            System.out.println("ite cost: " +(ee -e));
+            System.out.println("ite cost: " + (ee - e));
 
             System.out.println("record:" + sum);
             iterable.close();
             database.close();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }

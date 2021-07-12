@@ -738,6 +738,10 @@ public class VersionSet
                 }
 
                 // todo missing update to addedFiles?
+                // missing update to addedFiles for open db to release resource
+                if (levels.get(level).addedFilesMap.remove(fileNumber) != null) {
+                    batchSize--;
+                }
             }
 
             // Add new files
@@ -770,7 +774,7 @@ public class VersionSet
                     }
                 }
                 //levels.get(level).addedFiles.add(fileMetaData);
-                levels.get(level).addedFiles_.put(fileMetaData.getNumber(),fileMetaData);
+                levels.get(level).addedFilesMap.put(fileMetaData.getNumber(), fileMetaData);
                 batchSize++;
             }
         }
@@ -790,6 +794,7 @@ public class VersionSet
                 if (baseFiles == null) {
                     baseFiles = ImmutableList.of();
                 }
+                levels.get(level).addedFiles.addAll(levels.get(level).addedFilesMap.values());
                 SortedSet<FileMetaData> addedFiles = levels.get(level).addedFiles;
                 if (addedFiles == null) {
                     addedFiles = ImmutableSortedSet.of();
@@ -860,13 +865,13 @@ public class VersionSet
         private static class LevelState
         {
             private final SortedSet<FileMetaData> addedFiles;
-            private final SortedMap<Long, FileMetaData> addedFiles_;
+            private final SortedMap<Long, FileMetaData> addedFilesMap;
             private final Set<Long> deletedFiles = new HashSet<Long>();
 
             public LevelState(InternalKeyComparator internalKeyComparator)
             {
                 addedFiles = new TreeSet<FileMetaData>(new FileMetaDataBySmallestKey(internalKeyComparator));
-                addedFiles_ = new TreeMap<>();
+                addedFilesMap = new TreeMap<>();
             }
 
             @Override
