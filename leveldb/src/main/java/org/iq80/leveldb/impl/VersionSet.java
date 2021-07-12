@@ -732,12 +732,8 @@ public class VersionSet
             for (Entry<Integer, Long> entry : edit.getDeletedFiles().entries()) {
                 Integer level = entry.getKey();
                 Long fileNumber = entry.getValue();
-                LevelState levelState = levels.get(level);
-                //levelState.deletedFiles.add(fileNumber);
-                if (levelState.addedFiles_.remove(fileNumber) !=null){
-                    batchSize--;
-                }
-                ;
+                levels.get(level).deletedFiles.add(fileNumber);
+                // todo missing update to addedFiles?
             }
 
             // Add new files
@@ -764,8 +760,8 @@ public class VersionSet
                 }
                 fileMetaData.setAllowedSeeks(allowedSeeks);
 
-                //levels.get(level).deletedFiles.remove(fileMetaData.getNumber());
-                levels.get(level).addedFiles_.put(fileMetaData.getNumber(),fileMetaData);
+                levels.get(level).deletedFiles.remove(fileMetaData.getNumber());
+                levels.get(level).addedFiles.add(fileMetaData);
                 batchSize++;
             }
         }
@@ -785,7 +781,6 @@ public class VersionSet
                 if (baseFiles == null) {
                     baseFiles = ImmutableList.of();
                 }
-                levels.get(level).addedFiles.addAll(levels.get(level).addedFiles_.values());
                 SortedSet<FileMetaData> addedFiles = levels.get(level).addedFiles;
                 if (addedFiles == null) {
                     addedFiles = ImmutableSortedSet.of();
