@@ -877,19 +877,20 @@ public class DbImplTest
         dbOptions.createIfMissing(true);
         dbOptions.paranoidChecks(true);
         dbOptions.verifyChecksums(true);
-        dbOptions.maxBatchSize(7500);
+        dbOptions.maxBatchSize(64_000);
         dbOptions.compressionType(CompressionType.SNAPPY);
         dbOptions.blockSize(4 * 1024);
         dbOptions.writeBufferSize(10 * 1024 * 1024);
         dbOptions.cacheSize(10 * 1024 * 1024L);
-        dbOptions.maxOpenFiles(1000);
+        dbOptions.maxOpenFiles(100_000);
         dbOptions.fast(true);
+        dbOptions.maxManifestSize(256);
         try {
             long s = System.currentTimeMillis();
             database = factory.open(file, dbOptions);
             long e = System.currentTimeMillis();
             System.out.println("open cost :" + (e - s));
-            int sum = 0;
+            /*int sum = 0;
             DBIterator iterable = database.iterator();
             iterable.seekToFirst();
             while (iterable.hasNext()) {
@@ -900,7 +901,7 @@ public class DbImplTest
             System.out.println("ite cost: " + (ee - e));
 
             System.out.println("record:" + sum);
-            iterable.close();
+            iterable.close();*/
             database.close();
         }
         catch (Exception e) {

@@ -38,6 +38,9 @@ public class Options
 
     private boolean fast;
 
+    //M
+    private int maxManifestSize = 128;
+
     static void checkArgNotNull(Object value, String name)
     {
         if (value == null) {
@@ -199,8 +202,26 @@ public class Options
 
     public Options fast(boolean fast)
     {
-        maxBatchSize = Integer.MAX_VALUE;
+        if (fast) {
+            maxBatchSize = Integer.MAX_VALUE;
+        }
+
         this.fast = fast;
+        return this;
+    }
+
+    public int maxManifestSize()
+    {
+        return maxManifestSize;
+    }
+
+    public Options maxManifestSize(int maxManifestSize)
+    {
+        if (maxManifestSize < 0) {
+            fast(false);
+            maxBatchSize(-1);
+        }
+        this.maxManifestSize = maxManifestSize;
         return this;
     }
 }

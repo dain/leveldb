@@ -768,10 +768,8 @@ public class VersionSet
                 }
                 fileMetaData.setAllowedSeeks(allowedSeeks);
 
-                if (!versionSet.options.fast()) {
-                    if (levels.get(level).deletedFiles.remove(fileMetaData.getNumber())) {
-                        batchSize--;
-                    }
+                if (levels.get(level).deletedFiles.remove(fileMetaData.getNumber())) {
+                    batchSize--;
                 }
                 //levels.get(level).addedFiles.add(fileMetaData);
                 levels.get(level).addedFilesMap.put(fileMetaData.getNumber(), fileMetaData);
