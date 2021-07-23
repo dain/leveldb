@@ -33,6 +33,7 @@ public class Options
     private DBComparator comparator;
     private Logger logger;
     private long cacheSize;
+    private long bitsPerKey;
 
     private int maxBatchSize = 52_000;
 
@@ -178,6 +179,17 @@ public class Options
     public Options paranoidChecks(boolean paranoidChecks)
     {
         this.paranoidChecks = paranoidChecks;
+        return this;
+    }
+
+    public long bitsPerKey()
+    {
+        return cacheSize;
+    }
+
+    public Options bitsPerKey(long bitsPerKey)
+    {
+        this.bitsPerKey = bitsPerKey;
         return this;
     }
 
