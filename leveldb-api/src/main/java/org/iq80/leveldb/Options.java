@@ -184,7 +184,7 @@ public class Options
 
     public long bitsPerKey()
     {
-        return cacheSize;
+        return bitsPerKey;
     }
 
     public Options bitsPerKey(long bitsPerKey)
