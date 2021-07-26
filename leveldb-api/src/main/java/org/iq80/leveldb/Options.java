@@ -33,11 +33,9 @@ public class Options
     private DBComparator comparator;
     private Logger logger;
     private long cacheSize;
-    private long bitsPerKey;
+    private int bitsPerKey;
 
     private int maxBatchSize = 52_000;
-
-    private boolean fast;
 
     //M
     private int maxManifestSize = 128;
@@ -182,12 +180,12 @@ public class Options
         return this;
     }
 
-    public long bitsPerKey()
+    public int bitsPerKey()
     {
         return bitsPerKey;
     }
 
-    public Options bitsPerKey(long bitsPerKey)
+    public Options bitsPerKey(int bitsPerKey)
     {
         this.bitsPerKey = bitsPerKey;
         return this;
@@ -207,21 +205,6 @@ public class Options
         return this;
     }
 
-    public boolean fast()
-    {
-        return fast;
-    }
-
-    public Options fast(boolean fast)
-    {
-        if (fast) {
-            maxBatchSize = Integer.MAX_VALUE;
-        }
-
-        this.fast = fast;
-        return this;
-    }
-
     public int maxManifestSize()
     {
         return maxManifestSize;
@@ -230,7 +213,7 @@ public class Options
     public Options maxManifestSize(int maxManifestSize)
     {
         if (maxManifestSize < 0) {
-            fast(false);
+            maxManifestSize = -1;
             maxBatchSize(-1);
         }
         this.maxManifestSize = maxManifestSize;

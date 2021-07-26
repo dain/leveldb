@@ -732,12 +732,11 @@ public class VersionSet
             for (Entry<Integer, Long> entry : edit.getDeletedFiles().entries()) {
                 Integer level = entry.getKey();
                 Long fileNumber = entry.getValue();
-                if (!versionSet.options.fast()) {
-                    levels.get(level).deletedFiles.add(fileNumber);
-                    batchSize++;
-                }
 
-                // todo missing update to addedFiles?
+                levels.get(level).deletedFiles.add(fileNumber);
+                batchSize++;
+
+
                 // missing update to addedFiles for open db to release resource
                 if (levels.get(level).addedFilesMap.remove(fileNumber) != null) {
                     batchSize--;
@@ -771,7 +770,6 @@ public class VersionSet
                 if (levels.get(level).deletedFiles.remove(fileMetaData.getNumber())) {
                     batchSize--;
                 }
-                //levels.get(level).addedFiles.add(fileMetaData);
                 levels.get(level).addedFilesMap.put(fileMetaData.getNumber(), fileMetaData);
                 batchSize++;
             }
