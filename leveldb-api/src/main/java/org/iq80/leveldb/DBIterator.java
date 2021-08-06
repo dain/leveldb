@@ -62,4 +62,28 @@ public interface DBIterator
      * Repositions the iterator so it is at the end of of the Database.
      */
     void seekToLast();
+
+    /**
+     * An iterator is either positioned at a key/value pair, or
+     *  not valid.  This method returns true iff the iterator is valid.
+     * @return
+     */
+    boolean  Valid();
+
+    /**
+     * Return the key for the current entry.  The underlying storage for
+     * the returned slice is valid only until the next modification of
+     * the iterator.
+     * REQUIRES: Valid()
+     */
+   byte[] key();
+
+    /**
+     * Return the value for the current entry.  The underlying storage for
+     * the returned slice is valid only until the next modification of
+     * the iterator.
+     * REQUIRES: Valid()
+     */
+
+    byte[] value();
 }
