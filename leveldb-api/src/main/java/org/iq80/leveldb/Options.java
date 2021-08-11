@@ -40,6 +40,10 @@ public class Options
     //M
     private int maxManifestSize = 128;
 
+    private boolean reuseLogs = false;
+
+    private long maxFileSize = 2 * 1024 * 1024;
+
     static void checkArgNotNull(Object value, String name)
     {
         if (value == null) {
@@ -217,6 +221,28 @@ public class Options
             maxBatchSize(-1);
         }
         this.maxManifestSize = maxManifestSize;
+        return this;
+    }
+
+    public boolean reuseLogs()
+    {
+        return reuseLogs;
+    }
+
+    public Options reuseLogs(boolean reuseLogs)
+    {
+        this.reuseLogs = reuseLogs;
+        return this;
+    }
+
+    public long maxFileSize()
+    {
+        return maxFileSize;
+    }
+
+    public Options maxFileSize(long maxFileSize)
+    {
+        this.maxFileSize = maxFileSize;
         return this;
     }
 }
