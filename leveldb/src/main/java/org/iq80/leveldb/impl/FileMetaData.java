@@ -17,6 +17,8 @@
  */
 package org.iq80.leveldb.impl;
 
+import org.iq80.leveldb.util.Slice;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class FileMetaData
@@ -48,8 +50,14 @@ public class FileMetaData
     {
         this.number = number;
         this.fileSize = fileSize;
-        this.smallest = smallest;
-        this.largest = largest;
+        // Copy bytes of the key from slice so the byte array backing the slice can be freed.
+        // This is necessary to avoid pinning down the byte array which could be large because of
+        // containing both key and value.
+        this.smallest = new InternalKey(new Slice(smallest.getUserKey().getBytes()),
+                                        smallest.getSequenceNumber(), smallest.getValueType());
+
+        this.largest = new InternalKey(new Slice(largest.getUserKey().getBytes()),
+                                       largest.getSequenceNumber(), largest.getValueType());
     }
 
     public long getFileSize()
