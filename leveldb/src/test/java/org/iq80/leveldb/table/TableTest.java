@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -168,7 +169,7 @@ public abstract class TableTest
     private void reopenFile()
             throws IOException
     {
-        file = File.createTempFile("table", ".db");
+        file = Files.createTempFile("table", ".db").toFile();
         file.delete();
         randomAccessFile = new RandomAccessFile(file, "rw");
         fileChannel = randomAccessFile.getChannel();
