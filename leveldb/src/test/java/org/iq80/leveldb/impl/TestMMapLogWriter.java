@@ -23,6 +23,7 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
@@ -33,7 +34,7 @@ public class TestMMapLogWriter
     public void testLogRecordBounds()
             throws Exception
     {
-        File file = File.createTempFile("test", ".log");
+        File file = Files.createTempFile("test", ".log").toFile();
         try {
             int recordSize = LogConstants.BLOCK_SIZE - LogConstants.HEADER_SIZE;
             Slice record = new Slice(recordSize);
